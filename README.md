@@ -74,3 +74,22 @@ lib/
 ├── services/
 └── main.dart
 
+
+### 👥 Development
+
+IDireksyon is an undergraduate capstone project developed by a student team.
+
+The project is currently under active development. Features, interfaces, and system components may change as development and evaluation progress.
+
+📌 Project Status
+
+In Development
+
+Current development focus:
+
+Resident mobile application
+User interface implementation
+Personalized roadmap
+Government ID information
+Backend API integration
+Smart sequencing logic
