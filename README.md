@@ -73,9 +73,9 @@ lib/
 ├── admin/
 ├── services/
 └── main.dart
+```
 
-
-### 👥 Development
+## 👥 Development
 
 IDireksyon is an undergraduate capstone project developed by a student team.
 
