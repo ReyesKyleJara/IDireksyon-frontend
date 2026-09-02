@@ -87,9 +87,9 @@ In Development
 
 Current development focus:
 
-Resident mobile application
-User interface implementation
-Personalized roadmap
-Government ID information
-Backend API integration
-Smart sequencing logic
+- Resident mobile application
+- User interface implementation
+- Personalized roadmap
+- Government ID information
+- Backend API integration
+- Smart sequencing logic
