@@ -96,7 +96,7 @@ class _ResidentAppShellState extends State<ResidentAppShell> {
             BottomNavigationBarItem(
               icon: Icon(Icons.badge_outlined),
               activeIcon: Icon(Icons.badge),
-              label: 'IDs',
+              label: 'Directory',
             ),
 
             BottomNavigationBarItem(
