@@ -10,7 +10,6 @@ class RoadmapScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final backgroundColor = theme.scaffoldBackgroundColor;
     final cardColor = isDark
         ? theme.colorScheme.surfaceContainerHighest
         : Colors.white;
@@ -24,9 +23,11 @@ class RoadmapScreen extends StatelessWidget {
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
+          // ----------------------------------------------------------
           // HEADER
+          // ----------------------------------------------------------
           Text(
             'Roadmap',
             style: TextStyle(
@@ -47,9 +48,11 @@ class RoadmapScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
+          // ----------------------------------------------------------
           // CURRENT GOAL
+          // ----------------------------------------------------------
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: BorderRadius.circular(16),
@@ -69,8 +72,8 @@ class RoadmapScreen extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: primaryBlue.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
@@ -78,7 +81,7 @@ class RoadmapScreen extends StatelessWidget {
                   child: const Icon(
                     Icons.flag_outlined,
                     color: primaryBlue,
-                    size: 25,
+                    size: 24,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -89,7 +92,7 @@ class RoadmapScreen extends StatelessWidget {
                       Text(
                         'CURRENT GOAL',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.8,
                           color: secondaryTextColor,
@@ -99,7 +102,7 @@ class RoadmapScreen extends StatelessWidget {
                       Text(
                         'Get a Philippine Passport',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w800,
                           color: textColor,
                         ),
@@ -107,105 +110,131 @@ class RoadmapScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                Icon(
+                  Icons.chevron_right,
+                  size: 22,
+                  color: secondaryTextColor.withValues(alpha: 0.6),
+                ),
               ],
             ),
           ),
 
           const SizedBox(height: 20),
 
+          // ----------------------------------------------------------
           // PROGRESS
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: primaryBlue,
-              borderRadius: BorderRadius.circular(16),
+          // ----------------------------------------------------------
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Progress',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                ),
+              ),
+              Text(
+                '3 of 5 completed',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: secondaryTextColor,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: 0.6,
+              minHeight: 8,
+              backgroundColor: isDark
+                  ? Colors.grey.shade800
+                  : Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isDark
+                    ? Colors.blue.shade300
+                    : primaryBlue,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Your Progress',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      '3 of 5 steps',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+          ),
 
-                const SizedBox(height: 14),
+          const SizedBox(height: 6),
 
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: 0.6,
-                    minHeight: 8,
-                    backgroundColor:
-                        Colors.white.withValues(alpha: 0.2),
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(
-                      Colors.white,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-
-                Text(
-                  'You are making progress!',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+          Text(
+            'You are 60% through your current journey.',
+            style: TextStyle(
+              fontSize: 11,
+              color: secondaryTextColor,
             ),
           ),
 
           const SizedBox(height: 28),
 
-          // NEXT STEP HEADER
-          Text(
-            'Next Step',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: textColor,
-            ),
+          // ----------------------------------------------------------
+          // NEXT STEP
+          // ----------------------------------------------------------
+          Row(
+            children: [
+              Text(
+                'Next Step',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: primaryBlue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'READY',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: isDark
+                        ? Colors.blue.shade300
+                        : primaryBlue,
+                  ),
+                ),
+              ),
+            ],
           ),
 
           const SizedBox(height: 12),
 
+          // ----------------------------------------------------------
           // NEXT STEP CARD
+          // ----------------------------------------------------------
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: primaryBlue.withValues(alpha: 0.25),
+                color: primaryBlue.withValues(alpha: 0.3),
                 width: 1.2,
               ),
               boxShadow: isDark
                   ? []
                   : [
                       BoxShadow(
-                        color: primaryBlue.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
+                        color: primaryBlue.withValues(alpha: 0.06),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
                     ],
             ),
@@ -213,11 +242,12 @@ class RoadmapScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
                         color: primaryBlue,
                         shape: BoxShape.circle,
                       ),
@@ -226,7 +256,7 @@ class RoadmapScreen extends StatelessWidget {
                           '3',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -234,13 +264,27 @@ class RoadmapScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        'Apply for Passport',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: textColor,
-                        ),
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Apply for Passport',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: textColor,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Step 3 of 5',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: secondaryTextColor,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -257,13 +301,15 @@ class RoadmapScreen extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 // WHY THIS STEP
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: primaryBlue.withValues(alpha: 0.05),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.04)
+                        : primaryBlue.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -271,20 +317,33 @@ class RoadmapScreen extends StatelessWidget {
                         CrossAxisAlignment.start,
                     children: [
                       Icon(
-                        Icons.lightbulb_outline,
-                        size: 19,
+                        Icons.info_outline,
+                        size: 18,
                         color: isDark
                             ? Colors.blue.shade300
                             : primaryBlue,
                       ),
                       const SizedBox(width: 9),
                       Expanded(
-                        child: Text(
-                          'Why this is your next step: your required documents are currently marked as available.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.4,
-                            color: secondaryTextColor,
+                        child: RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: secondaryTextColor,
+                            ),
+                            children: const [
+                              TextSpan(
+                                text: 'Why this is next: ',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              TextSpan(
+                                text:
+                                    'your required documents are currently marked as available.',
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -335,7 +394,9 @@ class RoadmapScreen extends StatelessWidget {
 
           const SizedBox(height: 30),
 
-          // JOURNEY HEADER
+          // ----------------------------------------------------------
+          // JOURNEY
+          // ----------------------------------------------------------
           Text(
             'Your Journey',
             style: TextStyle(
@@ -347,7 +408,6 @@ class RoadmapScreen extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // TIMELINE
           _buildTimelineStep(
             context: context,
             number: '1',
@@ -379,7 +439,7 @@ class RoadmapScreen extends StatelessWidget {
             context: context,
             number: '4',
             title: 'Complete Biometrics',
-            subtitle: 'After application',
+            subtitle: 'Locked until previous step is completed',
             status: RoadmapStatus.locked,
             isLast: false,
           ),
@@ -413,20 +473,19 @@ class RoadmapScreen extends StatelessWidget {
         theme.colorScheme.onSurfaceVariant;
 
     Color circleColor;
-    Color iconColor;
-
+    Color contentColor;
     IconData? icon;
 
     switch (status) {
       case RoadmapStatus.completed:
         circleColor = Colors.green.shade600;
-        iconColor = Colors.white;
+        contentColor = textColor;
         icon = Icons.check;
         break;
 
       case RoadmapStatus.current:
         circleColor = primaryBlue;
-        iconColor = Colors.white;
+        contentColor = textColor;
         icon = null;
         break;
 
@@ -434,15 +493,13 @@ class RoadmapScreen extends StatelessWidget {
         circleColor = isDark
             ? Colors.grey.shade700
             : Colors.grey.shade300;
-        iconColor = secondaryTextColor;
+        contentColor = secondaryTextColor;
         icon = Icons.lock_outline;
         break;
 
       case RoadmapStatus.upcoming:
-        circleColor = isDark
-            ? Colors.grey.shade700
-            : Colors.grey.shade300;
-        iconColor = secondaryTextColor;
+        circleColor = Colors.transparent;
+        contentColor = secondaryTextColor;
         icon = null;
         break;
     }
@@ -454,7 +511,9 @@ class RoadmapScreen extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // TIMELINE COLUMN
+        // ----------------------------------------------------------
+        // TIMELINE
+        // ----------------------------------------------------------
         SizedBox(
           width: 42,
           child: Column(
@@ -469,7 +528,7 @@ class RoadmapScreen extends StatelessWidget {
                       ? Border.all(
                           color: secondaryTextColor
                               .withValues(alpha: 0.3),
-                          width: 1,
+                          width: 1.5,
                         )
                       : null,
                 ),
@@ -477,13 +536,16 @@ class RoadmapScreen extends StatelessWidget {
                   child: icon != null
                       ? Icon(
                           icon,
-                          size: 17,
-                          color: iconColor,
+                          size: 16,
+                          color: status ==
+                                  RoadmapStatus.upcoming
+                              ? secondaryTextColor
+                              : Colors.white,
                         )
                       : Text(
                           number,
-                          style: TextStyle(
-                            color: iconColor,
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                           ),
@@ -494,7 +556,7 @@ class RoadmapScreen extends StatelessWidget {
               if (!isLast)
                 Container(
                   width: 2,
-                  height: 58,
+                  height: 64,
                   color: lineColor,
                 ),
             ],
@@ -503,7 +565,9 @@ class RoadmapScreen extends StatelessWidget {
 
         const SizedBox(width: 12),
 
-        // STEP CONTENT
+        // ----------------------------------------------------------
+        // CONTENT
+        // ----------------------------------------------------------
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(
@@ -511,7 +575,8 @@ class RoadmapScreen extends StatelessWidget {
               bottom: 24,
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
@@ -521,10 +586,7 @@ class RoadmapScreen extends StatelessWidget {
                         status == RoadmapStatus.current
                             ? FontWeight.w800
                             : FontWeight.w700,
-                    color: status == RoadmapStatus.locked ||
-                            status == RoadmapStatus.upcoming
-                        ? secondaryTextColor
-                        : textColor,
+                    color: contentColor,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -532,9 +594,11 @@ class RoadmapScreen extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     fontSize: 11,
-                    color: status == RoadmapStatus.completed
-                        ? Colors.green.shade600
-                        : secondaryTextColor,
+                    height: 1.35,
+                    color:
+                        status == RoadmapStatus.completed
+                            ? Colors.green.shade600
+                            : secondaryTextColor,
                     fontWeight:
                         status == RoadmapStatus.current
                             ? FontWeight.w600
