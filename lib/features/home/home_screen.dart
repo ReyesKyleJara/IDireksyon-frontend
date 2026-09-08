@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../ids/ids_screen.dart';
+import '../office_finder/office_finder_screen.dart';
+import '../profile/manage_inventory_screen.dart';
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -26,7 +30,7 @@ class HomeScreen extends StatelessWidget {
           _buildRecommendedId(
             context: context,
             title: 'Philippine Passport',
-            imageColor: const Color(0xFFD0E3F3).withValues(alpha: 0.8), 
+            imageColor: const Color(0xFFD0E3F3).withValues(alpha: 0.8),
           ),
           const SizedBox(height: 12),
 
@@ -49,10 +53,17 @@ class HomeScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                border: Border.all(color: primaryBlue, width: 2),
+                border: Border.all(
+                  color: primaryBlue,
+                  width: 2,
+                ),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(Icons.badge, color: primaryBlue, size: 20),
+              child: const Icon(
+                Icons.badge,
+                color: primaryBlue,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 8),
             const Text(
@@ -71,8 +82,7 @@ class HomeScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            // Removed hardcoded Colors.black so it naturally adapts to white in Dark Mode
-            color: Theme.of(context).colorScheme.onSurface, 
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ],
@@ -80,7 +90,6 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeroBanner(BuildContext context) {
-    // The Hero banner stays blue in both light and dark mode for brand consistency
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -138,7 +147,10 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 4),
-                      Icon(Icons.arrow_forward, size: 16),
+                      Icon(
+                        Icons.arrow_forward,
+                        size: 16,
+                      ),
                     ],
                   ),
                 ),
@@ -158,7 +170,10 @@ class HomeScreen extends StatelessWidget {
                 child: Text(
                   'SVG Graphic\nHere',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
@@ -181,32 +196,66 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+
         Row(
           children: [
+            // DOCUMENT INVENTORY
             Expanded(
               child: _buildQuickActionCard(
                 context: context,
                 icon: Icons.folder,
                 iconColor: Colors.blue.shade700,
                 label: 'Document\nInventory',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          const ManageInventoryScreen(),
+                    ),
+                  );
+                },
               ),
             ),
+
             const SizedBox(width: 12),
+
+            // OFFICE FINDER
             Expanded(
               child: _buildQuickActionCard(
                 context: context,
                 icon: Icons.location_on,
                 iconColor: Colors.red.shade600,
                 label: 'Office\nFinder',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          const OfficeFinderScreen(),
+                    ),
+                  );
+                },
               ),
             ),
+
             const SizedBox(width: 12),
+
+            // ID DIRECTORY
             Expanded(
               child: _buildQuickActionCard(
                 context: context,
                 icon: Icons.badge,
                 iconColor: Colors.orange.shade400,
                 label: 'ID\nDirectory',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const IdsScreen(),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -220,61 +269,97 @@ class HomeScreen extends StatelessWidget {
     required IconData icon,
     required Color iconColor,
     required String label,
+    required VoidCallback onTap,
   }) {
-    // Theme-aware colors for the card
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white;
-    final borderColor = isDark ? Colors.transparent : Colors.grey.shade200;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      height: 100,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      decoration: BoxDecoration(
-        color: cardColor,
+    final cardColor = isDark
+        ? Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+        : Colors.white;
+
+    final borderColor =
+        isDark ? Colors.transparent : Colors.grey.shade200;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
-        boxShadow: isDark ? [] : [ // Only show shadow in light mode
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+        child: Container(
+          height: 100,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 12,
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 28, color: iconColor),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              height: 1.2,
-              color: Theme.of(context).colorScheme.onSurface,
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: borderColor,
             ),
+            boxShadow: isDark
+                ? []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: 0.02,
+                      ),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
-        ],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 28,
+                color: iconColor,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildRecommendedHeader(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment:
+          MainAxisAlignment.spaceBetween,
+      crossAxisAlignment:
+          CrossAxisAlignment.end,
       children: [
         Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
             Text(
               'Recommended for you',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface,
               ),
             ),
             const SizedBox(height: 4),
@@ -282,18 +367,28 @@ class HomeScreen extends StatelessWidget {
               'Based on your profile and documents',
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant,
               ),
             ),
           ],
         ),
         InkWell(
-          onTap: () {},
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const IdsScreen(),
+              ),
+            );
+          },
           child: Text(
             'View All',
             style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? Colors.blue.shade300 
+              color: Theme.of(context).brightness ==
+                      Brightness.dark
+                  ? Colors.blue.shade300
                   : primaryBlue,
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -309,46 +404,79 @@ class HomeScreen extends StatelessWidget {
     required String title,
     required Color imageColor,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white;
-    final borderColor = isDark ? Colors.transparent : Colors.grey.shade200;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cardColor,
+    final cardColor = isDark
+        ? Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+        : Colors.white;
+
+    final borderColor =
+        isDark ? Colors.transparent : Colors.grey.shade200;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const IdsScreen(),
+            ),
+          );
+        },
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: imageColor,
-            ),
-            child: const Center(
-              child: Icon(Icons.image, color: Colors.black26),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: borderColor,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.onSurface,
+          child: Row(
+            children: [
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  borderRadius:
+                      BorderRadius.circular(8),
+                  color: imageColor,
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.image,
+                    color: Colors.black26,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant,
+              ),
+            ],
           ),
-          Icon(
-            Icons.chevron_right,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ],
+        ),
       ),
     );
   }
