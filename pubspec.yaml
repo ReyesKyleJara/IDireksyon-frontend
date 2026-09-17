@@ -10,15 +10,28 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
   cupertino_icons: ^1.0.8
-  google_fonts: ^6.2.1
+  flutter_map: ^6.1.0
+  geolocator: ^13.0.2
+  latlong2: ^0.9.0
+  http: ^1.2.2
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Google Sans
+      fonts:
+        - asset: assets/fonts/GoogleSans-Regular.woff2
+          weight: 400
+        - asset: assets/fonts/GoogleSans-Medium.woff2
+          weight: 500
+        - asset: assets/fonts/GoogleSans-SemiBold.woff2
+          weight: 600
+        - asset: assets/fonts/GoogleSans-Bold.woff2
+          weight: 700
