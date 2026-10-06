@@ -1,3 +1,5 @@
+import '../../core/widgets/app_motion.dart';
+
 import 'package:flutter/material.dart';
 
 class ManageInventoryScreen extends StatefulWidget {
@@ -19,33 +21,18 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
   };
 
   final List<_InventoryOption> _ids = [
-    _InventoryOption(
-      title: 'PhilSys ID',
-      icon: Icons.badge_rounded,
-    ),
-    _InventoryOption(
-      title: 'Passport ID',
-      icon: Icons.menu_book_rounded,
-    ),
-    _InventoryOption(
-      title: 'SSS ID',
-      icon: Icons.credit_card_rounded,
-    ),
+    _InventoryOption(title: 'PhilSys ID', icon: Icons.badge_rounded),
+    _InventoryOption(title: 'Passport ID', icon: Icons.menu_book_rounded),
+    _InventoryOption(title: 'SSS ID', icon: Icons.credit_card_rounded),
     _InventoryOption(
       title: 'PhilHealth ID',
       icon: Icons.health_and_safety_rounded,
     ),
-    _InventoryOption(
-      title: 'UMID',
-      icon: Icons.credit_card_rounded,
-    ),
+    _InventoryOption(title: 'UMID', icon: Icons.credit_card_rounded),
   ];
 
   final List<_InventoryOption> _documents = [
-    _InventoryOption(
-      title: 'School ID',
-      icon: Icons.school_rounded,
-    ),
+    _InventoryOption(title: 'School ID', icon: Icons.school_rounded),
     _InventoryOption(
       title: 'Birth Certificate',
       icon: Icons.description_rounded,
@@ -67,9 +54,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
   }
 
   int get _selectedIdCount {
-    return _ids
-        .where((item) => _selectedItems.contains(item.title))
-        .length;
+    return _ids.where((item) => _selectedItems.contains(item.title)).length;
   }
 
   int get _selectedDocumentCount {
@@ -93,10 +78,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_rounded,
-            color: colorScheme.onSurface,
-          ),
+          icon: Icon(Icons.arrow_back_rounded, color: colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -112,10 +94,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
             onPressed: _saveInventory,
             child: const Text(
               'Save',
-              style: TextStyle(
-                color: primaryBlue,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(color: primaryBlue, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -155,12 +134,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
 
           const SizedBox(height: 12),
 
-          ..._ids.map(
-            (item) => _buildChecklistItem(
-              item,
-              colorScheme,
-            ),
-          ),
+          ..._ids.map((item) => _buildChecklistItem(item, colorScheme)),
 
           const SizedBox(height: 20),
 
@@ -168,12 +142,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
 
           const SizedBox(height: 12),
 
-          ..._documents.map(
-            (item) => _buildChecklistItem(
-              item,
-              colorScheme,
-            ),
-          ),
+          ..._documents.map((item) => _buildChecklistItem(item, colorScheme)),
         ],
       ),
     );
@@ -185,9 +154,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
       decoration: BoxDecoration(
         color: primaryBlue.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: primaryBlue.withValues(alpha: 0.12),
-        ),
+        border: Border.all(color: primaryBlue.withValues(alpha: 0.12)),
       ),
       child: Row(
         children: [
@@ -238,10 +205,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
     );
   }
 
-  Widget _buildSectionTitle(
-    String title,
-    ColorScheme colorScheme,
-  ) {
+  Widget _buildSectionTitle(String title, ColorScheme colorScheme) {
     return Text(
       title,
       style: TextStyle(
@@ -252,10 +216,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
     );
   }
 
-  Widget _buildChecklistItem(
-    _InventoryOption item,
-    ColorScheme colorScheme,
-  ) {
+  Widget _buildChecklistItem(_InventoryOption item, ColorScheme colorScheme) {
     final isSelected = _selectedItems.contains(item.title);
 
     return Padding(
@@ -263,14 +224,11 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
       child: Material(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        child: InkWell(
+        child: MotionInkWell(
           onTap: () => _toggleItem(item.title),
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 13,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
@@ -300,26 +258,20 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
                       fontWeight: isSelected
                           ? FontWeight.w700
                           : FontWeight.w500,
-                      color: isSelected
-                          ? primaryBlue
-                          : colorScheme.onSurface,
+                      color: isSelected ? primaryBlue : colorScheme.onSurface,
                     ),
                   ),
                 ),
 
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
+                  duration: AppMotion.duration(context, AppMotion.quick),
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? primaryBlue
-                        : Colors.transparent,
+                    color: isSelected ? primaryBlue : Colors.transparent,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected
-                          ? primaryBlue
-                          : colorScheme.outline,
+                      color: isSelected ? primaryBlue : colorScheme.outline,
                       width: 2,
                     ),
                   ),
@@ -344,8 +296,5 @@ class _InventoryOption {
   final String title;
   final IconData icon;
 
-  const _InventoryOption({
-    required this.title,
-    required this.icon,
-  });
+  const _InventoryOption({required this.title, required this.icon});
 }

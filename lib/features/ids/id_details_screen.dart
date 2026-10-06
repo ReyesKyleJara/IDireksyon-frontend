@@ -1,12 +1,13 @@
+import '../../core/widgets/app_motion.dart';
+
 import 'package:flutter/material.dart';
+
+import '../../core/theme/app_theme.dart';
 
 class IdDetailsScreen extends StatefulWidget {
   final String idName;
 
-  const IdDetailsScreen({
-    super.key,
-    required this.idName,
-  });
+  const IdDetailsScreen({super.key, required this.idName});
 
   @override
   State<IdDetailsScreen> createState() => _IdDetailsScreenState();
@@ -24,10 +25,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
   void initState() {
     super.initState();
 
-    _tabController = TabController(
-      length: 4,
-      vsync: this,
-    );
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -45,9 +43,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         child: Column(
           children: [
             _buildHeader(context),
-            Expanded(
-              child: _buildContent(context),
-            ),
+            Expanded(child: _buildContent(context)),
           ],
         ),
       ),
@@ -102,7 +98,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
     return Material(
       color: Colors.white.withValues(alpha: 0.10),
       borderRadius: BorderRadius.circular(12),
-      child: InkWell(
+      child: MotionInkWell(
         onTap: () => Navigator.pop(context),
         borderRadius: BorderRadius.circular(12),
         child: const SizedBox(
@@ -124,9 +120,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       children: [
         _buildIdThumbnail(),
         const SizedBox(width: 15),
-        Expanded(
-          child: _buildIdInformation(),
-        ),
+        Expanded(child: _buildIdInformation()),
         const SizedBox(width: 12),
         _buildReadiness(),
       ],
@@ -145,11 +139,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           width: 1,
         ),
       ),
-      child: const Icon(
-        Icons.badge_rounded,
-        size: 28,
-        color: Colors.white,
-      ),
+      child: const Icon(Icons.badge_rounded, size: 28, color: Colors.white),
     );
   }
 
@@ -179,39 +169,25 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         SizedBox(height: 7),
         Row(
           children: [
-            Icon(
-              Icons.schedule_rounded,
-              size: 13,
-              color: Colors.white60,
-            ),
+            Icon(Icons.schedule_rounded, size: 13, color: Colors.white60),
             SizedBox(width: 4),
             Text(
               'Valid for 10 years',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 10.5,
-              ),
+              style: TextStyle(color: Colors.white70, fontSize: 10.5),
             ),
           ],
         ),
         SizedBox(height: 3),
         Row(
           children: [
-            Icon(
-              Icons.public_rounded,
-              size: 13,
-              color: Colors.white60,
-            ),
+            Icon(Icons.public_rounded, size: 13, color: Colors.white60),
             SizedBox(width: 4),
             Expanded(
               child: Text(
                 'International travel',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 10.5,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 10.5),
               ),
             ),
           ],
@@ -236,9 +212,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                   value: 0.5,
                   strokeWidth: 4,
                   backgroundColor: Colors.white.withValues(alpha: 0.15),
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    gold,
-                  ),
+                  valueColor: const AlwaysStoppedAnimation<Color>(gold),
                 ),
               ),
               const Text(
@@ -273,10 +247,8 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
+        color: AppTheme.pageBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         children: [
@@ -319,18 +291,13 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
 
         dividerColor: const Color(0xFFE9ECF1),
 
-        labelStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
+        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         unselectedLabelStyle: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
 
-        labelPadding: const EdgeInsets.symmetric(
-          horizontal: 15,
-        ),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 15),
 
         tabs: const [
           Tab(text: 'Requirements'),
@@ -353,8 +320,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         _buildInfoBanner(
           icon: Icons.info_outline_rounded,
           title: 'Before you apply',
-          message:
-              'Make sure you have the required documents ready before proceeding with your application.',
+          message: 'Make sure you have the required documents ready before proceeding with your application.',
         ),
         const SizedBox(height: 22),
 
@@ -466,20 +432,12 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
 
         const SizedBox(height: 14),
 
-        _buildCostRow(
-          label: 'Application Fee',
-          amount: '₱950.00',
-        ),
-        _buildCostRow(
-          label: 'Processing Fee',
-          amount: '₱1,400.00',
-        ),
+        _buildCostRow(label: 'Application Fee', amount: '₱950.00'),
+        _buildCostRow(label: 'Processing Fee', amount: '₱1,400.00'),
 
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 10),
-          child: Divider(
-            color: Color(0xFFE7E9ED),
-          ),
+          child: Divider(color: Color(0xFFE7E9ED)),
         ),
 
         _buildCostRow(
@@ -505,9 +463,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
-        _buildSearchField(
-          hintText: 'Search offices',
-        ),
+        _buildSearchField(hintText: 'Search offices'),
 
         const SizedBox(height: 16),
 
@@ -527,17 +483,9 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                 ),
               ),
 
-              Positioned(
-                top: 45,
-                left: 90,
-                child: _buildMapPin(),
-              ),
+              Positioned(top: 45, left: 90, child: _buildMapPin()),
 
-              Positioned(
-                bottom: 45,
-                right: 90,
-                child: _buildMapPin(),
-              ),
+              Positioned(bottom: 45, right: 90, child: _buildMapPin()),
 
               Positioned(
                 bottom: 12,
@@ -546,7 +494,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
                   elevation: 1,
-                  child: InkWell(
+                  child: MotionInkWell(
                     onTap: () {},
                     borderRadius: BorderRadius.circular(10),
                     child: const Padding(
@@ -625,10 +573,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         const SizedBox(height: 5),
         const Text(
           'Follow these steps to complete your application.',
-          style: TextStyle(
-            fontSize: 12,
-            color: Color(0xFF778092),
-          ),
+          style: TextStyle(fontSize: 12, color: Color(0xFF778092)),
         ),
 
         const SizedBox(height: 24),
@@ -636,16 +581,14 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         _buildGuideStep(
           number: '01',
           title: 'Online Appointment',
-          description:
-              'Schedule an appointment through the official application portal.',
+          description: 'Schedule an appointment through the official application portal.',
           isLast: false,
         ),
 
         _buildGuideStep(
           number: '02',
           title: 'Accomplish the Form',
-          description:
-              'Complete the required application information before your appointment.',
+          description: 'Complete the required application information before your appointment.',
           isLast: false,
         ),
 
@@ -670,10 +613,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
   // SHARED COMPONENTS
   // ============================================================
 
-  Widget _buildSectionTitle({
-    required String title,
-    required String subtitle,
-  }) {
+  Widget _buildSectionTitle({required String title, required String subtitle}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -688,10 +628,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF7C8493),
-          ),
+          style: const TextStyle(fontSize: 11, color: Color(0xFF7C8493)),
         ),
       ],
     );
@@ -707,18 +644,12 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       decoration: BoxDecoration(
         color: softBlue,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFDCE6F4),
-        ),
+        border: Border.all(color: const Color(0xFFDCE6F4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.info_outline_rounded,
-            color: primaryBlue,
-            size: 20,
-          ),
+          const Icon(Icons.info_outline_rounded, color: primaryBlue, size: 20),
           const SizedBox(width: 11),
           Expanded(
             child: Column(
@@ -759,9 +690,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       decoration: BoxDecoration(
         color: const Color(0xFFFAFBFC),
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: const Color(0xFFE8EBEF),
-        ),
+        border: Border.all(color: const Color(0xFFE8EBEF)),
       ),
       child: Row(
         children: [
@@ -770,10 +699,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
             height: 24,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFC8CDD5),
-                width: 1.5,
-              ),
+              border: Border.all(color: const Color(0xFFC8CDD5), width: 1.5),
             ),
           ),
           const SizedBox(width: 12),
@@ -811,9 +737,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       decoration: BoxDecoration(
         color: const Color(0xFFF7F9FC),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE6EAF0),
-        ),
+        border: Border.all(color: const Color(0xFFE6EAF0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -868,8 +792,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
               label,
               style: TextStyle(
                 fontSize: isTotal ? 12 : 11.5,
-                fontWeight:
-                    isTotal ? FontWeight.w800 : FontWeight.w500,
+                fontWeight: isTotal ? FontWeight.w800 : FontWeight.w500,
                 color: const Color(0xFF4D5665),
               ),
             ),
@@ -887,16 +810,11 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
     );
   }
 
-  Widget _buildSearchField({
-    required String hintText,
-  }) {
+  Widget _buildSearchField({required String hintText}) {
     return TextField(
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: const TextStyle(
-          fontSize: 12,
-          color: Color(0xFF9AA1AC),
-        ),
+        hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF9AA1AC)),
         prefixIcon: const Icon(
           Icons.search_rounded,
           size: 20,
@@ -904,38 +822,25 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         ),
         filled: true,
         fillColor: const Color(0xFFF8F9FB),
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 13,
-        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 13),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: Color(0xFFE5E8EC),
-          ),
+          borderSide: const BorderSide(color: Color(0xFFE5E8EC)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: Color(0xFFE5E8EC),
-          ),
+          borderSide: const BorderSide(color: Color(0xFFE5E8EC)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: primaryBlue,
-            width: 1.3,
-          ),
+          borderSide: const BorderSide(color: primaryBlue, width: 1.3),
         ),
       ),
     );
   }
 
   Widget _buildMapPin() {
-    return const Icon(
-      Icons.location_on_rounded,
-      color: primaryBlue,
-      size: 32,
-    );
+    return const Icon(Icons.location_on_rounded, color: primaryBlue, size: 32);
   }
 
   Widget _buildOfficeCard({
@@ -948,9 +853,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: const Color(0xFFE5E8EC),
-        ),
+        border: Border.all(color: const Color(0xFFE5E8EC)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1014,22 +917,14 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
             height: 38,
             child: OutlinedButton.icon(
               onPressed: () {},
-              icon: const Icon(
-                Icons.directions_rounded,
-                size: 16,
-              ),
+              icon: const Icon(Icons.directions_rounded, size: 16),
               label: const Text(
                 'Get Directions',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: primaryBlue,
-                side: const BorderSide(
-                  color: Color(0xFFCCD6E5),
-                ),
+                side: const BorderSide(color: Color(0xFFCCD6E5)),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(9),
                 ),
@@ -1077,9 +972,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                   Expanded(
                     child: Container(
                       width: 1.5,
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 5,
-                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 5),
                       color: const Color(0xFFDCE2EA),
                     ),
                   ),

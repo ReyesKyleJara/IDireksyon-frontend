@@ -1,434 +1,311 @@
+import '../../core/widgets/app_motion.dart';
+
 import 'package:flutter/material.dart';
+
+import '../../core/widgets/page_header.dart';
 import 'id_details_screen.dart';
 
 class IdsScreen extends StatelessWidget {
   const IdsScreen({super.key});
 
-  static const Color primaryBlue = Color(0xFF1E3A8A);
-  static const Color lightBlue = Color(0xFFF0F5FA);
-  static const Color successGreen = Color(0xFF287A45);
-  static const Color successBackground = Color(0xFFE5F4EA);
+  static const primaryBlue = Color(0xFF174B85);
+
+  void _open(BuildContext context, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => IdDetailsScreen(idName: title)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    final accent = dark ? const Color(0xFFA8CCFA) : primaryBlue;
+    final card = dark ? colors.surfaceContainerHighest : Colors.white;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(20),
+      side: BorderSide(color: colors.outlineVariant),
+    );
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-        physics: const BouncingScrollPhysics(), // Adds premium iOS-style bounce
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
         children: [
-          _buildHeader(colorScheme),
-          const SizedBox(height: 24),
-
-          _buildSearchBar(context),
-          const SizedBox(height: 32),
-
-          _buildFeaturedSection(context),
-          const SizedBox(height: 36),
-
-          _buildAllIdsSection(context),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(ColorScheme colorScheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'ID Directory',
-          style: TextStyle(
-            fontSize: 28, // Slightly larger for stronger hierarchy
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
-            color: colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Browse supported government IDs and application guides',
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.4,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchBar(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      // OUTSTANDING UX: Added a soft shadow to make the search bar float
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: primaryBlue.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: 'Search IDs or Agencies',
-          hintStyle: TextStyle(
-            fontSize: 14,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-          ),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 4.0),
-            child: Icon(
-              Icons.search_rounded,
-              size: 22,
-              color: primaryBlue.withValues(alpha: 0.6), // Tinted icon
+          const PageHeader('ID Directory'),
+          const SizedBox(height: 4),
+          Text(
+            'Browse supported government IDs and application guides',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: colors.onSurfaceVariant,
             ),
           ),
-          filled: true,
-          fillColor: isDark
-              ? colorScheme.surfaceContainerHighest
-              : Colors.white, // Pure white for better contrast
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16, // Slightly taller for better touch target
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16), // Softer corners
-            borderSide: BorderSide.none, // Removed hard borders in favor of shadow
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: primaryBlue,
-              width: 1.5,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeaturedSection(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Featured IDs',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: colorScheme.onSurface,
+          const SizedBox(height: 20),
+          TextField(
+            decoration: InputDecoration(
+              hintText: 'Search IDs or Agencies',
+              hintStyle: TextStyle(
+                fontSize: 14,
+                color: colors.onSurfaceVariant,
+              ),
+              prefixIcon: Icon(Icons.search_rounded, color: accent),
+              filled: true,
+              fillColor: card,
+              contentPadding: const EdgeInsets.all(16),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: colors.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: accent, width: 1.5),
               ),
             ),
-            Icon(Icons.auto_awesome, size: 18, color: Colors.amber.shade600), // Small visual delight
-          ],
-        ),
-        const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 28),
+          const Text(
+            'Featured IDs',
+            style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Explore popular IDs to get started',
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 112 + MediaQuery.textScalerOf(context).scale(30),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _featured(
+                  context,
+                  'PhilSys ID',
+                  Icons.badge_rounded,
+                  const Color(0xFF174B85),
+                ),
+                _featured(
+                  context,
+                  'Passport ID',
+                  Icons.menu_book_rounded,
+                  const Color(0xFFC84648),
+                ),
+                _featured(
+                  context,
+                  'PhilHealth',
+                  Icons.health_and_safety_rounded,
+                  const Color(0xFF287A45),
+                ),
+                _featured(
+                  context,
+                  "Driver's License",
+                  Icons.directions_car_rounded,
+                  const Color(0xFFAA7309),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+          const Text(
+            'All IDs',
+            style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 14),
+          _idCard(
+            context,
+            shape,
+            card,
+            accent,
+            'Passport ID',
+            'Primary government-issued travel document',
+            '50% Ready',
+            Icons.menu_book_rounded,
+          ),
+          const SizedBox(height: 12),
+          _idCard(
+            context,
+            shape,
+            card,
+            accent,
+            'PhilSys ID',
+            'National identification for secure verification',
+            '76% Ready',
+            Icons.badge_rounded,
+          ),
+        ],
+      ),
+    );
+  }
 
-        SizedBox(
-          height: 120, // Slightly taller to accommodate shadow
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none, // Allows shadows to render outside the box
+  Widget _featured(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color tint,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    final foreground = dark ? Color.lerp(tint, Colors.white, 0.6)! : tint;
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: SizedBox(
+        width: 132,
+        child: Material(
+          color: Color.alphaBlend(
+            tint.withValues(alpha: dark ? 0.12 : 0.06),
+            dark ? colors.surfaceContainerHighest : Colors.white,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: colors.outlineVariant),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: MotionInkWell(
+            onTap: () => _open(context, title),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: foreground.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: foreground, size: 26),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _idCard(
+    BuildContext context,
+    ShapeBorder shape,
+    Color background,
+    Color accent,
+    String title,
+    String description,
+    String readiness,
+    IconData icon,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    final green = colors.brightness == Brightness.dark
+        ? const Color(0xFF95DCAF)
+        : const Color(0xFF287A45);
+    return Material(
+      color: background,
+      shape: shape,
+      clipBehavior: Clip.antiAlias,
+      child: MotionInkWell(
+        onTap: () => _open(context, title),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildFeaturedIdCard(
-                context,
-                title: 'PhilSys ID',
-                backgroundColor: const Color(0xFFF0F5FA),
-                icon: Icons.badge_rounded,
-                iconColor: Colors.blue.shade700,
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: accent, size: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.arrow_forward_rounded, size: 20, color: accent),
+                ],
               ),
-              const SizedBox(width: 14),
-              _buildFeaturedIdCard(
-                context,
-                title: 'Passport ID',
-                backgroundColor: const Color(0xFFFDF0F0),
-                icon: Icons.menu_book_rounded,
-                iconColor: Colors.red.shade700,
+              const SizedBox(height: 12),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: colors.onSurfaceVariant,
+                ),
               ),
-              const SizedBox(width: 14),
-              _buildFeaturedIdCard(
-                context,
-                title: 'PhilHealth',
-                backgroundColor: const Color(0xFFEFF9F1),
-                icon: Icons.health_and_safety_rounded,
-                iconColor: Colors.green.shade700,
-              ),
-              const SizedBox(width: 14),
-              _buildFeaturedIdCard(
-                context,
-                title: "Driver's License",
-                backgroundColor: const Color(0xFFFFF7E6),
-                icon: Icons.directions_car_rounded,
-                iconColor: Colors.orange.shade700,
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: green.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 14,
+                          color: green,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          readiness,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    'Updated May 23, 2025',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildFeaturedIdCard(
-    BuildContext context, {
-    required String title,
-    required Color backgroundColor,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: 110,
-      // OUTSTANDING UX: Soft shadow for featured cards
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: iconColor.withValues(alpha: 0.1),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => IdDetailsScreen(idName: title)),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, size: 24, color: iconColor),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.2,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAllIdsSection(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'All IDs',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        _buildIdListCard(
-          context,
-          title: 'Passport ID',
-          description: 'Primary government-issued travel document',
-          readiness: '50% Ready',
-          lastUpdated: 'May 23, 2025',
-          icon: Icons.menu_book_rounded,
-        ),
-        const SizedBox(height: 14),
-        _buildIdListCard(
-          context,
-          title: 'PhilSys ID',
-          description: 'National identification for secure verification',
-          readiness: '76% Ready',
-          lastUpdated: 'May 23, 2025',
-          icon: Icons.badge_rounded,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIdListCard(
-    BuildContext context, {
-    required String title,
-    required String description,
-    required String readiness,
-    required String lastUpdated,
-    required IconData icon,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      // OUTSTANDING UX: Soft ambient shadow for list items
-      decoration: BoxDecoration(
-        boxShadow: isDark ? [] : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: isDark ? colorScheme.surfaceContainerHighest : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => IdDetailsScreen(idName: title)),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildIdThumbnail(icon: icon),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          height: 1.3,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          _buildReadinessBadge(readiness),
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.update_rounded,
-                            size: 14,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            lastUpdated,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8F9FB),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: primaryBlue,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIdThumbnail({required IconData icon}) {
-    return Container(
-      width: 72,
-      height: 52,
-      decoration: BoxDecoration(
-        color: lightBlue,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: primaryBlue.withValues(alpha: 0.1)),
-      ),
-      child: Icon(icon, size: 28, color: primaryBlue),
-    );
-  }
-
-  Widget _buildReadinessBadge(String readiness) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: successBackground,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: successGreen.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle_rounded, size: 12, color: successGreen),
-          const SizedBox(width: 4),
-          Text(
-            readiness,
-            style: const TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              color: successGreen,
-            ),
-          ),
-        ],
       ),
     );
   }

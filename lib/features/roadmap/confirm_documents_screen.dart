@@ -1,9 +1,18 @@
+import '../../core/widgets/app_motion.dart';
+
 import 'package:flutter/material.dart';
 
 import 'suggested_roadmap_screen.dart';
+import 'id_journey.dart';
 
 class ConfirmDocumentsScreen extends StatefulWidget {
-  const ConfirmDocumentsScreen({super.key});
+  const ConfirmDocumentsScreen({
+    super.key,
+    this.targetIds = const ['Passport ID'],
+    this.existingJourneys = const [],
+  });
+  final List<String> targetIds;
+  final List<IdJourney> existingJourneys;
 
   static const primaryBlue = Color(0xFF12499A);
 
@@ -41,9 +50,9 @@ class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
     final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: colors.surface,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
@@ -51,61 +60,72 @@ class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
           icon: Icon(Icons.arrow_back_rounded, color: colors.onSurface),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Confirm your current\ndocuments',
-              style: TextStyle(
-                fontSize: 28,
-                height: 1.25,
-                fontWeight: FontWeight.w900,
-                color: colors.onSurface,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Review your owned IDs and supporting documents\nbefore we generate your roadmap.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: colors.onSurface,
-              ),
-            ),
-            const SizedBox(height: 17),
-            _buildSection('Owned IDs', _ownedIds, colors),
-            const SizedBox(height: 21),
-            _buildSection('Owned Documents', _ownedDocuments, colors),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              height: 38,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SuggestedRoadmapScreen(),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ConfirmDocumentsScreen.primaryBlue,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Confirm your current\ndocuments',
+                  style: TextStyle(
+                    fontSize: 24,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                    color: colors.onSurface,
                   ),
                 ),
-                child: const Text(
-                  'Save & Continue',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                const SizedBox(height: 8),
+                Text(
+                  'Review your owned IDs and supporting documents\nbefore we generate your roadmap.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: colors.onSurface,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 17),
+                _buildSection('Owned IDs', _ownedIds, colors),
+                const SizedBox(height: 21),
+                _buildSection('Owned Documents', _ownedDocuments, colors),
+                const SizedBox(height: 24),
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SuggestedRoadmapScreen(
+                            targetIds: widget.targetIds,
+                            ownedItems: _ownedItems.toList(),
+                            existingJourneys: widget.existingJourneys,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ConfirmDocumentsScreen.primaryBlue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Save & Continue',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -130,7 +150,7 @@ class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
         const SizedBox(height: 6),
         ...options.map(
           (option) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.only(bottom: 12),
             child: _DocumentOptionCard(
               option: option,
               selected: _ownedItems.contains(option.title),
@@ -159,17 +179,21 @@ class _DocumentOptionCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Material(
-      color: colors.surface,
-      borderRadius: BorderRadius.circular(11),
-      child: InkWell(
+      color: colors.brightness == Brightness.dark
+          ? colors.surfaceContainer
+          : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: MotionInkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(11),
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: AppMotion.duration(context),
+          curve: AppMotion.curve,
+          constraints: const BoxConstraints(minHeight: 60),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             border: Border.all(color: colors.outlineVariant),
-            borderRadius: BorderRadius.circular(11),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             children: [
@@ -192,7 +216,7 @@ class _DocumentOptionCard extends StatelessWidget {
                 ),
               ),
               AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
+                duration: AppMotion.duration(context, AppMotion.quick),
                 width: 18,
                 height: 18,
                 decoration: BoxDecoration(

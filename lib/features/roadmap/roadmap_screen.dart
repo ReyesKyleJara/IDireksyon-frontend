@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/page_header.dart';
 import 'build_roadmap_screen.dart';
+import '../ids/ids_screen.dart';
 
 class RoadmapScreen extends StatelessWidget {
-  const RoadmapScreen({super.key});
+  const RoadmapScreen({super.key, this.onOpenDirectory});
+
+  final VoidCallback? onOpenDirectory;
 
   static const primaryBlue = Color(0xFF12499A);
   static const illustrationBlue = Color(0xFF0E56BD);
@@ -22,22 +26,15 @@ class RoadmapScreen extends StatelessWidget {
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
         children: [
-          Text(
-            'My Roadmap',
-            style: TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.w800,
-              color: text,
-            ),
-          ),
-          const SizedBox(height: 2),
+          const PageHeader('My Roadmap'),
+          const SizedBox(height: 4),
           Text(
             'Track your progress and get to the IDs you need.',
             style: TextStyle(fontSize: 14, color: text),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           _Panel(
             color: card,
             border: border,
@@ -105,17 +102,28 @@ class RoadmapScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      SizedBox(
-                        height: 29,
+                      Container(
+                        constraints: const BoxConstraints(minHeight: 48),
                         width: double.infinity,
                         child: OutlinedButton(
-                          onPressed: () {},
+                          onPressed:
+                              onOpenDirectory ??
+                              () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => Scaffold(
+                                      appBar: AppBar(),
+                                      body: const IdsScreen(),
+                                    ),
+                                  ),
+                                );
+                              },
                           style: OutlinedButton.styleFrom(
                             foregroundColor: primaryBlue,
                             side: const BorderSide(color: primaryBlue),
                             padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(5),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: const Text(
@@ -155,9 +163,10 @@ class _Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: padding,
+    clipBehavior: Clip.antiAlias,
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(20),
       border: Border.all(color: border),
     ),
     child: child,
@@ -170,9 +179,9 @@ class _PrimaryButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
+  Widget build(BuildContext context) => Container(
     width: double.infinity,
-    height: 37,
+    constraints: const BoxConstraints(minHeight: 48),
     child: ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
@@ -180,7 +189,7 @@ class _PrimaryButton extends StatelessWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         padding: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: const Text(
         'Build My Roadmap',
@@ -244,7 +253,7 @@ class _DocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: 42,
-    height: 48,
+    constraints: const BoxConstraints(minHeight: 60),
     decoration: BoxDecoration(
       color: Colors.blue.shade50,
       border: Border.all(color: Colors.blue.shade100),

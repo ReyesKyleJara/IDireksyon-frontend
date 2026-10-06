@@ -1,11 +1,37 @@
 import 'package:flutter/material.dart';
 
+import 'active_journey_screen.dart';
+import 'id_journey.dart';
+import '../ids/id_details_screen.dart';
+import '../office_finder/office_finder_screen.dart';
+
 class SuggestedRoadmapScreen extends StatelessWidget {
-  const SuggestedRoadmapScreen({super.key});
+  const SuggestedRoadmapScreen({
+    super.key,
+    this.targetIds = const ['Passport ID'],
+    this.ownedItems = const [],
+    this.existingJourneys = const [],
+  });
+  final List<String> targetIds;
+  final List<String> ownedItems;
+  final List<IdJourney> existingJourneys;
+
+  List<_RoadmapStep> get _steps =>
+      targetIds.length == 1 && targetIds.first == 'Passport ID'
+      ? _passportSteps
+      : [
+          for (final id in targetIds)
+            _RoadmapStep(
+              title: id,
+              subtitle:
+                  'Review the requirements and application guide for this ID.',
+              icon: Icons.badge_outlined,
+            ),
+        ];
 
   static const primaryBlue = Color(0xFF12499A);
 
-  static const _steps = [
+  static const _passportSteps = [
     _RoadmapStep(
       title: 'Birth Certificate',
       subtitle:
@@ -34,9 +60,9 @@ class SuggestedRoadmapScreen extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: colors.surface,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
@@ -44,65 +70,83 @@ class SuggestedRoadmapScreen extends StatelessWidget {
           icon: Icon(Icons.arrow_back_rounded, color: colors.onSurface),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Suggested Roadmap',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                color: colors.onSurface,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Here’s the recommended sequence for your\nPassport journey.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: colors.onSurface,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _TargetCard(colors: colors),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 8),
-                itemCount: _steps.length,
-                itemBuilder: (context, index) => _StepRow(
-                  step: _steps[index],
-                  number: index + 1,
-                  isLast: index == _steps.length - 1,
-                  colors: colors,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 38,
-              child: ElevatedButton(
-                onPressed: () =>
-                    Navigator.popUntil(context, (route) => route.isFirst),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryBlue,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Suggested Roadmap',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: colors.onSurface,
                   ),
                 ),
-                child: const Text(
-                  'Confirm Suggested Journey',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                const SizedBox(height: 8),
+                Text(
+                  'Review the next steps for your ${targetIds.join(' + ')} journey.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: colors.onSurface,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                _TargetCard(colors: colors, title: targetIds.join(' + ')),
+                const SizedBox(height: 8),
+                SizedBox(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    itemCount: _steps.length,
+                    itemBuilder: (context, index) => _StepRow(
+                      step: _steps[index],
+                      number: index + 1,
+                      isLast: index == _steps.length - 1,
+                      colors: colors,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => JourneyLoadingScreen(
+                          journey: IdJourney(
+                            targetIds: targetIds,
+                            ownedItems: ownedItems,
+                          ),
+                          existingJourneys: existingJourneys,
+                        ),
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryBlue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Confirm Suggested Journey',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -110,19 +154,22 @@ class SuggestedRoadmapScreen extends StatelessWidget {
 }
 
 class _TargetCard extends StatelessWidget {
-  const _TargetCard({required this.colors});
+  const _TargetCard({required this.colors, required this.title});
+  final String title;
 
   final ColorScheme colors;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 103,
+      constraints: const BoxConstraints(minHeight: 103),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colors.surface,
+        color: colors.brightness == Brightness.dark
+            ? colors.surfaceContainer
+            : Colors.white,
         border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
@@ -131,7 +178,7 @@ class _TargetCard extends StatelessWidget {
             height: 76,
             decoration: BoxDecoration(
               color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
               Icons.menu_book_rounded,
@@ -143,7 +190,7 @@ class _TargetCard extends StatelessWidget {
           Expanded(
             child: _TargetMetric(
               label: 'Target ID',
-              value: 'Passport ID',
+              value: title,
               colors: colors,
             ),
           ),
@@ -218,7 +265,6 @@ class _StepRow extends StatelessWidget {
     required this.isLast,
     required this.colors,
   });
-
   final _RoadmapStep step;
   final int number;
   final bool isLast;
@@ -226,18 +272,20 @@ class _StepRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 80,
+    final accent = colors.brightness == Brightness.dark
+        ? Colors.blue.shade200
+        : SuggestedRoadmapScreen.primaryBlue;
+    return IntrinsicHeight(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            width: 33,
+            width: 36,
             child: Column(
               children: [
                 Container(
-                  width: 20,
-                  height: 20,
+                  width: 26,
+                  height: 26,
                   alignment: Alignment.center,
                   decoration: const BoxDecoration(
                     color: SuggestedRoadmapScreen.primaryBlue,
@@ -247,7 +295,7 @@ class _StepRow extends StatelessWidget {
                     '$number',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -261,83 +309,81 @@ class _StepRow extends StatelessWidget {
           ),
           Expanded(
             child: Container(
-              margin: const EdgeInsets.only(bottom: 7),
-              padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: colors.surface,
+                color: colors.brightness == Brightness.dark
+                    ? colors.surfaceContainer
+                    : Colors.white,
                 border: Border.all(color: colors.outlineVariant),
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    step.icon,
-                    size: 31,
-                    color: SuggestedRoadmapScreen.primaryBlue,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(step.icon, size: 28, color: accent),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              step.title,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: colors.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              step.subtitle,
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.4,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          step.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: SuggestedRoadmapScreen.primaryBlue,
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => switch (step.title) {
+                          'Birth Certificate' =>
+                            const PsaBirthCertificateGuideScreen(),
+                          'Find DFA Office' => const OfficeFinderScreen(),
+                          'Passport Application' => const IdDetailsScreen(
+                            idName: 'Passport ID',
                           ),
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          step.subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10,
-                            height: 1.15,
-                            color: colors.onSurface,
-                          ),
-                        ),
-                      ],
+                          'PhilSys National ID Registration' =>
+                            const IdDetailsScreen(idName: 'PhilSys ID'),
+                          _ => IdDetailsScreen(idName: step.title),
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 92,
-                    height: 28,
-                    child: OutlinedButton(
-                      onPressed: number == 1
-                          ? () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const PsaBirthCertificateGuideScreen(),
-                                ),
-                              );
-                            }
-                          : null,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: SuggestedRoadmapScreen.primaryBlue,
-                        side: const BorderSide(
-                          color: SuggestedRoadmapScreen.primaryBlue,
-                        ),
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
-                        ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: accent,
+                      minimumSize: const Size.fromHeight(48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
-                      child: const Text(
-                        'Preview Guide',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                    ),
+                    child: const Text(
+                      'Preview Guide',
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ],
@@ -360,9 +406,9 @@ class PsaBirthCertificateGuideScreen extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: colors.surface,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
@@ -379,8 +425,8 @@ class PsaBirthCertificateGuideScreen extends StatelessWidget {
               Text(
                 'PSA Birth Certificate Guide',
                 style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
                   color: colors.onSurface,
                   height: 1.1,
                 ),
@@ -397,10 +443,13 @@ class PsaBirthCertificateGuideScreen extends StatelessWidget {
               const SizedBox(height: 18),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 14,
+                ),
                 decoration: BoxDecoration(
                   color: primaryBlue.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: primaryBlue.withValues(alpha: 0.2)),
                 ),
                 child: Text(
@@ -417,8 +466,10 @@ class PsaBirthCertificateGuideScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
                 decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(14),
+                  color: colors.brightness == Brightness.dark
+                      ? colors.surfaceContainer
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: colors.outlineVariant),
                 ),
                 child: Column(
@@ -426,22 +477,19 @@ class PsaBirthCertificateGuideScreen extends StatelessWidget {
                     _GuideBulletRow(
                       icon: Icons.account_balance_outlined,
                       title: 'Request from the official PSA channel',
-                      detail:
-                          'Secure and official. Avoid fliers and unauthorized agents.',
+                      detail: 'Secure and official. Avoid fliers and unauthorized agents.',
                     ),
                     const SizedBox(height: 18),
                     _GuideBulletRow(
                       icon: Icons.person_outline,
                       title: 'Prepare your personal details',
-                      detail:
-                          'Full name, date of birth, place of birth, and parent\'s full names are usually required.',
+                      detail: 'Full name, date of birth, place of birth, and parent\'s full names are usually required.',
                     ),
                     const SizedBox(height: 18),
                     _GuideBulletRow(
                       icon: Icons.security_outlined,
                       title: 'Ensure the document is legible & authentic',
-                      detail:
-                          'Full name, date of birth, place of birth, and parent\'s full names are usually required.',
+                      detail: 'Full name, date of birth, place of birth, and parent\'s full names are usually required.',
                     ),
                   ],
                 ),
@@ -470,10 +518,13 @@ class PsaBirthCertificateGuideScreen extends StatelessWidget {
               const SizedBox(height: 22),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 14,
+                ),
                 decoration: BoxDecoration(
                   color: colors.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: colors.outlineVariant),
                 ),
                 child: Column(
@@ -532,7 +583,11 @@ class _GuideBulletRow extends StatelessWidget {
             color: const Color(0xFFEAF1FF),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: PsaBirthCertificateGuideScreen.primaryBlue, size: 18),
+          child: Icon(
+            icon,
+            color: PsaBirthCertificateGuideScreen.primaryBlue,
+            size: 18,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -582,8 +637,10 @@ class _InfoLinkRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: colors.brightness == Brightness.dark
+            ? colors.surfaceContainer
+            : Colors.white,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: colors.outlineVariant),
       ),
       child: Row(
@@ -611,7 +668,11 @@ class _InfoLinkRow extends StatelessWidget {
               ],
             ),
           ),
-          Icon(icon, color: PsaBirthCertificateGuideScreen.primaryBlue, size: 18),
+          Icon(
+            icon,
+            color: PsaBirthCertificateGuideScreen.primaryBlue,
+            size: 18,
+          ),
         ],
       ),
     );

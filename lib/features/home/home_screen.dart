@@ -1,52 +1,126 @@
-import 'dart:ui' as ui;
+import '../../core/widgets/app_motion.dart';
 
 import 'package:flutter/material.dart';
 
+import '../../core/auth/auth_service.dart';
 import '../ids/ids_screen.dart';
+import '../ids/id_details_screen.dart';
 import '../office_finder/office_finder_screen.dart';
 import '../profile/manage_inventory_screen.dart';
+import '../roadmap/build_roadmap_screen.dart';
+import '../roadmap/id_journey.dart';
+import '../roadmap/active_journey_screen.dart';
+import 'journey_banner.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.journeys = const [], this.onOpenJourney});
+  final List<IdJourney> journeys;
+  final ValueChanged<IdJourney>? onOpenJourney;
+  static const primaryBlue = Color(0xFF174B85);
 
-  static const Color primaryBlue = Color(0xFF1E3A8A);
-  static const Color accentYellow = Color(0xFFF4C542);
-  static const Color accentRed = Color(0xFFDC3B3B);
+  void _open(BuildContext context, Widget page) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+    final colors = Theme.of(context).colorScheme;
     return SafeArea(
-      child: Container(
-        color: colorScheme.surface,
+      child: ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
           children: [
             _buildHeader(context),
-            const SizedBox(height: 20),
-
-            _buildHeroBanner(context),
             const SizedBox(height: 24),
-
-            _buildQuickActions(context),
-            const SizedBox(height: 26),
-
-            _buildRecommendedHeader(context),
+            journeys.isEmpty
+                ? _banner(context)
+                : JourneyBanner(
+                    journeys: journeys,
+                    onOpen:
+                        onOpenJourney ??
+                        (journey) => _open(
+                          context,
+                          Scaffold(
+                            appBar: AppBar(title: const Text('My ID Journey')),
+                            body: ActiveJourneyScreen(
+                              journeys: journeys,
+                              initialJourney: journey,
+                            ),
+                          ),
+                        ),
+                  ),
+            const SizedBox(height: 28),
+            const Text(
+              'Quick actions',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 14),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _action(
+                    context,
+                    Icons.folder_copy_rounded,
+                    primaryBlue,
+                    'Document\nInventory',
+                    const ManageInventoryScreen(),
+                  ),
+                  const SizedBox(width: 10),
+                  _action(
+                    context,
+                    Icons.location_on_rounded,
+                    const Color(0xFFC84648),
+                    'Office\nFinder',
+                    const OfficeFinderScreen(),
+                  ),
+                  const SizedBox(width: 10),
+                  _action(
+                    context,
+                    Icons.badge_rounded,
+                    const Color(0xFFAA7309),
+                    'ID\nDirectory',
+                    const IdsScreen(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Recommended for you',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'A good place to start your journey',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _open(context, const IdsScreen()),
+                  child: const Text('View all'),
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
-
-            _buildRecommendedId(
-              context: context,
-              title: 'Philippine Passport',
-              imageColor: const Color(0xFFD0E3F3).withAlpha(204),
-            ),
+            _recommendation(context, passport: true),
             const SizedBox(height: 12),
-
-            _buildRecommendedId(
-              context: context,
-              title: 'PhilSys ID',
-              imageColor: const Color(0xFFFDE8E8).withAlpha(204),
-            ),
+            _recommendation(context, passport: false),
           ],
         ),
       ),
@@ -54,41 +128,51 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final name = AuthService.instance.user?['name'] as String?;
+    final displayName = name?.trim();
+    final colors = Theme.of(context).colorScheme;
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Good Morning,'
+        : hour < 18
+        ? 'Good Afternoon,'
+        : 'Good Evening,';
+
     return Row(
       children: [
-        Container(
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8EFFB),
-            shape: BoxShape.circle,
-            border: Border.all(color: primaryBlue, width: 2),
-          ),
-          child: const Icon(
-            Icons.account_circle_rounded,
-            color: primaryBlue,
-            size: 32,
+        CircleAvatar(
+          radius: 22,
+          backgroundColor: colors.surfaceContainerHighest,
+          child: Icon(
+            Icons.person_rounded,
+            color: colors.onSurfaceVariant,
+            size: 28,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Welcome, user!',
+                greeting,
                 style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 14,
+                  height: 1.2,
+                  fontWeight: FontWeight.w400,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               Text(
-                'Your ID journey starts here',
+                displayName == null || displayName.isEmpty
+                    ? 'User'
+                    : displayName,
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 24,
+                  height: 1.2,
+                  fontWeight: FontWeight.w800,
+                  color: colors.onSurface,
                 ),
               ),
             ],
@@ -98,435 +182,228 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeroBanner(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 174),
-          padding: const EdgeInsets.fromLTRB(20, 20, 16, 18),
-          decoration: BoxDecoration(
+  Widget _banner(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: primaryBlue.withValues(alpha: .18),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                primaryBlue.withValues(alpha: 0.92),
-                const Color(0xFF315BB5).withValues(alpha: 0.78),
-              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
+              colors: [Color(0xFF103765), Color(0xFF246AA5)],
             ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.5),
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: primaryBlue.withValues(alpha: 0.3),
-                  blurRadius: 28,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 12),
-              ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-            ],
           ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -18,
-                top: -24,
-                child: Container(
-                  width: 128,
-                  height: 128,
-                  decoration: BoxDecoration(
-                    color: accentYellow.withValues(alpha: 0.85),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 38,
-                bottom: -42,
-                child: Container(
-                  width: 112,
-                  height: 112,
-                  decoration: BoxDecoration(
-                    color: accentRed.withValues(alpha: 0.9),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final showArt =
+                  constraints.maxWidth >= 320 &&
+                  MediaQuery.textScalerOf(context).scale(1) < 1.5;
+              return Stack(
                 children: [
-                  const Text(
-                    'Start your ID journey',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w800,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const SizedBox(
-                    width: 240,
-                    child: Text(
-                      'Find the documents you need and keep every step organized.',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: BackdropFilter(
-                      filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                      child: Material(
-                        color: Colors.white.withValues(alpha: 0.72),
-                        elevation: 6,
-                        shadowColor: Colors.black.withValues(alpha: 0.22),
-                        child: InkWell(
-                          onTap: () {},
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 15,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(
-                                  'Get started',
-                                  style: TextStyle(
-                                    color: primaryBlue,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(
-                                  Icons.arrow_forward,
-                                  size: 16,
-                                  color: primaryBlue.withValues(alpha: 0.85),
-                                ),
-                              ],
-                            ),
-                          ),
+                  Positioned(
+                    right: -55,
+                    top: -65,
+                    child: Container(
+                      width: 220,
+                      height: 220,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: .08),
+                          width: 35,
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickActions(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quick actions',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        Row(
-          children: [
-            // DOCUMENT INVENTORY
-            Expanded(
-              child: _buildQuickActionCard(
-                context: context,
-                icon: Icons.folder,
-                iconColor: Colors.blue.shade700,
-                label: 'Document\nInventory',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ManageInventoryScreen(),
+                  if (showArt)
+                    const Positioned(
+                      right: 8,
+                      bottom: 24,
+                      child: ExcludeSemantics(child: _JourneyArt()),
                     ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // OFFICE FINDER
-            Expanded(
-              child: _buildQuickActionCard(
-                context: context,
-                icon: Icons.location_on,
-                iconColor: Colors.red.shade600,
-                label: 'Office\nFinder',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OfficeFinderScreen(),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      22,
+                      24,
+                      showArt ? 130 : 22,
+                      24,
                     ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // ID DIRECTORY
-            Expanded(
-              child: _buildQuickActionCard(
-                context: context,
-                icon: Icons.badge,
-                iconColor: Colors.orange.shade400,
-                label: 'ID\nDirectory',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const IdsScreen()),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActionCard({
-    required BuildContext context,
-    required IconData icon,
-    required Color iconColor,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final colorScheme = Theme.of(context).colorScheme;
-    final cardColor = colorScheme.surfaceContainerHighest;
-    final borderColor = colorScheme.outlineVariant;
-
-    return Material(
-      color: cardColor,
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          height: 112,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor, width: 1.1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.12 : 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, size: 23, color: iconColor),
-              ),
-              const SizedBox(height: 9),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecommendedHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Recommended for you',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Based on your profile and documents',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const IdsScreen()),
-            );
-          },
-          child: Text(
-            'View All',
-            style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.blue.shade300
-                  : primaryBlue,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecommendedId({
-    required BuildContext context,
-    required String title,
-    required Color imageColor,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final cardColor = isDark
-        ? Colors.white.withValues(alpha: 0.09)
-        : Colors.white.withValues(alpha: 0.68);
-
-    final borderColor = Colors.white.withValues(alpha: isDark ? 0.16 : 0.8);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const IdsScreen()),
-              );
-            },
-            borderRadius: BorderRadius.circular(18),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: borderColor, width: 1.1),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 7),
-                  ),
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.55),
-                    blurRadius: 2,
-                    offset: const Offset(0, -1),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: imageColor,
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.badge_outlined,
-                        color: primaryBlue,
-                        size: 28,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          title,
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.auto_awesome_rounded,
+                              color: Color(0xFFFFD576),
+                              size: 14,
+                            ),
+                            SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'YOUR NEXT CHAPTER',
+                                style: TextStyle(
+                                  color: Color(0xFFD5E7FA),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 13),
+                        const Text(
+                          'Your ID journey\nstarts here.',
                           style: TextStyle(
-                            fontSize: 15,
+                            color: Colors.white,
+                            fontSize: 25,
                             fontWeight: FontWeight.w800,
-                            color: Theme.of(context).colorScheme.onSurface,
+                            height: 1.12,
+                            letterSpacing: -.6,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Explore requirements and application steps',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        const SizedBox(height: 10),
+                        const Text(
+                          'The right IDs. Clear steps.\nLet’s get you started.',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                            color: Color(0xFFD5E7FA),
+                            fontSize: 12,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: primaryBlue,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () => _open(
+                            context,
+                            BuildRoadmapScreen(existingJourneys: journeys),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Get started',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              SizedBox(width: 10),
+                              Icon(Icons.arrow_forward_rounded, size: 17),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _surface(BuildContext context, {required Widget child}) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.brightness == Brightness.dark
+          ? colors.surfaceContainer
+          : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    );
+  }
+
+  Widget _action(
+    BuildContext context,
+    IconData icon,
+    Color tint,
+    String label,
+    Widget page,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    final pastel = icon == Icons.folder_copy_rounded
+        ? const Color(0xFFF0F5FA)
+        : icon == Icons.location_on_rounded
+        ? const Color(0xFFFDF0F0)
+        : const Color(0xFFFFF7E6);
+    return Expanded(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: tint.withValues(alpha: dark ? .05 : .08),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Material(
+          color: dark
+              ? Color.alphaBlend(
+                  tint.withValues(alpha: .12),
+                  colors.surfaceContainer,
+                )
+              : pastel,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: MotionInkWell(
+            onTap: () => _open(context, page),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 22),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: primaryBlue.withValues(alpha: 0.08),
+                      color: dark
+                          ? colors.surfaceContainerHighest
+                          : Colors.white,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      Icons.arrow_forward,
-                      size: 17,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.blue.shade200
-                          : primaryBlue,
+                      icon,
+                      color: dark ? Color.lerp(tint, Colors.white, .4) : tint,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -534,6 +411,271 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _recommendation(BuildContext context, {required bool passport}) {
+    final colors = Theme.of(context).colorScheme;
+    return _surface(
+      context,
+      child: MotionInkWell(
+        onTap: () => _open(
+          context,
+          IdDetailsScreen(idName: passport ? 'Passport ID' : 'PhilSys ID'),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              ExcludeSemantics(
+                child: Container(
+                  width: 76,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: passport
+                        ? const Color(0xFFEAF1FB)
+                        : const Color(0xFFFFF1EB),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Transform.rotate(
+                      angle: passport ? -.09 : .08,
+                      child: passport
+                          ? Container(
+                              width: 44,
+                              height: 62,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF234E7A),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.public,
+                                    color: Color(0xFFE9CB87),
+                                    size: 26,
+                                  ),
+                                  SizedBox(height: 5),
+                                  Text(
+                                    'PASSPORT',
+                                    style: TextStyle(
+                                      color: Color(0xFFE9CB87),
+                                      fontSize: 6,
+                                      letterSpacing: .8,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : const _MiniId(),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      passport ? 'TRAVEL & EXPLORATION' : 'EVERYDAY ESSENTIAL',
+                      style: TextStyle(
+                        color: colors.onSurfaceVariant,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: .7,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      passport ? 'Philippine Passport' : 'PhilSys ID',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      passport
+                          ? 'Your gateway to the world'
+                          : 'One ID. More possibilities.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 22,
+                color: colors.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniId extends StatelessWidget {
+  const _MiniId();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 62,
+      height: 42,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(5),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x180E335B),
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            height: 3,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF245FA0),
+                  Color(0xFFDA5C5C),
+                  Color(0xFFF0C660),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              const Icon(
+                Icons.person_rounded,
+                size: 20,
+                color: HomeScreen.primaryBlue,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Column(
+                  children: [
+                    for (final width in [25.0, 20.0, 23.0])
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 3),
+                        width: width,
+                        height: 2,
+                        color: const Color(0xFFCBD8E6),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JourneyArt extends StatelessWidget {
+  const _JourneyArt();
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 116,
+      height: 174,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 112,
+            height: 112,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: .08),
+            ),
+          ),
+          Transform.rotate(
+            angle: .12,
+            child: Container(
+              width: 83,
+              height: 142,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F6FC),
+                borderRadius: BorderRadius.circular(17),
+                border: Border.all(color: const Color(0xFF092A50), width: 5),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x40092343),
+                    blurRadius: 14,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 25,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF092A50),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Icon(
+                    Icons.verified_user_rounded,
+                    color: HomeScreen.primaryBlue,
+                    size: 25,
+                  ),
+                  const SizedBox(height: 10),
+                  const _MiniId(),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB8CEE4),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 15,
+            child: Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD576),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                size: 23,
+                color: Color(0xFF163F65),
+              ),
+            ),
+          ),
+          const Positioned(
+            left: 1,
+            top: 12,
+            child: Icon(Icons.auto_awesome, size: 22, color: Color(0xFFFFD576)),
+          ),
+        ],
       ),
     );
   }

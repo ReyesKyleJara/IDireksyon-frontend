@@ -1,27 +1,62 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/app_motion.dart';
+
 import '../home/home_screen.dart';
 import '../roadmap/roadmap_screen.dart';
+import '../roadmap/active_journey_screen.dart';
+import '../roadmap/id_journey.dart';
 import '../ids/ids_screen.dart';
 import '../profile/profile_screen.dart';
 
 class ResidentAppShell extends StatefulWidget {
-  const ResidentAppShell({super.key});
+  const ResidentAppShell({
+    super.key,
+    this.initialIndex = 0,
+    this.journeyConfirmed = false,
+    this.journeys = const [],
+  });
+  final int initialIndex;
+  final bool journeyConfirmed;
+  final List<IdJourney> journeys;
 
   @override
   State<ResidentAppShell> createState() => _ResidentAppShellState();
 }
 
 class _ResidentAppShellState extends State<ResidentAppShell> {
-  int _currentIndex = 0;
+  late int _currentIndex = widget.initialIndex;
 
   static const Color primaryBlue = Color(0xFF1E3A8A);
 
-  final List<Widget> _pages = const [
-    HomeScreen(),
-    RoadmapScreen(),
-    IdsScreen(),
-    ProfileScreen(),
+  late final List<IdJourney> _journeys = widget.journeys.isNotEmpty
+      ? List.of(widget.journeys)
+      : widget.journeyConfirmed
+      ? [IdJourney()]
+      : [];
+
+  late final List<Widget> _pages = [
+    HomeScreen(
+      journeys: _journeys,
+      onOpenJourney: (journey) {
+        setState(() {
+          journey.minimized = false;
+          _pages[1] = ActiveJourneyScreen(
+            key: ObjectKey(journey),
+            journeys: _journeys,
+            initialJourney: journey,
+          );
+          _currentIndex = 1;
+        });
+      },
+    ),
+    _journeys.isNotEmpty
+        ? ActiveJourneyScreen(journeys: _journeys)
+        : RoadmapScreen(
+            onOpenDirectory: () => setState(() => _currentIndex = 2),
+          ),
+    const IdsScreen(),
+    const ProfileScreen(),
   ];
 
   @override
@@ -29,22 +64,34 @@ class _ResidentAppShellState extends State<ResidentAppShell> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          for (var i = 0; i < _pages.length; i++)
+            MotionTab(active: i == _currentIndex, child: _pages[i]),
+        ],
+      ),
 
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: EdgeInsets.zero,
         child: Container(
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: colorScheme.outlineVariant),
+            color: colorScheme.brightness == Brightness.dark
+                ? colorScheme.surfaceContainer
+                : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+            ),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
             child: BottomNavigationBar(
               currentIndex: _currentIndex,
 
               onTap: (index) {
+                if (index == _currentIndex) return;
+                FocusManager.instance.primaryFocus?.unfocus();
                 setState(() {
                   _currentIndex = index;
                 });
@@ -54,8 +101,13 @@ class _ResidentAppShellState extends State<ResidentAppShell> {
 
               backgroundColor: Colors.transparent,
               elevation: 0,
+              iconSize: 27,
+              selectedFontSize: 11,
+              unselectedFontSize: 11,
 
-              selectedItemColor: primaryBlue,
+              selectedItemColor: colorScheme.brightness == Brightness.dark
+                  ? Colors.blue.shade200
+                  : primaryBlue,
 
               unselectedItemColor: colorScheme.onSurfaceVariant,
 
@@ -82,13 +134,13 @@ class _ResidentAppShellState extends State<ResidentAppShell> {
                   // Route icon represents the user's ID journey.
                   icon: Icon(Icons.alt_route_outlined),
                   activeIcon: Icon(Icons.alt_route),
-                  label: 'Roadmap',
+                  label: 'My ID Journey',
                 ),
 
                 BottomNavigationBarItem(
                   icon: Icon(Icons.badge_outlined),
                   activeIcon: Icon(Icons.badge),
-                  label: 'Directory',
+                  label: 'ID Directory',
                 ),
 
                 BottomNavigationBarItem(

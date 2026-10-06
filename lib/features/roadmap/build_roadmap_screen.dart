@@ -1,9 +1,13 @@
+import '../../core/widgets/app_motion.dart';
+
 import 'package:flutter/material.dart';
 
 import 'confirm_documents_screen.dart';
+import 'id_journey.dart';
 
 class BuildRoadmapScreen extends StatefulWidget {
-  const BuildRoadmapScreen({super.key});
+  const BuildRoadmapScreen({super.key, this.existingJourneys = const []});
+  final List<IdJourney> existingJourneys;
 
   static const primaryBlue = Color(0xFF12499A);
 
@@ -38,9 +42,9 @@ class _BuildRoadmapScreenState extends State<BuildRoadmapScreen> {
     final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: colors.surface,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
@@ -48,91 +52,108 @@ class _BuildRoadmapScreenState extends State<BuildRoadmapScreen> {
           icon: Icon(Icons.arrow_back_rounded, color: colors.onSurface),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'What IDs do you want to\nacquire?',
-              style: TextStyle(
-                fontSize: 28,
-                height: 1.25,
-                fontWeight: FontWeight.w900,
-                color: colors.onSurface,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Select one or more IDs you want to include in\nthis journey.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: colors.onSurface,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: BuildRoadmapScreen.primaryBlue.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                '${_selectedIds.length} ID${_selectedIds.length == 1 ? '' : 's'} selected',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: BuildRoadmapScreen.primaryBlue,
-                ),
-              ),
-            ),
-            const SizedBox(height: 17),
-            Expanded(
-              child: ListView.separated(
-                itemCount: _ids.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 7),
-                itemBuilder: (context, index) {
-                  final id = _ids[index];
-                  return _IdOptionCard(
-                    id: id,
-                    selected: _selectedIds.contains(id.title),
-                    onTap: () => _toggleId(id.title),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 38,
-              child: ElevatedButton(
-                onPressed: _selectedIds.isEmpty
-                    ? null
-                    : () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ConfirmDocumentsScreen(),
-                          ),
-                        );
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: BuildRoadmapScreen.primaryBlue,
-                  disabledBackgroundColor: colors.surfaceContainerHighest,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'What IDs do you want to\nacquire?',
+                  style: TextStyle(
+                    fontSize: 24,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                    color: colors.onSurface,
                   ),
                 ),
-                child: const Text(
-                  'Next',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                const SizedBox(height: 8),
+                Text(
+                  'Select one or more IDs you want to include in\nthis journey.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: colors.onSurface,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: BuildRoadmapScreen.primaryBlue.withValues(
+                      alpha: 0.08,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    '${_selectedIds.length} ID${_selectedIds.length == 1 ? '' : 's'} selected',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: BuildRoadmapScreen.primaryBlue,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 17),
+                SizedBox(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _ids.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final id = _ids[index];
+                      return _IdOptionCard(
+                        id: id,
+                        selected: _selectedIds.contains(id.title),
+                        onTap: () => _toggleId(id.title),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: ElevatedButton(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ConfirmDocumentsScreen(
+                                  targetIds: _selectedIds.toList(),
+                                  existingJourneys: widget.existingJourneys,
+                                ),
+                              ),
+                            );
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: BuildRoadmapScreen.primaryBlue,
+                      disabledBackgroundColor: colors.surfaceContainerHighest,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Next',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -155,14 +176,18 @@ class _IdOptionCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Material(
-      color: colors.surface,
-      borderRadius: BorderRadius.circular(11),
-      child: InkWell(
+      color: colors.brightness == Brightness.dark
+          ? colors.surfaceContainer
+          : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: MotionInkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(11),
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: AppMotion.duration(context),
+          curve: AppMotion.curve,
+          constraints: const BoxConstraints(minHeight: 60),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             border: Border.all(
               color: selected
@@ -170,7 +195,7 @@ class _IdOptionCard extends StatelessWidget {
                   : colors.outlineVariant,
               width: selected ? 1.4 : 1,
             ),
-            borderRadius: BorderRadius.circular(11),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             children: [
@@ -193,7 +218,7 @@ class _IdOptionCard extends StatelessWidget {
                 ),
               ),
               AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
+                duration: AppMotion.duration(context, AppMotion.quick),
                 width: 18,
                 height: 18,
                 decoration: BoxDecoration(
