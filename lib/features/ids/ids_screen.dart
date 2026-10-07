@@ -1,435 +1,242 @@
 import 'package:flutter/material.dart';
 import 'id_details_screen.dart';
+import '../../models/government_id.dart';
+import '../../services/api_service.dart';
 
-class IdsScreen extends StatelessWidget {
-  const IdsScreen({super.key});
+class IdsScreen extends StatefulWidget {
+  final Future<List<GovernmentIdDetails>> Function()? loadIds;
+  final Future<GovernmentIdDetails> Function(int)? loadDetail;
+  const IdsScreen({super.key, this.loadIds, this.loadDetail});
 
-  static const Color primaryBlue = Color(0xFF1E3A8A);
-  static const Color lightBlue = Color(0xFFF0F5FA);
-  static const Color successGreen = Color(0xFF287A45);
-  static const Color successBackground = Color(0xFFE5F4EA);
+  @override
+  State<IdsScreen> createState() => _IdsScreenState();
+}
+
+class _IdsScreenState extends State<IdsScreen> {
+  late Future<List<GovernmentIdDetails>> _ids;
+  String _search = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _ids = _load();
+  }
+
+  Future<List<GovernmentIdDetails>> _load() =>
+      widget.loadIds?.call() ?? ApiService.getGovernmentIds();
+
+  static const primaryBlue = Color(0xFF174B85);
+
+  void _open(BuildContext context, GovernmentIdDetails record) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => IdDetailsScreen(idName: record.name, governmentId: record.id, loadDetail: widget.loadDetail)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-        physics: const BouncingScrollPhysics(), // Adds premium iOS-style bounce
-        children: [
-          _buildHeader(colorScheme),
-          const SizedBox(height: 24),
-
-          _buildSearchBar(context),
-          const SizedBox(height: 32),
-
-          _buildFeaturedSection(context),
-          const SizedBox(height: 36),
-
-          _buildAllIdsSection(context),
-        ],
-      ),
+    return FutureBuilder<List<GovernmentIdDetails>>(
+      future: _ids,
+      builder: (context, snapshot) {
+        return _directory(context, snapshot.data ?? [],
+          loading: snapshot.connectionState != ConnectionState.done,
+          failed: snapshot.hasError,
+        );
+      },
     );
   }
 
-  Widget _buildHeader(ColorScheme colorScheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'ID Directory',
-          style: TextStyle(
-            fontSize: 28, // Slightly larger for stronger hierarchy
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
-            color: colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Browse supported government IDs and application guides',
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.4,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchBar(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      // OUTSTANDING UX: Added a soft shadow to make the search bar float
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: primaryBlue.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: 'Search IDs or Agencies',
-          hintStyle: TextStyle(
-            fontSize: 14,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-          ),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 4.0),
-            child: Icon(
-              Icons.search_rounded,
-              size: 22,
-              color: primaryBlue.withValues(alpha: 0.6), // Tinted icon
-            ),
-          ),
-          filled: true,
-          fillColor: isDark
-              ? colorScheme.surfaceContainerHighest
-              : Colors.white, // Pure white for better contrast
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16, // Slightly taller for better touch target
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16), // Softer corners
-            borderSide: BorderSide.none, // Removed hard borders in favor of shadow
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: primaryBlue,
-              width: 1.5,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeaturedSection(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Featured IDs',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            Icon(Icons.auto_awesome, size: 18, color: Colors.amber.shade600), // Small visual delight
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        SizedBox(
-          height: 120, // Slightly taller to accommodate shadow
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none, // Allows shadows to render outside the box
-            children: [
-              _buildFeaturedIdCard(
-                context,
-                title: 'PhilSys ID',
-                backgroundColor: const Color(0xFFF0F5FA),
-                icon: Icons.badge_rounded,
-                iconColor: Colors.blue.shade700,
-              ),
-              const SizedBox(width: 14),
-              _buildFeaturedIdCard(
-                context,
-                title: 'Passport ID',
-                backgroundColor: const Color(0xFFFDF0F0),
-                icon: Icons.menu_book_rounded,
-                iconColor: Colors.red.shade700,
-              ),
-              const SizedBox(width: 14),
-              _buildFeaturedIdCard(
-                context,
-                title: 'PhilHealth',
-                backgroundColor: const Color(0xFFEFF9F1),
-                icon: Icons.health_and_safety_rounded,
-                iconColor: Colors.green.shade700,
-              ),
-              const SizedBox(width: 14),
-              _buildFeaturedIdCard(
-                context,
-                title: "Driver's License",
-                backgroundColor: const Color(0xFFFFF7E6),
-                icon: Icons.directions_car_rounded,
-                iconColor: Colors.orange.shade700,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeaturedIdCard(
-    BuildContext context, {
-    required String title,
-    required Color backgroundColor,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: 110,
-      // OUTSTANDING UX: Soft shadow for featured cards
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: iconColor.withValues(alpha: 0.1),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => IdDetailsScreen(idName: title)),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, size: 24, color: iconColor),
+  Widget _directory(BuildContext context, List<GovernmentIdDetails> records,
+      {required bool loading, required bool failed}) {
+    final query = _search.toLowerCase().trim();
+    final visible = records.where((record) =>
+      record.name.toLowerCase().contains(query) ||
+      (record.issuedBy ?? '').toLowerCase().contains(query)).toList();
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    final background = dark ? colors.surface : const Color(0xFFFCFCF8);
+    return ColoredBox(
+      color: background,
+      child: SafeArea(
+        child: ListView.builder(
+          key: const PageStorageKey('id-directory-list'),
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+          itemCount: 1 + (loading || failed ? 0 : visible.length),
+          itemBuilder: (context, index) {
+            if (index > 0) return _idCard(context, visible[index - 1], index - 1);
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('ID Directory', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: colors.onSurface)),
+              const SizedBox(height: 5),
+              Text('Browse supported government IDs\nand application guides.',
+                style: TextStyle(fontSize: 13, height: 1.45, color: colors.onSurfaceVariant)),
+              const SizedBox(height: 18),
+              TextField(
+                onChanged: (value) => setState(() { _search = value; }),
+                decoration: InputDecoration(
+                  hintText: 'Search IDs or Agencies',
+                  hintStyle: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+                  prefixIcon: Icon(Icons.search_rounded, size: 19, color: colors.onSurfaceVariant),
+                  filled: true,
+                  fillColor: dark ? colors.surfaceContainer : Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9),
+                    borderSide: BorderSide(color: colors.outlineVariant)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9),
+                    borderSide: const BorderSide(color: primaryBlue, width: 1.5)),
                 ),
+              ),
+              if (loading) ...[
+                const SizedBox(height: 24),
+                const LinearProgressIndicator(minHeight: 2),
                 const SizedBox(height: 12),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.2,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
+                Text('Loading government IDs…', style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
+              ] else if (failed) ...[
+                const SizedBox(height: 24),
+                const Text('Could not load the ID directory.'),
+                TextButton(onPressed: () {
+                  final request = _load();
+                  setState(() { _ids = request; });
+                }, child: const Text('Retry')),
+              ] else ...[
+                if (visible.isNotEmpty) ...[
+                  const SizedBox(height: 22),
+                  const Text('Featured IDs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 12),
+                  LayoutBuilder(builder: (context, constraints) {
+                    final width = ((constraints.maxWidth - 24) / 4).clamp(88.0, 150.0).toDouble();
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        for (var i = 0; i < visible.take(4).length; i++)
+                          _featured(context, visible[i], i, width),
+                      ]),
+                    );
+                  }),
+                ],
+                const SizedBox(height: 24),
+                const Text('All IDs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 12),
+                if (visible.isEmpty)
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(records.isEmpty ? 'No Government IDs are available yet.' : 'No matching IDs.')),
               ],
-            ),
-          ),
+            ]);
+          },
         ),
       ),
     );
   }
 
-  Widget _buildAllIdsSection(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+  static const _pastels = [Color(0xFFCDDEFB), Color(0xFFF7DDD7), Color(0xFFE0EED1), Color(0xFFD4DFF7)];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'All IDs',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: colorScheme.onSurface,
-          ),
+  Widget _featured(BuildContext context, GovernmentIdDetails record, int index, double width) {
+    final colors = Theme.of(context).colorScheme;
+    final tint = _pastels[index % _pastels.length];
+    final dark = colors.brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: SizedBox(width: width, child: Material(
+        color: dark ? Color.alphaBlend(tint.withValues(alpha: 0.15), colors.surfaceContainer) : tint,
+        borderRadius: BorderRadius.circular(12), clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _open(context, record),
+          child: Padding(padding: const EdgeInsets.fromLTRB(8, 12, 8, 12), child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 68, child: Center(child: _DirectoryArt(name: record.name))),
+              const SizedBox(height: 10),
+              Text(record.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, height: 1.25, fontWeight: FontWeight.w700, color: colors.onSurface)),
+              if (record.issuedBy != null) ...[
+                const SizedBox(height: 3),
+                Text(record.issuedBy!, maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 9, height: 1.25, color: colors.onSurfaceVariant)),
+              ],
+            ],
+          )),
         ),
-        const SizedBox(height: 16),
-
-        _buildIdListCard(
-          context,
-          title: 'Passport ID',
-          description: 'Primary government-issued travel document',
-          readiness: '50% Ready',
-          lastUpdated: 'May 23, 2025',
-          icon: Icons.menu_book_rounded,
-        ),
-        const SizedBox(height: 14),
-        _buildIdListCard(
-          context,
-          title: 'PhilSys ID',
-          description: 'National identification for secure verification',
-          readiness: '76% Ready',
-          lastUpdated: 'May 23, 2025',
-          icon: Icons.badge_rounded,
-        ),
-      ],
+      )),
     );
   }
 
-  Widget _buildIdListCard(
-    BuildContext context, {
-    required String title,
-    required String description,
-    required String readiness,
-    required String lastUpdated,
-    required IconData icon,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      // OUTSTANDING UX: Soft ambient shadow for list items
-      decoration: BoxDecoration(
-        boxShadow: isDark ? [] : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+  Widget _idCard(BuildContext context, GovernmentIdDetails record, int index) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    final tint = _pastels[index % _pastels.length];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: isDark ? colorScheme.surfaceContainerHighest : Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: dark ? colors.surfaceContainer : Colors.white,
+        elevation: dark ? 0 : 1,
+        shadowColor: const Color(0x140C2545),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.45))),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => IdDetailsScreen(idName: title)),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildIdThumbnail(icon: icon),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          height: 1.3,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          _buildReadinessBadge(readiness),
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.update_rounded,
-                            size: 14,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            lastUpdated,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8F9FB),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: primaryBlue,
-                  ),
-                ),
-              ],
+          onTap: () => _open(context, record),
+          child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [
+            Container(
+              width: 72, height: 104,
+              decoration: BoxDecoration(
+                color: dark ? tint.withValues(alpha: 0.12) : tint.withValues(alpha: 0.32),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: _DirectoryArt(name: record.name),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(record.name, style: TextStyle(fontSize: 15, height: 1.3,
+                fontWeight: FontWeight.w800, color: colors.onSurface)),
+              if (record.description != null) ...[
+                const SizedBox(height: 4),
+                Text(record.description!, maxLines: 3, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, height: 1.4, color: colors.onSurfaceVariant)),
+              ],
+              if (record.issuedBy != null) ...[
+                const SizedBox(height: 8),
+                Text(record.issuedBy!, style: TextStyle(fontSize: 10, height: 1.3,
+                  fontWeight: FontWeight.w500, color: colors.onSurfaceVariant)),
+              ],
+            ])),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, size: 20, color: colors.onSurfaceVariant),
+          ])),
         ),
       ),
     );
   }
 
-  Widget _buildIdThumbnail({required IconData icon}) {
-    return Container(
-      width: 72,
-      height: 52,
-      decoration: BoxDecoration(
-        color: lightBlue,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: primaryBlue.withValues(alpha: 0.1)),
-      ),
-      child: Icon(icon, size: 28, color: primaryBlue),
-    );
-  }
 
-  Widget _buildReadinessBadge(String readiness) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: successBackground,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: successGreen.withValues(alpha: 0.2)),
+}
+
+// Decorative illustrations only; names never determine requirements or API IDs.
+class _DirectoryArt extends StatelessWidget {
+  const _DirectoryArt({required this.name});
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final passport = name.toLowerCase().contains('passport');
+    return ExcludeSemantics(child: Transform.rotate(
+      angle: passport ? 0.07 : -0.06,
+      child: Container(
+        width: passport ? 42 : 58, height: passport ? 58 : 40,
+        decoration: BoxDecoration(
+          color: passport ? const Color(0xFF82363E) : const Color(0xFFF8FBFF),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: passport ? const Color(0xFF632731) : const Color(0xFFB7C8E4)),
+          boxShadow: const [BoxShadow(color: Color(0x200C2545), blurRadius: 5, offset: Offset(1, 3))],
+        ),
+        child: passport
+            ? const Icon(Icons.public_rounded, color: Color(0xFFDDBA76), size: 25)
+            : const Padding(padding: EdgeInsets.all(5), child: Row(children: [
+                Icon(Icons.person_rounded, color: Color(0xFF527BAE), size: 22),
+                SizedBox(width: 3),
+                Expanded(child: Icon(Icons.notes_rounded, color: Color(0xFF8EACD1), size: 18)),
+              ])),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle_rounded, size: 12, color: successGreen),
-          const SizedBox(width: 4),
-          Text(
-            readiness,
-            style: const TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              color: successGreen,
-            ),
-          ),
-        ],
-      ),
-    );
+    ));
   }
 }

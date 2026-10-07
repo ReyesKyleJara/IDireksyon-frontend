@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../models/government_id.dart';
+import '../../services/api_service.dart';
+import 'requirements_tab.dart';
+
 class IdDetailsScreen extends StatefulWidget {
   final String idName;
+  final int? governmentId;
+  final Future<GovernmentIdDetails> Function(int)? loadDetail;
 
-  const IdDetailsScreen({
-    super.key,
-    required this.idName,
-  });
+  const IdDetailsScreen({super.key, required this.idName, this.governmentId, this.loadDetail});
 
   @override
   State<IdDetailsScreen> createState() => _IdDetailsScreenState();
@@ -16,7 +19,8 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
     with SingleTickerProviderStateMixin {
   static const Color primaryBlue = Color(0xFF1E3A8A);
   static const Color softBlue = Color(0xFFEFF4FB);
-  static const Color gold = Color(0xFFF4C542);
+  Future<GovernmentIdDetails>? _detail;
+  GovernmentIdDetails? _record;
 
   late final TabController _tabController;
 
@@ -24,10 +28,22 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
   void initState() {
     super.initState();
 
-    _tabController = TabController(
-      length: 4,
-      vsync: this,
-    );
+    _tabController = TabController(length: 4, vsync: this);
+    _detail = _load();
+  }
+
+  Future<GovernmentIdDetails>? _load() {
+    final id = widget.governmentId;
+    return id == null ? null : (widget.loadDetail?.call(id) ?? ApiService.getGovernmentId(id));
+  }
+
+  @override
+  void didUpdateWidget(covariant IdDetailsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.governmentId != widget.governmentId) {
+      _record = null;
+      _detail = _load();
+    }
   }
 
   @override
@@ -38,17 +54,74 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<GovernmentIdDetails>(
+      future: _detail,
+      builder: (context, snapshot) {
+        _record = snapshot.connectionState == ConnectionState.done && !snapshot.hasError ? snapshot.data : null;
+        return _buildScreen(context, snapshot);
+      },
+    );
+  }
+
+  Widget _buildScreen(BuildContext context, AsyncSnapshot<GovernmentIdDetails> snapshot) {
     return Scaffold(
-      backgroundColor: primaryBlue,
+      backgroundColor: const Color(0xFF072C76),
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: _buildContent(context),
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverAppBar(
+              primary: false,
+              pinned: true,
+              backgroundColor: const Color(0xFF072C76),
+              foregroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              leading: IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.chevron_left_rounded),
+              ),
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              title: AnimatedSwitcher(
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero : const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [...previousChildren, ?currentChild],
+                ),
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.12), end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: innerBoxIsScrolled
+                    ? Text(_record?.name ?? widget.idName,
+                        key: const ValueKey('compact-id-title'),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))
+                    : const SizedBox.shrink(key: ValueKey('expanded-id-title')),
+              ),
+            ),
+            SliverToBoxAdapter(child: _buildHeader(context)),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _PinnedIdTabs(
+                height: 48 + (MediaQuery.textScalerOf(context).scale(12) - 12).clamp(0, double.infinity),
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: _buildTabBar(),
+                ),
+              ),
             ),
           ],
+          body: _buildContent(context, snapshot),
         ),
       ),
     );
@@ -60,239 +133,59 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
 
   Widget _buildHeader(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-      child: Column(
-        children: [
-          _buildTopBar(),
-          const SizedBox(height: 20),
-          _buildIdOverview(),
-        ],
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 4, 20, 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Container(width: 88, height: 64,
+            decoration: BoxDecoration(color: const Color(0xFFDDE7FA), borderRadius: BorderRadius.circular(5)),
+            child: const Icon(Icons.badge_outlined, size: 46, color: Color(0xFF345F9E))),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_record?.name ?? widget.idName, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 20, height: 1.2, fontWeight: FontWeight.w800, color: Colors.white)),
+            if (_record?.description != null) ...[
+              const SizedBox(height: 4),
+              Text(_record!.description!, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 10, height: 1.4, color: Colors.white70)),
+            ],
+            if (_record?.validity != null) _headerFact(Icons.calendar_month_outlined, 'Validity', _record!.validity!),
+            if (_record?.issuedBy != null) _headerFact(Icons.account_balance_outlined, 'Issued by', _record!.issuedBy!),
+            if (_record?.purpose != null) _headerFact(Icons.person_outline_rounded, 'Use', _record!.purpose!),
+          ])),
+        ]),
+      ]),
     );
   }
 
-  Widget _buildTopBar() {
-    return SizedBox(
-      height: 42,
-      child: Row(
-        children: [
-          _buildBackButton(),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              widget.idName,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.2,
-              ),
-            ),
-          ),
-          const SizedBox(width: 50),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBackButton() {
-    return Material(
-      color: Colors.white.withValues(alpha: 0.10),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () => Navigator.pop(context),
-        borderRadius: BorderRadius.circular(12),
-        child: const SizedBox(
-          width: 42,
-          height: 42,
-          child: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-            size: 18,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIdOverview() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        _buildIdThumbnail(),
-        const SizedBox(width: 15),
-        Expanded(
-          child: _buildIdInformation(),
-        ),
-        const SizedBox(width: 12),
-        _buildReadiness(),
-      ],
-    );
-  }
-
-  Widget _buildIdThumbnail() {
-    return Container(
-      width: 82,
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.18),
-          width: 1,
-        ),
-      ),
-      child: const Icon(
-        Icons.badge_rounded,
-        size: 28,
-        color: Colors.white,
-      ),
-    );
-  }
-
-  Widget _buildIdInformation() {
-    return const Column(
+  Widget _headerFact(IconData icon, String label, String value) {
+    return Padding(padding: const EdgeInsets.only(top: 7), child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Issued by',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        SizedBox(height: 1),
-        Text(
-          'Department of Foreign Affairs',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        SizedBox(height: 7),
-        Row(
-          children: [
-            Icon(
-              Icons.schedule_rounded,
-              size: 13,
-              color: Colors.white60,
-            ),
-            SizedBox(width: 4),
-            Text(
-              'Valid for 10 years',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 10.5,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 3),
-        Row(
-          children: [
-            Icon(
-              Icons.public_rounded,
-              size: 13,
-              color: Colors.white60,
-            ),
-            SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                'International travel',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 10.5,
-                ),
-              ),
-            ),
-          ],
-        ),
+        Icon(icon, size: 15, color: Colors.white70),
+        const SizedBox(width: 7),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+          Text(value, maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10, height: 1.35, color: Colors.white70)),
+        ])),
       ],
-    );
-  }
-
-  Widget _buildReadiness() {
-    return Column(
-      children: [
-        SizedBox(
-          width: 56,
-          height: 56,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 56,
-                height: 56,
-                child: CircularProgressIndicator(
-                  value: 0.5,
-                  strokeWidth: 4,
-                  backgroundColor: Colors.white.withValues(alpha: 0.15),
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    gold,
-                  ),
-                ),
-              ),
-              const Text(
-                '50%',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Ready',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
+    ));
   }
 
   // ============================================================
   // WHITE CONTENT CONTAINER
   // ============================================================
 
-  Widget _buildContent(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
-      ),
-      child: Column(
+  Widget _buildContent(BuildContext context, AsyncSnapshot<GovernmentIdDetails> snapshot) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: TabBarView(
+        controller: _tabController,
         children: [
-          const SizedBox(height: 8),
-          _buildTabBar(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildRequirementsTab(),
-                _buildCostTab(),
-                _buildOfficesTab(),
-                _buildGuideTab(),
-              ],
-            ),
-          ),
+          _buildRequirementsTab(snapshot),
+          _buildCostTab(),
+          _buildOfficesTab(),
+          _buildGuideTab(),
         ],
       ),
     );
@@ -310,10 +203,12 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         isScrollable: true,
         tabAlignment: TabAlignment.start,
 
-        labelColor: primaryBlue,
+        labelColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFFA8CCFA) : primaryBlue,
         unselectedLabelColor: const Color(0xFF9299A5),
 
-        indicatorColor: primaryBlue,
+        indicatorColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFFA8CCFA) : primaryBlue,
         indicatorWeight: 2.5,
         indicatorSize: TabBarIndicatorSize.label,
 
@@ -346,57 +241,28 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
   // REQUIREMENTS
   // ============================================================
 
-  Widget _buildRequirementsTab() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-      children: [
-        _buildInfoBanner(
-          icon: Icons.info_outline_rounded,
-          title: 'Before you apply',
-          message:
-              'Make sure you have the required documents ready before proceeding with your application.',
-        ),
-        const SizedBox(height: 22),
-
-        _buildSectionTitle(
-          title: 'Basic Requirements',
-          subtitle: 'Documents you should prepare',
-        ),
-        const SizedBox(height: 12),
-
-        _buildRequirementItem(
-          title: 'Birth Certificate',
-          subtitle: 'Original or certified copy',
-        ),
-        _buildRequirementItem(
-          title: 'Valid Government ID',
-          subtitle: 'Bring an accepted primary ID',
-        ),
-
-        const SizedBox(height: 22),
-
-        _buildSectionTitle(
-          title: 'Primary ID Requirements',
-          subtitle: 'Additional requirements for this application',
-        ),
-        const SizedBox(height: 12),
-
-        _buildRequirementItem(
-          title: 'Personal Appearance',
-          subtitle: 'Applicant must appear in person',
-        ),
-        _buildRequirementItem(
-          title: 'Confirmed Appointment',
-          subtitle: 'Bring your appointment confirmation',
-        ),
-
-        const SizedBox(height: 20),
-
-        _buildImportantNotes(
-          'Requirements may vary depending on your application type and current government policies.',
-        ),
-      ],
-    );
+  Widget _buildRequirementsTab(AsyncSnapshot<GovernmentIdDetails> snapshot) {
+    if (widget.governmentId == null) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text('Open this ID from the ID Directory to view its current requirements.'),
+      );
+    }
+    if (snapshot.connectionState != ConnectionState.done) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (snapshot.hasError || snapshot.data == null) {
+      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Could not load requirements.'),
+        TextButton(onPressed: () {
+              final request = _load();
+              setState(() {
+                _detail = request;
+              });
+            }, child: const Text('Retry')),
+      ]));
+    }
+    return RequirementsTab(governmentId: snapshot.data!);
   }
 
   // ============================================================
@@ -694,114 +560,6 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildInfoBanner({
-    required IconData icon,
-    required String title,
-    required String message,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: softBlue,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFDCE6F4),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.info_outline_rounded,
-            color: primaryBlue,
-            size: 20,
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: primaryBlue,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  message,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    height: 1.45,
-                    color: Color(0xFF566174),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRequirementItem({
-    required String title,
-    required String subtitle,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 9),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAFBFC),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: const Color(0xFFE8EBEF),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFC8CDD5),
-                width: 1.5,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF293244),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFF858D9A),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1118,4 +876,23 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       ),
     );
   }
+}
+
+class _PinnedIdTabs extends SliverPersistentHeaderDelegate {
+  final double height;
+  final Widget child;
+
+  _PinnedIdTabs({required this.height, required this.child});
+
+  @override
+  double get minExtent => height;
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => child;
+
+  @override
+  bool shouldRebuild(covariant _PinnedIdTabs oldDelegate) =>
+      height != oldDelegate.height || child != oldDelegate.child;
 }
