@@ -1,71 +1,171 @@
-import '../../core/widgets/app_motion.dart';
-
 import 'package:flutter/material.dart';
+
+import '../../core/auth/auth_service.dart';
 
 class ManageInventoryScreen extends StatefulWidget {
   const ManageInventoryScreen({super.key});
 
   @override
-  State<ManageInventoryScreen> createState() => _ManageInventoryScreenState();
+  State<ManageInventoryScreen> createState() =>
+      _ManageInventoryScreenState();
 }
 
 class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
   static const Color primaryBlue = Color(0xFF1E3A8A);
 
-  final Set<String> _selectedItems = {
-    'PhilSys ID',
-    'Passport ID',
-    'PhilHealth ID',
-    'School ID',
-    'Birth Certificate',
-  };
+  final List<_InventoryOption> _ids = [];
+  final List<_InventoryOption> _documents = [];
 
-  final List<_InventoryOption> _ids = [
-    _InventoryOption(title: 'PhilSys ID', icon: Icons.badge_rounded),
-    _InventoryOption(title: 'Passport ID', icon: Icons.menu_book_rounded),
-    _InventoryOption(title: 'SSS ID', icon: Icons.credit_card_rounded),
-    _InventoryOption(
-      title: 'PhilHealth ID',
-      icon: Icons.health_and_safety_rounded,
-    ),
-    _InventoryOption(title: 'UMID', icon: Icons.credit_card_rounded),
-  ];
+  final Set<int> _selectedIdIds = {};
+  final Set<int> _selectedDocumentIds = {};
 
-  final List<_InventoryOption> _documents = [
-    _InventoryOption(title: 'School ID', icon: Icons.school_rounded),
-    _InventoryOption(
-      title: 'Birth Certificate',
-      icon: Icons.description_rounded,
-    ),
-    _InventoryOption(
-      title: 'Certificate of Residency',
-      icon: Icons.home_work_rounded,
-    ),
-  ];
+  bool _isLoading = true;
+  bool _isSaving = false;
+  String? _errorMessage;
 
-  void _toggleItem(String title) {
+  @override
+  void initState() {
+    super.initState();
+    _loadInventory();
+  }
+
+  Future<void> _loadInventory() async {
     setState(() {
-      if (_selectedItems.contains(title)) {
-        _selectedItems.remove(title);
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final data = await AuthService.instance.getInventory();
+
+      final rawIds = data['government_ids'];
+      final rawDocuments = data['documents'];
+
+      if (rawIds is! List || rawDocuments is! List) {
+        throw const AuthException(
+          'The server returned an unexpected inventory response.',
+        );
+      }
+
+      final ids = rawIds
+          .whereType<Map>()
+          .map(
+            (item) => _InventoryOption.fromJson(
+              Map<String, dynamic>.from(item),
+              type: _InventoryType.governmentId,
+            ),
+          )
+          .toList();
+
+      final documents = rawDocuments
+          .whereType<Map>()
+          .map(
+            (item) => _InventoryOption.fromJson(
+              Map<String, dynamic>.from(item),
+              type: _InventoryType.document,
+            ),
+          )
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        _ids
+          ..clear()
+          ..addAll(ids);
+
+        _documents
+          ..clear()
+          ..addAll(documents);
+
+        _selectedIdIds
+          ..clear()
+          ..addAll(
+            ids.where((item) => item.owned).map((item) => item.id),
+          );
+
+        _selectedDocumentIds
+          ..clear()
+          ..addAll(
+            documents.where((item) => item.owned).map((item) => item.id),
+          );
+
+        _isLoading = false;
+      });
+    } on AuthException catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Unable to load your inventory.';
+      });
+    }
+  }
+
+  void _toggleItem(_InventoryOption item) {
+    setState(() {
+      final selectedSet = item.type == _InventoryType.governmentId
+          ? _selectedIdIds
+          : _selectedDocumentIds;
+
+      if (selectedSet.contains(item.id)) {
+        selectedSet.remove(item.id);
       } else {
-        _selectedItems.add(title);
+        selectedSet.add(item.id);
       }
     });
   }
 
-  int get _selectedIdCount {
-    return _ids.where((item) => _selectedItems.contains(item.title)).length;
+  Future<void> _saveInventory() async {
+    if (_isSaving) return;
+
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await AuthService.instance.saveInventory(
+        governmentIdIds: _selectedIdIds.toList()..sort(),
+        documentIds: _selectedDocumentIds.toList()..sort(),
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Inventory updated successfully.'),
+        ),
+      );
+
+      Navigator.pop(context, true);
+    } on AuthException catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _isSaving = false;
+        _errorMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _isSaving = false;
+        _errorMessage = 'Unable to save your inventory.';
+      });
+    }
   }
 
-  int get _selectedDocumentCount {
-    return _documents
-        .where((item) => _selectedItems.contains(item.title))
-        .length;
-  }
+  int get _selectedIdCount => _selectedIdIds.length;
 
-  void _saveInventory() {
-    Navigator.pop(context);
-  }
+  int get _selectedDocumentCount => _selectedDocumentIds.length;
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +178,10 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: colorScheme.onSurface),
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: colorScheme.onSurface,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -91,58 +194,173 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: _saveInventory,
-            child: const Text(
-              'Save',
-              style: TextStyle(color: primaryBlue, fontWeight: FontWeight.w700),
-            ),
+            onPressed:
+                _isLoading || _isSaving ? null : _saveInventory,
+            child: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Save',
+                    style: TextStyle(
+                      color: primaryBlue,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        physics: const BouncingScrollPhysics(),
+      body: _buildBody(colorScheme),
+    );
+  }
+
+  Widget _buildBody(ColorScheme colorScheme) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_errorMessage != null &&
+        _ids.isEmpty &&
+        _documents.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.cloud_off_rounded,
+                size: 42,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _loadInventory,
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      physics: const BouncingScrollPhysics(),
+      children: [
+        Text(
+          'Tell us what you already have',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.3,
+            color: colorScheme.onSurface,
+          ),
+        ),
+
+        const SizedBox(height: 6),
+
+        Text(
+          'Select the IDs and documents you currently have. '
+          'IDireksyon will use these when building your personalized journey.',
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 16),
+          _buildErrorBanner(colorScheme),
+        ],
+
+        const SizedBox(height: 24),
+
+        _buildStatusBanner(colorScheme),
+
+        const SizedBox(height: 28),
+
+        _buildSectionTitle('Government IDs', colorScheme),
+
+        const SizedBox(height: 12),
+
+        if (_ids.isEmpty)
+          _buildEmptyMessage(
+            'No Government IDs are available yet.',
+            colorScheme,
+          )
+        else
+          ..._ids.map(
+            (item) => _buildChecklistItem(
+              item,
+              _selectedIdIds.contains(item.id),
+              colorScheme,
+            ),
+          ),
+
+        const SizedBox(height: 20),
+
+        _buildSectionTitle('Documents', colorScheme),
+
+        const SizedBox(height: 12),
+
+        if (_documents.isEmpty)
+          _buildEmptyMessage(
+            'No documents are available yet.',
+            colorScheme,
+          )
+        else
+          ..._documents.map(
+            (item) => _buildChecklistItem(
+              item,
+              _selectedDocumentIds.contains(item.id),
+              colorScheme,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildErrorBanner(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Tell us what you already have',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.3,
-              color: colorScheme.onSurface,
+          Icon(
+            Icons.error_outline_rounded,
+            size: 20,
+            color: colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onErrorContainer,
+              ),
             ),
           ),
-
-          const SizedBox(height: 6),
-
-          Text(
-            'Select the IDs and documents you currently have. IDireksyon will use these when building your personalized roadmap.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          _buildStatusBanner(colorScheme),
-
-          const SizedBox(height: 28),
-
-          _buildSectionTitle('Government IDs', colorScheme),
-
-          const SizedBox(height: 12),
-
-          ..._ids.map((item) => _buildChecklistItem(item, colorScheme)),
-
-          const SizedBox(height: 20),
-
-          _buildSectionTitle('Documents', colorScheme),
-
-          const SizedBox(height: 12),
-
-          ..._documents.map((item) => _buildChecklistItem(item, colorScheme)),
         ],
       ),
     );
@@ -154,7 +372,9 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
       decoration: BoxDecoration(
         color: primaryBlue.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: primaryBlue.withValues(alpha: 0.12)),
+        border: Border.all(
+          color: primaryBlue.withValues(alpha: 0.12),
+        ),
       ),
       child: Row(
         children: [
@@ -179,7 +399,8 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$_selectedIdCount IDs · $_selectedDocumentCount documents',
+                  '$_selectedIdCount IDs · '
+                  '$_selectedDocumentCount documents',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -205,7 +426,10 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title, ColorScheme colorScheme) {
+  Widget _buildSectionTitle(
+    String title,
+    ColorScheme colorScheme,
+  ) {
     return Text(
       title,
       style: TextStyle(
@@ -216,19 +440,40 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
     );
   }
 
-  Widget _buildChecklistItem(_InventoryOption item, ColorScheme colorScheme) {
-    final isSelected = _selectedItems.contains(item.title);
+  Widget _buildEmptyMessage(
+    String message,
+    ColorScheme colorScheme,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Text(
+        message,
+        style: TextStyle(
+          fontSize: 13,
+          color: colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
 
+  Widget _buildChecklistItem(
+    _InventoryOption item,
+    bool isSelected,
+    ColorScheme colorScheme,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        child: MotionInkWell(
-          onTap: () => _toggleItem(item.title),
+        child: InkWell(
+          onTap: () => _toggleItem(item),
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 13,
+            ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
@@ -241,7 +486,9 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
             child: Row(
               children: [
                 Icon(
-                  item.icon,
+                  item.type == _InventoryType.governmentId
+                      ? Icons.badge_rounded
+                      : Icons.description_rounded,
                   size: 21,
                   color: isSelected
                       ? primaryBlue
@@ -252,26 +499,32 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
 
                 Expanded(
                   child: Text(
-                    item.title,
+                    item.name,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: isSelected
                           ? FontWeight.w700
                           : FontWeight.w500,
-                      color: isSelected ? primaryBlue : colorScheme.onSurface,
+                      color: isSelected
+                          ? primaryBlue
+                          : colorScheme.onSurface,
                     ),
                   ),
                 ),
 
                 AnimatedContainer(
-                  duration: AppMotion.duration(context, AppMotion.quick),
+                  duration: const Duration(milliseconds: 150),
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: isSelected ? primaryBlue : Colors.transparent,
+                    color: isSelected
+                        ? primaryBlue
+                        : Colors.transparent,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected ? primaryBlue : colorScheme.outline,
+                      color: isSelected
+                          ? primaryBlue
+                          : colorScheme.outline,
                       width: 2,
                     ),
                   ),
@@ -292,9 +545,42 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
   }
 }
 
-class _InventoryOption {
-  final String title;
-  final IconData icon;
+enum _InventoryType {
+  governmentId,
+  document,
+}
 
-  const _InventoryOption({required this.title, required this.icon});
+class _InventoryOption {
+  final int id;
+  final String name;
+  final bool owned;
+  final _InventoryType type;
+
+  const _InventoryOption({
+    required this.id,
+    required this.name,
+    required this.owned,
+    required this.type,
+  });
+
+  factory _InventoryOption.fromJson(
+    Map<String, dynamic> json, {
+    required _InventoryType type,
+  }) {
+    final id = json['id'];
+    final name = json['name'];
+
+    if (id is! int || name is! String) {
+      throw const FormatException(
+        'Invalid inventory item.',
+      );
+    }
+
+    return _InventoryOption(
+      id: id,
+      name: name,
+      owned: json['owned'] == true,
+      type: type,
+    );
+  }
 }
