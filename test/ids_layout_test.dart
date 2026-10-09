@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idireksyon_frontend/core/theme/app_theme.dart';
 import 'package:idireksyon_frontend/features/ids/ids_screen.dart';
+import 'package:idireksyon_frontend/models/government_id.dart';
 
 void main() {
   for (final dark in [false, true]) {
@@ -21,30 +23,54 @@ void main() {
                   .copyWith(textScaler: TextScaler.linear(scale)),
               child: child!,
             ),
-            home: const Scaffold(body: IdsScreen()),
+            home: Scaffold(body: IdsScreen(loadIds: () async => [
+              GovernmentIdDetails.fromJson({'id': 34, 'name': 'Philippine Passport', 'description': 'Travel document'}),
+              GovernmentIdDetails.fromJson({'id': 5, 'name': 'National ID', 'description': 'Identification'}),
+            ])),
           ),
         );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
+        expect(find.text('Featured IDs'), findsOneWidget);
+        expect(find.text('All IDs'), findsOneWidget);
         await tester.drag(find.byType(ListView).first, const Offset(0, -500));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
+        expect(find.text('Philippine Passport'), findsWidgets);
+        expect(find.text('National ID'), findsWidgets);
+        expect(find.text('Browse IDs'), findsNothing);
+        expect(find.byType(ListView), findsOneWidget);
         if (dark) {
-          final cards = tester
-              .widgetList<Material>(
-                find.descendant(
-                  of: find.byType(IdsScreen),
-                  matching: find.byType(Material),
-                ),
-              )
-              .where((material) => material.shape is RoundedRectangleBorder);
-          expect(cards.length, greaterThanOrEqualTo(3));
+          final title = tester.widget<Text>(find.text('Philippine Passport').first);
+          expect(title.style!.color!.computeLuminance(), greaterThan(0.5));
+          final cards = tester.widgetList<Material>(
+            find.descendant(
+              of: find.byType(IdsScreen),
+              matching: find.byType(Material),
+            ),
+          ).where((material) => material.shape is RoundedRectangleBorder);
+          expect(cards, isNotEmpty);
           for (final card in cards) {
             expect(card.color!.computeLuminance(), lessThan(0.2));
           }
         }
+
       });
     }
   }
+  testWidgets('shows directory heading and search while the first request is pending', (tester) async {
+    final pending = Completer<List<GovernmentIdDetails>>();
+    await tester.pumpWidget(MaterialApp(home: Scaffold(
+      body: IdsScreen(loadIds: () => pending.future),
+    )));
+    expect(find.text('ID Directory'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Loading government IDs…'), findsOneWidget);
+    pending.complete([]);
+    await tester.pumpAndSettle();
+    expect(find.text('No Government IDs are available yet.'), findsOneWidget);
+    expect(find.text('Loading government IDs…'), findsNothing);
+  });
+
 }
 

@@ -7,30 +7,52 @@ import 'package:http/testing.dart';
 import 'package:idireksyon_frontend/core/auth/auth_service.dart';
 import 'package:idireksyon_frontend/core/theme/app_theme.dart';
 import 'package:idireksyon_frontend/features/profile/account_details_screen.dart';
+import 'package:idireksyon_frontend/features/ids/ids_screen.dart';
 import 'package:idireksyon_frontend/features/shell/resident_app_shell.dart';
 
 void main() {
-  testWidgets('directory button selects directory tab', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: const ResidentAppShell(initialIndex: 1),
-      ),
-    );
-    await tester.ensureVisible(find.text('Open ID Directory'));
-    await tester.tap(find.text('Open ID Directory'));
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
-          .currentIndex,
-      2,
-    );
-    expect(
-      find.text('Browse supported government IDs and application guides'),
-      findsOneWidget,
-    );
-  });
+  for (final offline in [false, true]) {
+    testWidgets('directory button selects directory tab: offline=$offline', (tester) async {
+      var requests = 0;
+      await http.runWithClient(() async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const ResidentAppShell(initialIndex: 1),
+          ),
+        );
+        await tester.ensureVisible(find.text('Open ID Directory'));
+        await tester.tap(find.text('Open ID Directory'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<BottomNavigationBar>(find.byType(BottomNavigationBar)).currentIndex,
+          2,
+        );
+        final directory = find.byType(IdsScreen);
+        expect(directory, findsOneWidget);
+        expect(find.descendant(of: directory, matching: find.text('ID Directory')), findsOneWidget);
+        expect(find.descendant(of: directory, matching: find.byType(TextField)), findsOneWidget);
+        if (offline) {
+          expect(find.text('Could not load the ID directory.'), findsOneWidget);
+          expect(find.text('Retry'), findsOneWidget);
+        } else {
+          expect(find.text('Directory test credential'), findsWidgets);
+          expect(find.text('Could not load the ID directory.'), findsNothing);
+        }
+        expect(requests, 1);
+        expect(tester.takeException(), isNull);
+      }, () => MockClient((request) async {
+        requests++;
+        expect(request.method, 'GET');
+        expect(request.url.path, '/api/government-ids');
+        return offline
+            ? http.Response('Unavailable', 503)
+            : http.Response(jsonEncode({'data': [
+                {'id': 34, 'name': 'Directory test credential'},
+              ]}), 200);
+      }));
+    });
+  }
 
   testWidgets('account details save real data and display server errors', (
     tester,
