@@ -162,4 +162,131 @@ class AuthService {
       'password_confirmation': confirmation,
     });
   }
+  Future<Map<String, dynamic>> getInventory() async {
+  if (token == null) {
+    throw const AuthException('Please sign in again.');
+  }
+
+  try {
+    final response = await _client
+        .get(
+          Uri.parse(
+            '${baseUrl.replaceAll(RegExp(r'/$'), '')}/auth/inventory',
+          ),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 20));
+
+    if (response.statusCode >= 500) {
+      throw const AuthException(
+        'The server is unavailable. Please try again.',
+      );
+    }
+
+    final body = jsonDecode(response.body);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AuthException(
+        body is Map<String, dynamic>
+            ? body['message']?.toString() ?? 'Unable to load inventory.'
+            : 'Unable to load inventory.',
+      );
+    }
+
+    if (body is! Map<String, dynamic> ||
+        body['data'] is! Map<String, dynamic>) {
+      throw const AuthException(
+        'The server returned an unexpected inventory response.',
+      );
+    }
+
+    return body['data'] as Map<String, dynamic>;
+  } on TimeoutException {
+    throw const AuthException(
+      'The connection timed out. Please try again.',
+    );
+  } on http.ClientException {
+    throw const AuthException(
+      'Cannot connect to the server. Check your connection and try again.',
+    );
+  } on FormatException {
+    throw const AuthException(
+      'The server returned an unexpected response.',
+    );
+  }
+}
+
+Future<Map<String, dynamic>> saveInventory({
+  required List<int> governmentIdIds,
+  required List<int> documentIds,
+}) async {
+  if (token == null) {
+    throw const AuthException('Please sign in again.');
+  }
+
+  try {
+    final response = await _client
+        .put(
+          Uri.parse(
+            '${baseUrl.replaceAll(RegExp(r'/$'), '')}/auth/inventory',
+          ),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'government_id_ids': governmentIdIds,
+            'document_ids': documentIds,
+          }),
+        )
+        .timeout(const Duration(seconds: 20));
+
+    final body = jsonDecode(response.body);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String message = 'Unable to save inventory.';
+
+      if (body is Map<String, dynamic>) {
+        final errors = body['errors'];
+
+        if (errors is Map && errors.isNotEmpty) {
+          final first = errors.values.first;
+
+          if (first is List && first.isNotEmpty) {
+            message = first.first.toString();
+          }
+        } else if (body['message'] != null) {
+          message = body['message'].toString();
+        }
+      }
+
+      throw AuthException(message);
+    }
+
+    if (body is! Map<String, dynamic> ||
+        body['data'] is! Map<String, dynamic>) {
+      throw const AuthException(
+        'The server returned an unexpected inventory response.',
+      );
+    }
+
+    return body['data'] as Map<String, dynamic>;
+  } on TimeoutException {
+    throw const AuthException(
+      'The connection timed out. Please try again.',
+    );
+  } on http.ClientException {
+    throw const AuthException(
+      'Cannot connect to the server. Check your connection and try again.',
+    );
+  } on FormatException {
+    throw const AuthException(
+      'The server returned an unexpected response.',
+    );
+  }
+}
 }
