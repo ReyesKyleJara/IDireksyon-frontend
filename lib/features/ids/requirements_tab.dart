@@ -73,19 +73,10 @@ class _RequirementsTabState extends State<RequirementsTab> {
           ]);
         }),
         const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: _accent(context).withValues(alpha: 0.05),
-            border: Border.all(color: colors.outlineVariant),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(Icons.info_outline_rounded, size: 22, color: _accent(context)),
-            const SizedBox(width: 12),
-            Expanded(child: Text('Use this guide to prepare for your application. Check the accepted items and any special instructions before your visit.',
-              style: TextStyle(fontSize: 12, height: 1.5, color: colors.onSurface))),
-          ]),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text('Prepare each requirement below. Where choices are offered, only the stated number is needed.',
+            style: TextStyle(fontSize: 13, height: 1.5, color: colors.onSurfaceVariant)),
         ),
         if (selected.groups.isEmpty)
           const Padding(padding: EdgeInsets.only(top: 24),
@@ -104,57 +95,57 @@ class _RequirementSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final hasAlternatives = group.ways.length > 1;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(border: Border(
         bottom: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.55)))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 22, height: 22,
-            decoration: BoxDecoration(color: _accent(context), shape: BoxShape.circle),
-            child: Icon(group.ways.any((way) => way.items.length > 1)
-              ? Icons.badge_outlined : Icons.description_outlined,
-              size: 14, color: colors.brightness == Brightness.dark ? colors.surface : Colors.white)),
-          const SizedBox(width: 7),
-          Expanded(child: Text(group.displayName, style: TextStyle(fontSize: 16, height: 1.4,
-            fontWeight: FontWeight.w700, color: colors.onSurface))),
-        ]),
-        if (group.conditionType != 'always') ...[
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: _accent(context).withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(8)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Only required when', style: TextStyle(fontSize: 13,
-                fontWeight: FontWeight.w700, color: _accent(context))),
-              if (group.condition != null) ...[
-                const SizedBox(height: 4),
-                Text(group.condition!, style: TextStyle(fontSize: 13, height: 1.5, color: colors.onSurface)),
-              ],
-            ]),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(Icons.description_outlined, size: 18, color: _accent(context)),
           ),
-        ],
-        if (group.ways.length > 1) ...[
-          const SizedBox(height: 10),
-          Text('Choose one of the options below.',
-            style: TextStyle(fontSize: 15, height: 1.5, color: colors.onSurfaceVariant)),
-        ],
-        for (var index = 0; index < group.ways.length; index++) ...[
-          if (index > 0)
-            Padding(padding: const EdgeInsets.symmetric(vertical: 18), child: Row(children: [
-              Expanded(child: Divider(color: colors.outlineVariant)),
-              Padding(padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Text('OR', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colors.onSurfaceVariant))),
-              Expanded(child: Divider(color: colors.outlineVariant)),
-            ])),
-          if (group.ways.length > 1)
-            Padding(padding: const EdgeInsets.only(top: 12),
-              child: Text('Option ${index + 1}', style: TextStyle(fontSize: 15,
-                fontWeight: FontWeight.w700, color: _accent(context)))),
-          _WayView(key: ValueKey(index), way: group.ways[index], heading: group.displayName),
-        ],
+          const SizedBox(width: 8),
+          Expanded(child: Text(group.displayName, style: TextStyle(
+            fontSize: 16, height: 1.4, fontWeight: FontWeight.w600, color: colors.onSurface))),
+        ]),
+        Padding(
+          padding: const EdgeInsets.only(left: 26),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (group.conditionType != 'always')
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(group.condition == null
+                    ? 'Conditional requirement — check when this applies.'
+                    : 'Only if: ${group.condition}',
+                  style: TextStyle(fontSize: 13, height: 1.5, color: colors.onSurfaceVariant)),
+              ),
+            if (hasAlternatives)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Meet one of these alternatives, not all of them.',
+                  style: TextStyle(fontSize: 13, height: 1.5, color: colors.onSurfaceVariant)),
+              ),
+            for (var index = 0; index < group.ways.length; index++) ...[
+              if (index > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text('OR', style: TextStyle(fontSize: 12,
+                    fontWeight: FontWeight.w700, color: _accent(context))),
+                ),
+              if (hasAlternatives)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text('Option ${index + 1}', style: TextStyle(fontSize: 13,
+                    fontWeight: FontWeight.w600, color: colors.onSurface)),
+                ),
+              _WayView(key: ValueKey((group.ways[index].id, index)),
+                way: group.ways[index], heading: group.displayName,
+                alternative: hasAlternatives),
+            ],
+          ]),
+        ),
       ]),
     );
   }
@@ -163,44 +154,52 @@ class _RequirementSection extends StatelessWidget {
 class _WayView extends StatelessWidget {
   final RequirementWay way;
   final String heading;
-  const _WayView({super.key, required this.way, required this.heading});
+  final bool alternative;
+  const _WayView({super.key, required this.way, required this.heading, required this.alternative});
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final isChoice = way.items.length > 1 && way.requiredCount < way.items.length;
+    final collapseItems = isChoice || way.items.length > 3;
     final items = [
       for (final item in way.items)
-        _ItemView(item: item, showName: way.items.length != 1 || item.name != heading,
+        _ItemView(item: item,
+          showName: alternative || way.items.length != 1 || item.name != heading,
           bullet: way.items.length > 1),
     ];
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const SizedBox(height: 10),
-      Text(way.instruction, style: TextStyle(fontSize: 15, height: 1.5,
-        fontWeight: FontWeight.w600, color: _accent(context))),
-      if (way.qualification != null) ...[
-        const SizedBox(height: 8),
-        Text(way.qualification!, style: TextStyle(fontSize: 15, height: 1.5, color: colors.onSurface)),
-      ],
-      if (way.items.length > 3)
+      if (way.items.length != 1 || alternative)
         Padding(
-          padding: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(way.instruction, style: TextStyle(fontSize: 13, height: 1.5,
+            fontWeight: FontWeight.w600, color: _accent(context))),
+        ),
+      if (way.qualification != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(way.qualification!, style: TextStyle(
+            fontSize: 13, height: 1.5, color: colors.onSurfaceVariant)),
+        ),
+      if (collapseItems)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
           child: Material(
-            color: _accent(context).withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(8),
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(6),
             clipBehavior: Clip.antiAlias,
             child: ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-              childrenPadding: const EdgeInsets.only(right: 12, bottom: 14),
+              tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+              childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
               shape: const Border(),
               collapsedShape: const Border(),
               iconColor: _accent(context),
               collapsedIconColor: _accent(context),
               title: Text(
-                way.requiredCount < way.items.length
-                    ? 'View ${way.items.length} accepted items'
+                isChoice ? 'View ${way.items.length} accepted items'
                     : 'View all ${way.items.length} required items',
-                style: TextStyle(fontSize: 14, height: 1.4,
-                  fontWeight: FontWeight.w600, color: _accent(context)),
+                style: TextStyle(fontSize: 13, height: 1.4,
+                  fontWeight: FontWeight.w500, color: _accent(context)),
               ),
               children: items,
             ),
@@ -216,28 +215,28 @@ class _ItemView extends StatelessWidget {
   final RequirementItem item;
   final bool showName, bullet;
   const _ItemView({required this.item, required this.showName, required this.bullet});
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final detailsStyle = TextStyle(fontSize: 12, height: 1.5, color: colors.onSurfaceVariant);
+    final detailsStyle = TextStyle(fontSize: 13, height: 1.5, color: colors.onSurfaceVariant);
     if (!showName && item.quantity == null && item.submission == null && item.instructions == null) {
       return const SizedBox.shrink();
     }
     return Padding(
-      padding: const EdgeInsets.only(top: 6, left: 29),
+      padding: const EdgeInsets.only(top: 5),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (bullet) ...[
-          Padding(padding: const EdgeInsets.only(top: 4),
+          Padding(padding: const EdgeInsets.only(top: 8),
             child: Icon(Icons.circle, size: 4, color: colors.onSurfaceVariant)),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
         ],
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showName) Text(item.name, style: TextStyle(fontSize: 15, height: 1.5,
+          if (showName) Text(item.name, style: TextStyle(fontSize: 14, height: 1.5,
             fontWeight: FontWeight.w500, color: colors.onSurface)),
           if (item.quantity != null) Text('Quantity: ${item.quantity}', style: detailsStyle),
           if (item.submission != null) Text(item.submission!, style: detailsStyle),
-          if (item.instructions != null)
-            Padding(padding: const EdgeInsets.only(top: 4), child: Text(item.instructions!, style: detailsStyle)),
+          if (item.instructions != null) Text(item.instructions!, style: detailsStyle),
         ])),
       ]),
     );

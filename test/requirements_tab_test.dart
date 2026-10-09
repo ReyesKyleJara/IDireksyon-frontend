@@ -47,7 +47,7 @@ void main() {
       requirement('PSA Birth Certificate', [{...item('PSA Birth Certificate'), 'submission_format': 'original_photocopy', 'submission_label': 'Original + Photocopy', 'copies': 1, 'instructions': 'Bring a clear copy.'}]),
     ])], legacy: 'Old duplicate summary'));
     expect(find.text('PSA Birth Certificate'), findsOneWidget);
-    expect(find.text('Required'), findsOneWidget);
+    expect(find.text('Required'), findsNothing);
     expect(find.text('Original + 1 photocopy'), findsOneWidget);
     final title = tester.widget<Text>(find.text('PSA Birth Certificate'));
     final submission = tester.widget<Text>(find.text('Original + 1 photocopy'));
@@ -101,8 +101,7 @@ void main() {
          'qualification_label': 'At least one selected item must: Contain photo and signature'},
       ],
     }])]));
-    expect(find.text('Only required when'), findsOneWidget);
-    expect(find.text('When the name differs'), findsOneWidget);
+    expect(find.text('Only if: When the name differs'), findsOneWidget);
     expect(find.text('Option 1'), findsOneWidget);
     expect(find.text('OR'), findsOneWidget);
     expect(find.text('Option 2'), findsOneWidget);
@@ -204,4 +203,67 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Requirements for this application are not available yet.'), findsOneWidget);
   });
+  testWidgets('keeps short accepted choices collapsed without hiding qualifications', (tester) async {
+    await showRequirements(tester, record(sets: [scenario(1, 'Adult', [{
+      'id': 1, 'title': 'Proof of address', 'condition_type': 'always',
+      'ways': [{
+        'required_count': 1,
+        'qualification_type': 'current_address',
+        'qualification_label': 'Each selected item must: Show current address',
+        'items': [item('National ID'), item('License')],
+      }],
+    }])]));
+    expect(find.text('Choose 1 accepted item'), findsOneWidget);
+    expect(find.text('Each selected item must: Show current address'), findsOneWidget);
+    expect(find.text('National ID'), findsNothing);
+    await tester.tap(find.text('View 2 accepted items'));
+    await tester.pumpAndSettle();
+    expect(find.text('National ID'), findsOneWidget);
+    expect(find.text('License'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows all mandatory items without describing them as alternatives', (tester) async {
+    await showRequirements(tester, record(sets: [scenario(1, 'Adult', [
+      requirement('Supporting documents', [item('Birth Certificate'), item('Application Form')], count: 2),
+    ])]));
+    expect(find.text('Provide all listed items'), findsOneWidget);
+    expect(find.text('Birth Certificate'), findsOneWidget);
+    expect(find.text('Application Form'), findsOneWidget);
+    expect(find.byType(ExpansionTile), findsNothing);
+    expect(find.text('Choose 2 accepted items'), findsNothing);
+  });
+
+  testWidgets('keeps a distinct requirement title and its selected document visible', (tester) async {
+    await showRequirements(tester, record(sets: [scenario(1, 'Adult', [
+      requirement('Proof of birth', [item('Birth Certificate')]),
+    ])]));
+    expect(find.text('Proof of birth'), findsOneWidget);
+    expect(find.text('Birth Certificate'), findsOneWidget);
+  });
+
+  testWidgets('accepted choices and instructions wrap with large text on a narrow screen', (tester) async {
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(2)), child: child!),
+      home: Scaffold(body: RequirementsTab(governmentId: record(sets: [scenario(1, 'Adult', [
+        requirement('Proof of identity with a long descriptive heading', [
+          {...item('Long government identification document name'),
+            'instructions': 'Bring the original document and a clear copy of both sides.'},
+          item('Another accepted identification document'),
+        ]),
+      ])]))),
+    ));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('View 2 accepted items'));
+    await tester.tap(find.text('View 2 accepted items'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bring the original document and a clear copy of both sides.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
 }
