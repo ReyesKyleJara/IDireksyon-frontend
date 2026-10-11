@@ -70,20 +70,28 @@ class AuthService {
   }
 
   Future<void> saveProfileSetup({
-    required List<String> ids,
-    required List<String> documents,
-  }) async {
-    if (token == null) throw const AuthException('Please sign in again.');
-    final data = await _post('profile-setup', {
-      'ids': ids,
-      'documents': documents,
-    });
-    final profile = data['user'];
-    if (profile is! Map<String, dynamic>) {
-      throw const AuthException('The server returned an unexpected response.');
-    }
-    user = profile;
+  required List<int> governmentIdIds,
+  required List<int> documentIds,
+}) async {
+  if (token == null) {
+    throw const AuthException('Please sign in again.');
   }
+
+  final data = await _post('profile-setup', {
+    'government_id_ids': governmentIdIds,
+    'document_ids': documentIds,
+  });
+
+  final profile = data['user'];
+
+  if (profile is! Map<String, dynamic>) {
+    throw const AuthException(
+      'The server returned an unexpected response.',
+    );
+  }
+
+  user = profile;
+}
 
   Future<Map<String, dynamic>> _post(
     String path,
