@@ -1,70 +1,214 @@
 import '../../core/widgets/app_motion.dart';
 
 import 'package:flutter/material.dart';
-
-import '../../core/theme/app_theme.dart';
-
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/theme/app_theme.dart';
 
 class SignupForm extends StatefulWidget {
-  const SignupForm({super.key, required this.usePhone});
+  const SignupForm({
+    super.key,
+    required this.usePhone,
+  });
+
   final bool usePhone;
 
   @override
-  State<SignupForm> createState() => _SignupFormState();
+  State<SignupForm> createState() =>
+      _SignupFormState();
 }
 
-class _SignupFormState extends State<SignupForm> {
-  static const _blue = Color(0xFF0B4295);
-  final _formKey = GlobalKey<FormState>();
-  final _password = TextEditingController();
-  final _name = TextEditingController();
-  final _contact = TextEditingController();
-  final _confirmation = TextEditingController();
+class _SignupFormState
+    extends State<SignupForm> {
+  static const _blue =
+      Color(0xFF0B4295);
+
+  final _formKey =
+      GlobalKey<FormState>();
+
+  final _contact =
+      TextEditingController();
+  final _password =
+      TextEditingController();
+  final _confirmation =
+      TextEditingController();
+
+  late bool _usePhone;
+
   bool _submitting = false;
   bool _accepted = false;
   bool _showAgreementError = false;
 
+  bool _showPassword = false;
+  bool _showConfirmation = false;
+
+  String? _contactServerError;
+  String? _passwordServerError;
+  String? _confirmationServerError;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _usePhone = widget.usePhone;
+  }
+
   @override
   void dispose() {
-    _password.dispose();
-    _name.dispose();
     _contact.dispose();
+    _password.dispose();
     _confirmation.dispose();
+
     super.dispose();
   }
 
   void _message(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+        ),
+      );
+  }
+
+  void _switchMethod(bool phone) {
+    if (_usePhone == phone) return;
+
+    setState(() {
+      _usePhone = phone;
+
+      _contact.clear();
+      _contactServerError = null;
+    });
+  }
+
+  String _friendlyContactError(
+    String serverMessage,
+  ) {
+    final lower =
+        serverMessage.toLowerCase();
+
+    if (lower.contains('taken') ||
+        lower.contains('already')) {
+      return _usePhone
+      ? 'This phone number can’t be used. Try another or log in.'
+      : 'This email can’t be used. Try another or log in.';
+    }
+
+    return serverMessage;
   }
 
   Future<void> _submit() async {
     if (_submitting) return;
-    final valid = _formKey.currentState!.validate();
-    setState(() => _showAgreementError = !_accepted);
-    if (valid && _accepted) {
-      FocusScope.of(context).unfocus();
-      setState(() => _submitting = true);
-      try {
-        await AuthService.instance.register(
-          name: _name.text,
-          contact: _contact.text,
-          usePhone: widget.usePhone,
-          password: _password.text,
-          confirmation: _confirmation.text,
-          accepted: _accepted,
-        );
-        if (!mounted) return;
-        Navigator.of(context)
-            .pushNamedAndRemoveUntil('/profile/setup', (_) => false);
-      } on AuthException catch (error) {
-        if (mounted) _message(error.message);
-      } finally {
-        if (mounted) setState(() => _submitting = false);
+
+    setState(() {
+      _contactServerError = null;
+      _passwordServerError = null;
+      _confirmationServerError =
+          null;
+    });
+
+    final valid =
+        _formKey.currentState!.validate();
+
+    setState(() {
+      _showAgreementError =
+          !_accepted;
+    });
+
+    if (!valid || !_accepted) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _submitting = true;
+    });
+
+    try {
+      await AuthService.instance.register(
+        contact: _contact.text,
+        usePhone: _usePhone,
+        password: _password.text,
+        confirmation:
+            _confirmation.text,
+        accepted: _accepted,
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context)
+          .pushNamedAndRemoveUntil(
+        '/profile/setup',
+        (_) => false,
+      );
+    } on AuthException catch (error) {
+      if (!mounted) return;
+
+      final contactKey =
+          _usePhone
+              ? 'phone'
+              : 'email';
+
+      final contactError =
+          error.fieldErrors[
+              contactKey];
+
+      final passwordError =
+          error.fieldErrors[
+              'password'];
+
+      final termsError =
+          error.fieldErrors[
+              'terms_accepted'];
+
+      final hasFieldError =
+          contactError != null ||
+              passwordError != null ||
+              termsError != null;
+
+      if (hasFieldError) {
+        setState(() {
+          if (contactError != null) {
+            _contactServerError =
+                _friendlyContactError(
+              contactError,
+            );
+          }
+
+          if (passwordError != null) {
+            if (passwordError
+                .toLowerCase()
+                .contains(
+                  'confirmation',
+                )) {
+              _confirmationServerError =
+                  passwordError;
+            } else {
+              _passwordServerError =
+                  passwordError;
+            }
+          }
+
+          if (termsError != null) {
+            _showAgreementError =
+                true;
+          }
+        });
+
+        _formKey.currentState
+            ?.validate();
+      } else {
+        _message(error.message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+        });
       }
     }
   }
@@ -73,65 +217,166 @@ class _SignupFormState extends State<SignupForm> {
     String label,
     String hint, {
     bool secret = false,
+    bool showSecret = false,
+    VoidCallback? onToggleSecret,
+    ValueChanged<String>? onChanged,
     String? helper,
     TextEditingController? controller,
     TextInputType? keyboard,
     Iterable<String>? autofill,
-    required FormFieldValidator<String> validator,
+    required FormFieldValidator<String>
+        validator,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding:
+          const EdgeInsets.only(
+        bottom: 10,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 13, color: Colors.black),
+            style:
+                const TextStyle(
+              fontSize: 13,
+              fontWeight:
+                  FontWeight.w500,
+              color:
+                  Color(0xFF20242B),
+            ),
           ),
-          const SizedBox(height: 3),
+
+          const SizedBox(height: 6),
+
           TextFormField(
             controller: controller,
-            obscureText: secret,
+            obscureText:
+                secret && !showSecret,
             autocorrect: false,
             enableSuggestions: !secret,
             keyboardType: keyboard,
             autofillHints: autofill,
-            textInputAction: label == 'Confirm Password'
-                ? TextInputAction.done
-                : TextInputAction.next,
-            onFieldSubmitted: label == 'Confirm Password'
-                ? (_) => _submit()
-                : null,
+            onChanged: onChanged,
+            textInputAction:
+                label ==
+                        'Confirm Password'
+                    ? TextInputAction.done
+                    : TextInputAction.next,
+            onFieldSubmitted:
+                label ==
+                        'Confirm Password'
+                    ? (_) => _submit()
+                    : null,
             validator: validator,
-            style: const TextStyle(fontSize: 13, color: Colors.black),
-            decoration: InputDecoration(
+            style:
+                const TextStyle(
+              fontSize: 14,
+              color:
+                  Color(0xFF20242B),
+            ),
+            decoration:
+                InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF98A2B3),
+              hintStyle:
+                  const TextStyle(
+                fontSize: 14,
+                color:
+                    Color(0xFF98A2B3),
               ),
               helperText: helper,
-              helperStyle: const TextStyle(
+              helperStyle:
+                  const TextStyle(
                 fontSize: 11,
-                color: Color(0xFF98A2B3),
+                color:
+                    Color(0xFF8E96A3),
               ),
+
+              // Allow validation messages to wrap.
+              errorMaxLines: 2,
+
+              suffixIcon: secret
+                  ? IconButton(
+                      tooltip:
+                          showSecret
+                              ? 'Hide password'
+                              : 'Show password',
+                      onPressed:
+                          onToggleSecret,
+                      icon: Icon(
+                        showSecret
+                            ? Icons
+                                .visibility_off_outlined
+                            : Icons
+                                .visibility_outlined,
+                        size: 20,
+                        color:
+                            const Color(
+                          0xFF697386,
+                        ),
+                      ),
+                    )
+                  : null,
               filled: true,
               fillColor: Colors.white,
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
+              contentPadding:
+                  const EdgeInsets
+                      .symmetric(
                 horizontal: 15,
-                vertical: 13,
+                vertical: 14,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+              border:
+                  OutlineInputBorder(
+                borderRadius:
+                    BorderRadius
+                        .circular(12),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFFDFE3EB)),
+              enabledBorder:
+                  OutlineInputBorder(
+                borderRadius:
+                    BorderRadius
+                        .circular(12),
+                borderSide:
+                    const BorderSide(
+                  color:
+                      Color(0xFFDDE1E6),
+                ),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _blue),
+              focusedBorder:
+                  OutlineInputBorder(
+                borderRadius:
+                    BorderRadius
+                        .circular(12),
+                borderSide:
+                    const BorderSide(
+                  color: _blue,
+                  width: 1.5,
+                ),
+              ),
+              errorBorder:
+                  OutlineInputBorder(
+                borderRadius:
+                    BorderRadius
+                        .circular(12),
+                borderSide:
+                    const BorderSide(
+                  color:
+                      Color(0xFFB3261E),
+                ),
+              ),
+              focusedErrorBorder:
+                  OutlineInputBorder(
+                borderRadius:
+                    BorderRadius
+                        .circular(12),
+                borderSide:
+                    const BorderSide(
+                  color:
+                      Color(0xFFB3261E),
+                  width: 1.5,
+                ),
               ),
             ),
           ),
@@ -140,304 +385,694 @@ class _SignupFormState extends State<SignupForm> {
     );
   }
 
-  Widget _method(String label, bool phone) {
-    final selected = widget.usePhone == phone;
+  Widget _method(
+    String label,
+    bool phone,
+  ) {
+    final selected =
+        _usePhone == phone;
+
     return Expanded(
       child: Semantics(
         selected: selected,
-        child: TextButton(
-          onPressed: selected
-              ? () {}
-              : () => Navigator.of(context).pushReplacementNamed(
-                  phone ? '/signup/phone' : '/signup/email',
-                ),
-          style: TextButton.styleFrom(
-            backgroundColor: selected ? _blue : const Color(0xFFD9D9D9),
-            foregroundColor: selected ? Colors.white : _blue,
-            minimumSize: const Size(0, 32),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            shape: const RoundedRectangleBorder(),
-            textStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+        button: true,
+        child: InkWell(
+          onTap: () =>
+              _switchMethod(phone),
+          borderRadius:
+              BorderRadius.circular(
+            10,
+          ),
+          child:
+              AnimatedContainer(
+            duration:
+                const Duration(
+              milliseconds: 150,
+            ),
+            height: 38,
+            alignment:
+                Alignment.center,
+            decoration:
+                BoxDecoration(
+              color: selected
+                  ? _blue
+                  : Colors.transparent,
+              borderRadius:
+                  BorderRadius
+                      .circular(10),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight:
+                    FontWeight.w600,
+                color: selected
+                    ? Colors.white
+                    : const Color(
+                        0xFF667085,
+                      ),
+              ),
             ),
           ),
-          child: Text(label),
         ),
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.pageBackground,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: (constraints.maxHeight - 48).clamp(
-                  0.0,
-                  double.infinity,
+  Widget build(
+    BuildContext context,
+  ) {
+    return Theme(
+      data: AppTheme.lightTheme,
+      child: Scaffold(
+        backgroundColor:
+            AppTheme.pageBackground,
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder:
+                (
+              context,
+              constraints,
+            ) {
+              return SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior
+                        .onDrag,
+                padding:
+                    const EdgeInsets
+                        .fromLTRB(
+                  20,
+                  18,
+                  20,
+                  24,
                 ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: AutofillGroup(
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const SizedBox(height: 54),
-                              Center(
-                                child: SvgPicture.asset(
-                                  'assets/onboarding pictures/Group 105.svg',
-                                  width: 80,
-                                  height: 54,
-                                  excludeFromSemantics: true,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              const Text(
-                                'IDireksyon',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontFamily: 'Bricolage Grotesque',
-                                  fontSize: 32,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0A426E),
-                                ),
-                              ),
-                              const SizedBox(height: 26),
-                              const Text(
-                                'Create Account',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontFamily: 'Bricolage Grotesque',
-                                  fontSize: 24,
-                                  height: 1.25,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Let’s set up your ID journey',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              _field(
-                                'Name',
-                                'e.g. Juan',
-                                controller: _name,
-                                autofill: const [AutofillHints.name],
-                                validator: (value) =>
-                                    value == null || value.trim().isEmpty
-                                    ? 'Enter your name'
-                                    : null,
-                              ),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(5),
-                                child: Row(
-                                  children: [
-                                    _method('Email', false),
-                                    _method('Phone Number', true),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              _field(
-                                widget.usePhone ? 'Phone Number' : 'Email',
-                                widget.usePhone
-                                    ? 'e.g. 09091234567'
-                                    : 'e.g. juandelacruz@email.com',
-                                controller: _contact,
-                                keyboard: widget.usePhone
-                                    ? TextInputType.phone
-                                    : TextInputType.emailAddress,
-                                autofill: [
-                                  widget.usePhone
-                                      ? AutofillHints.telephoneNumber
-                                      : AutofillHints.email,
-                                ],
-                                validator: (value) {
-                                  final contact = (value ?? '').trim();
-                                  if (widget.usePhone) {
-                                    return RegExp(r'^(09\d{9}|\+639\d{9})$')
-                                            .hasMatch(
-                                              contact.replaceAll(
-                                                RegExp(r'[\s()-]'),
-                                                '',
-                                              ),
-                                            )
-                                        ? null
-                                        : 'Enter a valid mobile number (09… or +639…)';
-                                  }
-                                  return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
-                                          .hasMatch(contact)
-                                      ? null
-                                      : 'Enter a valid email address';
-                                },
-                              ),
-                              _field(
-                                'Password',
-                                'Create a strong password',
-                                secret: true,
-                                controller: _password,
-                                autofill: const [AutofillHints.newPassword],
-                                helper: 'Must be at least 8 characters',
-                                validator: (value) => (value ?? '').length < 8
-                                    ? 'Use at least 8 characters'
-                                    : null,
-                              ),
-                              _field(
-                                'Confirm Password',
-                                'Re-enter password',
-                                controller: _confirmation,
-                                secret: true,
-                                validator: (value) =>
-                                    value == null || value.isEmpty
-                                    ? 'Confirm your password'
-                                    : value != _password.text
-                                    ? 'Passwords do not match'
-                                    : null,
-                              ),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                child:
+                    ConstrainedBox(
+                  constraints:
+                      BoxConstraints(
+                    minHeight:
+                        (constraints
+                                    .maxHeight -
+                                42)
+                            .clamp(
+                      0.0,
+                      double.infinity,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment:
+                        MainAxisAlignment
+                            .spaceBetween,
+                    children: [
+                      Center(
+                        child:
+                            ConstrainedBox(
+                          constraints:
+                              const BoxConstraints(
+                            maxWidth:
+                                420,
+                          ),
+                          child:
+                              AutofillGroup(
+                            child: Form(
+                              key:
+                                  _formKey,
+                              child:
+                                  Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment
+                                        .stretch,
                                 children: [
-                                  SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: Checkbox(
-                                      value: _accepted,
-                                      activeColor: _blue,
-                                      semanticLabel:
-                                          'Agree to Terms and Privacy Policy',
-                                      onChanged: (value) => setState(() {
-                                        _accepted = value ?? false;
-                                        _showAgreementError = !_accepted;
-                                      }),
+                                  const SizedBox(
+                                    height:
+                                        32,
+                                  ),
+
+                                  Center(
+                                    child:
+                                        SvgPicture
+                                            .asset(
+                                      'assets/onboarding pictures/Group 105.svg',
+                                      width:
+                                          76,
+                                      height:
+                                          52,
+                                      excludeFromSemantics:
+                                          true,
                                     ),
                                   ),
-                                  Expanded(
-                                    child: Text.rich(
-                                      TextSpan(
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          height: 1.15,
-                                          color: Colors.black,
+
+                                  const SizedBox(
+                                    height: 8,
+                                  ),
+
+                                  const Text(
+                                    'IDireksyon',
+                                    textAlign:
+                                        TextAlign
+                                            .center,
+                                    style:
+                                        TextStyle(
+                                      fontFamily:
+                                          'Bricolage Grotesque',
+                                      fontSize:
+                                          31,
+                                      height:
+                                          1.2,
+                                      fontWeight:
+                                          FontWeight
+                                              .w800,
+                                      color:
+                                          Color(
+                                        0xFF0A426E,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height:
+                                        22,
+                                  ),
+
+                                  const Text(
+                                    'Create Account',
+                                    textAlign:
+                                        TextAlign
+                                            .center,
+                                    style:
+                                        TextStyle(
+                                      fontFamily:
+                                          'Bricolage Grotesque',
+                                      fontSize:
+                                          24,
+                                      height:
+                                          1.25,
+                                      fontWeight:
+                                          FontWeight
+                                              .w700,
+                                      color:
+                                          Colors
+                                              .black,
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height: 5,
+                                  ),
+
+                                  const Text(
+                                    'Create your account to get started.',
+                                    textAlign:
+                                        TextAlign
+                                            .center,
+                                    style:
+                                        TextStyle(
+                                      fontSize:
+                                          13,
+                                      color:
+                                          Color(
+                                        0xFF667085,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height:
+                                        22,
+                                  ),
+
+                                  Container(
+                                    padding:
+                                        const EdgeInsets
+                                            .all(
+                                      3,
+                                    ),
+                                    decoration:
+                                        BoxDecoration(
+                                      color:
+                                          const Color(
+                                        0xFFEDEFF3,
+                                      ),
+                                      borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                        12,
+                                      ),
+                                    ),
+                                    child:
+                                        Row(
+                                      children: [
+                                        _method(
+                                          'Email',
+                                          false,
                                         ),
-                                        children: [
-                                          const TextSpan(
-                                            text: 'By creating an account, you agree to our ',
+                                        _method(
+                                          'Phone Number',
+                                          true,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height:
+                                        14,
+                                  ),
+
+                                  _field(
+                                    _usePhone
+                                        ? 'Phone Number'
+                                        : 'Email',
+                                    _usePhone
+                                        ? 'e.g. 09123456789 or +639123456789'
+                                        : 'e.g. juandelacruz@email.com',
+                                    controller:
+                                        _contact,
+                                    keyboard:
+                                        _usePhone
+                                            ? TextInputType
+                                                .phone
+                                            : TextInputType
+                                                .emailAddress,
+                                    autofill: [
+                                      _usePhone
+                                          ? AutofillHints
+                                              .telephoneNumber
+                                          : AutofillHints
+                                              .email,
+                                    ],
+                                    onChanged:
+                                        (_) {
+                                      if (_contactServerError !=
+                                          null) {
+                                        setState(
+                                          () {
+                                            _contactServerError =
+                                                null;
+                                          },
+                                        );
+                                      }
+                                    },
+                                    validator:
+                                        (value) {
+                                      final contact =
+                                          (value ??
+                                                  '')
+                                              .trim();
+
+                                      if (_usePhone) {
+                                        final normalized =
+                                            contact
+                                                .replaceAll(
+                                          RegExp(
+                                            r'[\s()-]',
                                           ),
-                                          WidgetSpan(
-                                            child: MotionInkWell(
-                                              onTap: () => _message(
-                                                'Terms and Privacy Policy are not available yet.',
-                                              ),
-                                              child: const Text(
-                                                'Terms and Privacy Policy',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: _blue,
-                                                  decoration:
-                                                      TextDecoration.underline,
-                                                ),
+                                          '',
+                                        );
+
+                                        if (!RegExp(
+                                          r'^(09\d{9}|\+639\d{9})$',
+                                        ).hasMatch(
+                                          normalized,
+                                        )) {
+                                          return 'Enter a valid mobile number (09… or +639…)';
+                                        }
+                                      } else {
+                                        if (!RegExp(
+                                          r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                                        ).hasMatch(
+                                          contact,
+                                        )) {
+                                          return 'Enter a valid email address';
+                                        }
+                                      }
+
+                                      return _contactServerError;
+                                    },
+                                  ),
+
+                                  _field(
+                                    'Password',
+                                    'Create a strong password',
+                                    secret:
+                                        true,
+                                    showSecret:
+                                        _showPassword,
+                                    onToggleSecret:
+                                        () {
+                                      setState(
+                                        () {
+                                          _showPassword =
+                                              !_showPassword;
+                                        },
+                                      );
+                                    },
+                                    onChanged:
+                                        (_) {
+                                      if (_passwordServerError !=
+                                          null) {
+                                        setState(
+                                          () {
+                                            _passwordServerError =
+                                                null;
+                                          },
+                                        );
+                                      }
+                                    },
+                                    controller:
+                                        _password,
+                                    autofill:
+                                        const [
+                                      AutofillHints
+                                          .newPassword,
+                                    ],
+                                    helper:
+                                        'Must be at least 8 characters',
+                                    validator:
+                                        (value) {
+                                      if ((value ??
+                                                  '')
+                                              .length <
+                                          8) {
+                                        return 'Use at least 8 characters';
+                                      }
+
+                                      return _passwordServerError;
+                                    },
+                                  ),
+
+                                  _field(
+                                    'Confirm Password',
+                                    'Re-enter password',
+                                    secret:
+                                        true,
+                                    showSecret:
+                                        _showConfirmation,
+                                    onToggleSecret:
+                                        () {
+                                      setState(
+                                        () {
+                                          _showConfirmation =
+                                              !_showConfirmation;
+                                        },
+                                      );
+                                    },
+                                    onChanged:
+                                        (_) {
+                                      if (_confirmationServerError !=
+                                          null) {
+                                        setState(
+                                          () {
+                                            _confirmationServerError =
+                                                null;
+                                          },
+                                        );
+                                      }
+                                    },
+                                    controller:
+                                        _confirmation,
+                                    autofill:
+                                        const [
+                                      AutofillHints
+                                          .newPassword,
+                                    ],
+                                    validator: (value) {
+  // Don't validate confirmation yet
+  // if the main password itself is invalid.
+  if (_password.text.length < 8) {
+    return null;
+  }
+
+  if (value == null || value.isEmpty) {
+    return 'Confirm your password';
+  }
+
+  if (value != _password.text) {
+    return 'Passwords do not match';
+  }
+
+  return _confirmationServerError;
+},
+                                  ),
+
+                                  const SizedBox(
+                                    height: 2,
+                                  ),
+
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment
+                                            .start,
+                                    children: [
+                                      SizedBox(
+                                        width:
+                                            24,
+                                        height:
+                                            24,
+                                        child:
+                                            Checkbox(
+                                          value:
+                                              _accepted,
+                                          activeColor:
+                                              _blue,
+                                          semanticLabel:
+                                              'Agree to Terms and Privacy Policy',
+                                          onChanged:
+                                              (value) {
+                                            setState(
+                                              () {
+                                                _accepted =
+                                                    value ??
+                                                        false;
+
+                                                _showAgreementError =
+                                                    !_accepted;
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      ),
+
+                                      const SizedBox(
+                                        width: 5,
+                                      ),
+
+                                      Expanded(
+                                        child:
+                                            Text.rich(
+                                          TextSpan(
+                                            style:
+                                                const TextStyle(
+                                              fontSize:
+                                                  12.5,
+                                              height:
+                                                  1.35,
+                                              color:
+                                                  Color(
+                                                0xFF4F5663,
                                               ),
                                             ),
+                                            children: [
+                                              const TextSpan(
+                                                text:
+                                                    'By creating an account, you agree to our ',
+                                              ),
+
+                                              WidgetSpan(
+                                                child:
+                                                    MotionInkWell(
+                                                  onTap:
+                                                      () =>
+                                                          _message(
+                                                    'Terms and Privacy Policy are not available yet.',
+                                                  ),
+                                                  child:
+                                                      const Text(
+                                                    'Terms and Privacy Policy',
+                                                    style:
+                                                        TextStyle(
+                                                      fontSize:
+                                                          12.5,
+                                                      color:
+                                                          _blue,
+                                                      decoration:
+                                                          TextDecoration.underline,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+
+                                              const TextSpan(
+                                                text:
+                                                    '. Your information is used to personalize ID guidance and improve your experience.',
+                                              ),
+                                            ],
                                           ),
-                                          const TextSpan(
-                                            text: '. Your information is used solely to generate personalized ID recommendations and improve your experience.',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  if (_showAgreementError)
+                                    const Padding(
+                                      padding:
+                                          EdgeInsets
+                                              .only(
+                                        top: 6,
+                                        bottom:
+                                            6,
+                                        left:
+                                            29,
+                                      ),
+                                      child:
+                                          Text(
+                                        'Please accept the Terms and Privacy Policy.',
+                                        style:
+                                            TextStyle(
+                                          color:
+                                              Color(
+                                            0xFFB3261E,
                                           ),
-                                        ],
+                                          fontSize:
+                                              12,
+                                        ),
                                       ),
                                     ),
+
+                                  const SizedBox(
+                                    height:
+                                        18,
+                                  ),
+
+                                  FilledButton(
+                                    onPressed:
+                                        _submitting
+                                            ? null
+                                            : _submit,
+                                    style:
+                                        FilledButton
+                                            .styleFrom(
+                                      backgroundColor:
+                                          _blue,
+                                      foregroundColor:
+                                          Colors
+                                              .white,
+                                      disabledBackgroundColor:
+                                          _blue
+                                              .withValues(
+                                        alpha:
+                                            0.55,
+                                      ),
+                                      minimumSize:
+                                          const Size
+                                              .fromHeight(
+                                        50,
+                                      ),
+                                      shape:
+                                          RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius
+                                                .circular(
+                                          12,
+                                        ),
+                                      ),
+                                    ),
+                                    child:
+                                        _submitting
+                                            ? const SizedBox(
+                                                width:
+                                                    20,
+                                                height:
+                                                    20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth:
+                                                      2,
+                                                  color:
+                                                      Colors.white,
+                                                ),
+                                              )
+                                            : const Text(
+                                                'Create Account',
+                                                style:
+                                                    TextStyle(
+                                                  fontSize:
+                                                      14,
+                                                  fontWeight:
+                                                      FontWeight.w700,
+                                                ),
+                                              ),
+                                  ),
+
+                                  const SizedBox(
+                                    height: 4,
+                                  ),
+
+                                  Wrap(
+                                    alignment:
+                                        WrapAlignment
+                                            .center,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment
+                                            .center,
+                                    children: [
+                                      const Text(
+                                        'Already have an account?',
+                                        style:
+                                            TextStyle(
+                                          fontSize:
+                                              14,
+                                          color:
+                                              Color(
+                                            0xFF526079,
+                                          ),
+                                        ),
+                                      ),
+
+                                      TextButton(
+                                        onPressed:
+                                            () {
+                                          Navigator.of(
+                                            context,
+                                          ).pushReplacementNamed(
+                                            '/login',
+                                          );
+                                        },
+                                        style:
+                                            TextButton
+                                                .styleFrom(
+                                          foregroundColor:
+                                              const Color(
+                                            0xFFFFAB00,
+                                          ),
+                                          padding:
+                                              const EdgeInsets
+                                                  .symmetric(
+                                            horizontal:
+                                                4,
+                                          ),
+                                        ),
+                                        child:
+                                            const Text(
+                                          'Log In',
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                              if (_showAgreementError)
-                                const Padding(
-                                  padding: EdgeInsets.only(bottom: 8),
-                                  child: Text(
-                                    'Please accept the Terms and Privacy Policy.',
-                                    style: TextStyle(
-                                      color: Color(0xFFB3261E),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              const SizedBox(height: 16),
-                              FilledButton(
-                                onPressed: _submitting ? null : _submit,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _blue,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size.fromHeight(44),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                child: Text(
-                                  _submitting ? 'Creating account…' : 'Sign Up',
-                                ),
-                              ),
-                              Wrap(
-                                alignment: WrapAlignment.center,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  const Text(
-                                    'Already have an account?',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF526079),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context)
-                                            .pushReplacementNamed('/login'),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: const Color(0xFFFFAB00),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                      ),
-                                    ),
-                                    child: const Text('Log In'),
-                                  ),
-                                ],
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
+
+                    ],
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 24, bottom: 8),
-                    child: Text(
-                      'Simple. Clear. Step-by-step.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: Colors.black),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),
