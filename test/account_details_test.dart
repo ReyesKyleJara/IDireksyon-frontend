@@ -11,6 +11,57 @@ import 'package:idireksyon_frontend/features/ids/ids_screen.dart';
 import 'package:idireksyon_frontend/features/shell/resident_app_shell.dart';
 
 void main() {
+  testWidgets('saved account updates persistent Home and Profile without tab requests', (tester) async {
+    final original = AuthService.instance;
+    addTearDown(() => AuthService.instance = original);
+    var accountRequests = 0;
+    var directoryRequests = 0;
+    AuthService.instance = AuthService(client: MockClient((request) async {
+      accountRequests++;
+      expect(request.url.path, '/api/auth/account');
+      return http.Response(jsonEncode({'user': {
+        'id': 1, ...jsonDecode(request.body) as Map<String, dynamic>,
+      }}), 200);
+    }))..token = 'test'
+      ..user = {'id': 1, 'name': 'Kai', 'email': 'kai@example.com'};
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: const ResidentAppShell(),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Kai'), findsOneWidget);
+
+      for (final name in ['Kyle', 'Kai']) {
+        await tester.tap(find.text('Profile').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Account Details'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextFormField).first, name);
+        await tester.ensureVisible(find.text('Save account details'));
+        await tester.tap(find.text('Save account details'));
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextFormField>(find.byType(TextFormField).first).controller!.text, name);
+        // Both headers must update even while covered by the account route.
+        expect(find.text(name, skipOffstage: false), findsNWidgets(3));
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.text(name), findsOneWidget);
+        await tester.tap(find.text('Home').last);
+        await tester.pumpAndSettle();
+        expect(find.text(name), findsOneWidget);
+      }
+      expect(accountRequests, 2);
+      expect(directoryRequests, 1);
+      expect(tester.takeException(), isNull);
+    }, () => MockClient((request) async {
+      directoryRequests++;
+      expect(request.url.path, '/api/government-ids');
+      return http.Response('{"data":[]}', 200);
+    }));
+  });
+
   for (final offline in [false, true]) {
     testWidgets('directory button selects directory tab: offline=$offline', (tester) async {
       var requests = 0;

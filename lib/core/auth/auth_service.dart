@@ -16,7 +16,7 @@ class AuthException implements Exception {
   String? field(String name) => fieldErrors[name];
 }
 
-class AuthService {
+class AuthService extends ChangeNotifier {
   AuthService({
     http.Client? client,
     String? baseUrl,
@@ -45,7 +45,15 @@ class AuthService {
   // Session is currently kept in memory.
   // Restarting the app requires signing in again.
   String? token;
-  Map<String, dynamic>? user;
+  Map<String, dynamic>? _user;
+
+  Map<String, dynamic>? get user => _user;
+
+  // Notify mounted user-data widgets whenever a session response replaces it.
+  set user(Map<String, dynamic>? value) {
+    _user = value;
+    notifyListeners();
+  }
 
   Future<void> login(
     String identifier,
