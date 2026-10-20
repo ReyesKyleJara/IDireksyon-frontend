@@ -1,9 +1,9 @@
+
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/profile/profile_avatar.dart';
 import '../../core/profile/profile_photo_service.dart';
-import '../../core/widgets/page_header.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});
@@ -14,43 +14,32 @@ class AccountDetailsScreen extends StatefulWidget {
 }
 
 class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
-  final _accountForm = GlobalKey<FormState>();
-  final _passwordForm = GlobalKey<FormState>();
+  static const _navy = Color(0xFF1E3A8A);
 
-  final ProfilePhotoService _photoService =
-      ProfilePhotoService.instance;
+  final _formKey = GlobalKey<FormState>();
+  final _photoService = ProfilePhotoService.instance;
+
+  late final bool _usePhone =
+      AuthService.instance.user?['email'] == null;
 
   late final _name = TextEditingController(
     text: AuthService.instance.user?['name'] as String? ?? '',
   );
 
-  late final bool _usePhone =
-      AuthService.instance.user?['email'] == null;
-
   late final _contact = TextEditingController(
-    text:
-        AuthService.instance.user?[_usePhone ? 'phone' : 'email']
-                as String? ??
-            '',
+    text: AuthService.instance.user?[
+            _usePhone ? 'phone' : 'email'] as String? ??
+        '',
   );
 
-  final _current = TextEditingController();
-  final _password = TextEditingController();
-  final _confirmation = TextEditingController();
-
-  final _hidden = [true, true, true];
-
-  bool _savingAccount = false;
-  bool _savingPassword = false;
+  bool _saving = false;
   bool _changingPhoto = false;
 
-  bool get _busy =>
-      _savingAccount || _savingPassword || _changingPhoto;
+  bool get _busy => _saving || _changingPhoto;
 
   @override
   void initState() {
     super.initState();
-
     _photoService.addListener(_onPhotoChanged);
     _photoService.load();
   }
@@ -58,418 +47,291 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   @override
   void dispose() {
     _photoService.removeListener(_onPhotoChanged);
-
-    for (final c in [
-      _name,
-      _contact,
-      _current,
-      _password,
-      _confirmation,
-    ]) {
-      c.dispose();
-    }
-
+    _name.dispose();
+    _contact.dispose();
     super.dispose();
   }
 
   void _onPhotoChanged() {
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
-  Future<void> _showPhotoOptions() async {
+  void _message(String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _changePhoto() async {
     if (_busy) return;
 
     await _photoService.load();
-
     if (!mounted) return;
 
-    final action = await showModalBottomSheet<_PhotoAction>(
+    final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
-      builder: (context) {
-        final colors = Theme.of(context).colorScheme;
-
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Profile photo',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'Profile photo',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 8),
-                ListTile(
-                  leading: const Icon(
-                    Icons.photo_library_outlined,
-                    color: Color(0xFF1E3A8A),
-                  ),
-                  title: Text(
-                    _photoService.hasPhoto
-                        ? 'Choose another photo'
-                        : 'Choose from gallery',
-                  ),
-                  onTap: () {
-                    Navigator.pop(
-                      context,
-                      _PhotoAction.choose,
-                    );
-                  },
-                ),
-                if (_photoService.hasPhoto)
-                  ListTile(
-                    leading: Icon(
-                      Icons.delete_outline_rounded,
-                      color: colors.error,
-                    ),
-                    title: Text(
-                      'Remove photo',
-                      style: TextStyle(
-                        color: colors.error,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(
-                        context,
-                        _PhotoAction.remove,
-                      );
-                    },
-                  ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(
+                _photoService.hasPhoto
+                    ? 'Choose another photo'
+                    : 'Choose from gallery',
+              ),
+              onTap: () =>
+                  Navigator.pop(sheetContext, 'choose'),
+            ),
+            if (_photoService.hasPhoto)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Remove photo'),
+                onTap: () =>
+                    Navigator.pop(sheetContext, 'remove'),
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
     );
 
     if (!mounted || action == null) return;
 
-    setState(() {
-      _changingPhoto = true;
-    });
+    setState(() => _changingPhoto = true);
 
     try {
-      if (action == _PhotoAction.choose) {
-        final changed =
-            await _photoService.pickFromGallery();
-
-        if (changed && mounted) {
+      if (action == 'choose') {
+        final changed = await _photoService.pickFromGallery();
+        if (mounted && changed) {
           _message('Profile photo updated.');
         }
       } else {
         await _photoService.removePhoto();
-
-        if (mounted) {
-          _message('Profile photo removed.');
-        }
+        if (mounted) _message('Profile photo removed.');
       }
     } catch (_) {
       if (mounted) {
         _message('Unable to update your profile photo.');
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _changingPhoto = false;
-        });
-      }
+      if (mounted) setState(() => _changingPhoto = false);
     }
   }
 
-  Future<void> _save({
-    required bool password,
-  }) async {
-    if (_busy ||
-        !(password ? _passwordForm : _accountForm)
-            .currentState!
-            .validate()) {
-      return;
-    }
+  Future<void> _saveAccount() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
 
     FocusScope.of(context).unfocus();
-
-    setState(() {
-      if (password) {
-        _savingPassword = true;
-      } else {
-        _savingAccount = true;
-      }
-    });
+    setState(() => _saving = true);
 
     try {
-      if (password) {
-        await AuthService.instance.updatePassword(
-          current: _current.text,
-          password: _password.text,
-          confirmation: _confirmation.text,
-        );
-      } else {
-        await AuthService.instance.updateAccount(
-          name: _name.text,
-          contact: _contact.text,
-          usePhone: _usePhone,
-        );
-      }
+      await AuthService.instance.updateAccount(
+        name: _name.text.trim(),
+        contact: _contact.text.trim(),
+        usePhone: _usePhone,
+      );
 
       if (!mounted) return;
 
-      if (password) {
-        _passwordForm.currentState!.reset();
+      final user = AuthService.instance.user;
 
-        _current.clear();
-        _password.clear();
-        _confirmation.clear();
+      _name.text = user?['name'] as String? ?? _name.text;
+      _contact.text = user?[
+              _usePhone ? 'phone' : 'email'] as String? ??
+          _contact.text;
 
-        _hidden.fillRange(0, 3, true);
-      } else {
-        _name.text =
-            AuthService.instance.user!['name'] as String;
-
-        _contact.text =
-            AuthService.instance.user![
-                    _usePhone ? 'phone' : 'email']
-                as String;
-      }
-
-      _message(
-        password
-            ? 'Password updated.'
-            : 'Account details updated.',
-      );
+      _message('Profile updated successfully.');
     } on AuthException catch (error) {
+      if (mounted) _message(error.message);
+    } catch (_) {
       if (mounted) {
-        _message(error.message);
+        _message('Unable to save changes.');
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _savingAccount = false;
-          _savingPassword = false;
-        });
-      }
+      if (mounted) setState(() => _saving = false);
     }
   }
 
-  void _message(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-        ),
-      );
-  }
-
-  Color get _accent =>
-      Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFFA8CCFA)
-          : const Color(0xFF1E3A8A);
-
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final muted = colors.onSurfaceVariant;
 
     return Scaffold(
-      backgroundColor:
-          Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Profile'),
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         scrolledUnderElevation: 0,
+        title: const Text(''),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          keyboardDismissBehavior:
-              ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: 600,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const PageHeader('Account Details'),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Keep your personal information up to date and manage your password.',
-                    style: TextStyle(
-                      color: colors.onSurfaceVariant,
-                      height: 1.4,
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Edit profile',
+                      style: TextStyle(
+                        fontSize: 27,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 7),
+                    Text(
+                      'Make changes to your personal details.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: muted,
+                        height: 1.4,
+                      ),
+                    ),
 
-                  _buildPhotoSection(colors),
+                    const SizedBox(height: 32),
 
-                  const SizedBox(height: 24),
-
-                  _card(
-                    icon: Icons.person_outline_rounded,
-                    title: 'Personal information',
-                    children: [
-                      Form(
-                        key: _accountForm,
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.stretch,
-                          children: [
-                            _field(
-                              'Display name',
-                              _name,
-                              autofill: const [
-                                AutofillHints.name,
-                              ],
-                              validator: (v) {
-                                final value = v?.trim() ?? '';
-
-                                if (value.isEmpty) {
-                                  return 'Enter the name you want us to use';
-                                }
-
-                                if (value.length > 255) {
-                                  return 'Use 255 characters or fewer';
-                                }
-
-                                return null;
-                              },
+                    // PROFILE PHOTO
+                    Center(
+                      child: Column(
+                        children: [
+                          ProfileAvatar(
+                            size: 100,
+                            onTap: _changePhoto,
+                          ),
+                          const SizedBox(height: 10),
+                          TextButton(
+                            onPressed: _busy ? null : _changePhoto,
+                            style: TextButton.styleFrom(
+                              foregroundColor: _navy,
                             ),
-                            const SizedBox(height: 18),
-                            _field(
-                              _usePhone
-                                  ? 'Mobile number'
-                                  : 'Email address',
-                              _contact,
-                              keyboard: _usePhone
-                                  ? TextInputType.phone
-                                  : TextInputType.emailAddress,
-                              autofill: [
-                                _usePhone
-                                    ? AutofillHints.telephoneNumber
-                                    : AutofillHints.email,
-                              ],
-                              validator: (v) {
-                                final value = (v ?? '').trim();
-
-                                final valid = _usePhone
-                                    ? RegExp(
-                                        r'^(09\d{9}|\+639\d{9})$',
-                                      ).hasMatch(
-                                        value.replaceAll(
-                                          RegExp(r'[\s()-]'),
-                                          '',
-                                        ),
-                                      )
-                                    : RegExp(
-                                        r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                                      ).hasMatch(value);
-
-                                return valid
-                                    ? null
-                                    : _usePhone
-                                    ? 'Enter a valid Philippine mobile number'
-                                    : 'Enter a valid email address';
-                              },
-                            ),
-                            const SizedBox(height: 22),
-                            _button(
-                              'Save account details',
-                              _savingAccount,
-                              () => _save(
-                                password: false,
+                            child: Text(
+                              _photoService.hasPhoto
+                                  ? 'Change photo'
+                                  : 'Add profile photo',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    // NAME
+                    _field(
+                      label: 'Full name',
+                      controller: _name,
+                      autofill: const [AutofillHints.name],
+                      validator: (value) {
+                        final name = value?.trim() ?? '';
+
+                        if (name.isEmpty) {
+                          return 'Please enter your name.';
+                        }
+                        if (name.length > 255) {
+                          return 'Maximum of 255 characters.';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 23),
+
+                    // EMAIL OR PHONE
+                    _field(
+                      label: _usePhone
+                          ? 'Mobile number'
+                          : 'Email address',
+                      controller: _contact,
+                      keyboardType: _usePhone
+                          ? TextInputType.phone
+                          : TextInputType.emailAddress,
+                      autofill: [
+                        _usePhone
+                            ? AutofillHints.telephoneNumber
+                            : AutofillHints.email,
+                      ],
+                      validator: (value) {
+                        final contact = (value ?? '').trim();
+
+                        if (_usePhone) {
+                          final normalized = contact.replaceAll(
+                            RegExp(r'[\s()-]'),
+                            '',
+                          );
+
+                          if (!RegExp(
+                            r'^(09\d{9}|\+639\d{9})$',
+                          ).hasMatch(normalized)) {
+                            return 'Enter a valid Philippine mobile number.';
+                          }
+                        } else {
+                          if (!RegExp(
+                            r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                          ).hasMatch(contact)) {
+                            return 'Enter a valid email address.';
+                          }
+                        }
+
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 36),
+
+                    // SAVE BUTTON
+                    FilledButton(
+                      onPressed: _busy ? null : _saveAccount,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _navy,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  _card(
-                    icon: Icons.lock_outline_rounded,
-                    title: 'Change password',
-                    children: [
-                      Text(
-                        'Choose a new password with at least 8 characters.',
-                        style: TextStyle(
-                          color: colors.onSurfaceVariant,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Form(
-                        key: _passwordForm,
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.stretch,
-                          children: [
-                            _field(
-                              'Current password',
-                              _current,
-                              secret: 0,
-                              autofill: const [
-                                AutofillHints.password,
-                              ],
-                              validator: (v) =>
-                                  v == null || v.isEmpty
-                                  ? 'Enter your current password'
-                                  : null,
-                            ),
-                            const SizedBox(height: 18),
-                            _field(
-                              'New password',
-                              _password,
-                              secret: 1,
-                              autofill: const [
-                                AutofillHints.newPassword,
-                              ],
-                              validator: (v) =>
-                                  v == null || v.length < 8
-                                  ? 'Use at least 8 characters'
-                                  : v.length > 128
-                                  ? 'Use 128 characters or fewer'
-                                  : v == _current.text
-                                  ? 'Choose a different password'
-                                  : null,
-                            ),
-                            const SizedBox(height: 18),
-                            _field(
-                              'Confirm new password',
-                              _confirmation,
-                              secret: 2,
-                              autofill: const [
-                                AutofillHints.newPassword,
-                              ],
-                              validator: (v) =>
-                                  v == null || v.isEmpty
-                                  ? 'Confirm your new password'
-                                  : v != _password.text
-                                  ? 'Passwords do not match'
-                                  : null,
-                            ),
-                            const SizedBox(height: 22),
-                            _button(
-                              'Update password',
-                              _savingPassword,
-                              () => _save(
-                                password: true,
+                      child: _saving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'Save changes',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -478,115 +340,12 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     );
   }
 
-  Widget _buildPhotoSection(
-    ColorScheme colors,
-  ) {
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            ProfileAvatar(
-              size: 88,
-              showCameraButton: true,
-              onTap: _showPhotoOptions,
-            ),
-            if (_changingPhoto)
-              const Positioned.fill(
-                child: Center(
-                  child: SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        TextButton.icon(
-          onPressed:
-              _busy ? null : _showPhotoOptions,
-          icon: Icon(
-            _photoService.hasPhoto
-                ? Icons.edit_outlined
-                : Icons.add_a_photo_outlined,
-            size: 18,
-          ),
-          label: Text(
-            _photoService.hasPhoto
-                ? 'Change photo'
-                : 'Add profile photo',
-          ),
-        ),
-        Text(
-          'This photo is currently saved on this device.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 11.5,
-            height: 1.35,
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _card({
-    required IconData icon,
-    required String title,
-    required List<Widget> children,
-  }) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colors.brightness == Brightness.dark
-            ? colors.surfaceContainer
-            : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colors.outlineVariant,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                color: _accent,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _field(
-    String label,
-    TextEditingController controller, {
-    int? secret,
-    TextInputType? keyboard,
+  Widget _field({
+    required String label,
+    required TextEditingController controller,
+    required String? Function(String?) validator,
+    TextInputType? keyboardType,
     Iterable<String>? autofill,
-    required FormFieldValidator<String> validator,
   }) {
     final colors = Theme.of(context).colorScheme;
 
@@ -600,112 +359,41 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         TextFormField(
           controller: controller,
           enabled: !_busy,
           validator: validator,
-          keyboardType: keyboard,
+          keyboardType: keyboardType,
           autofillHints: autofill,
-          obscureText:
-              secret != null && _hidden[secret],
           autocorrect: false,
-          enableSuggestions: secret == null,
           decoration: InputDecoration(
             errorMaxLines: 3,
             filled: true,
-            fillColor:
-                Theme.of(context).scaffoldBackgroundColor,
-            contentPadding:
-                const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 15,
+            fillColor: colors.surface,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 17,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
                 color: colors.outlineVariant,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: _accent,
-                width: 2,
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: _navy,
+                width: 1.5,
               ),
             ),
-            suffixIcon: secret == null
-                ? null
-                : IconButton(
-                    tooltip:
-                        '${_hidden[secret] ? 'Show' : 'Hide'} ${label.toLowerCase()}',
-                    onPressed: _busy
-                        ? null
-                        : () {
-                            setState(() {
-                              _hidden[secret] =
-                                  !_hidden[secret];
-                            });
-                          },
-                    icon: Icon(
-                      _hidden[secret]
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      size: 20,
-                    ),
-                  ),
           ),
         ),
       ],
     );
   }
-
-  Widget _button(
-    String label,
-    bool saving,
-    VoidCallback onPressed,
-  ) =>
-      FilledButton(
-        onPressed: _busy ? null : onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: _accent,
-          foregroundColor:
-              Theme.of(context).brightness ==
-                      Brightness.dark
-                  ? Colors.black
-                  : Colors.white,
-          minimumSize: const Size.fromHeight(48),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: saving
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-      );
-}
-
-enum _PhotoAction {
-  choose,
-  remove,
 }
