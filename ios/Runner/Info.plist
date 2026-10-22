@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo to use as your profile picture.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a photo to use as your profile picture.</string>
+	<key>DartDefines</key>
+	<string>$(DART_DEFINES)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Your location is used to calculate directions to the selected office.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

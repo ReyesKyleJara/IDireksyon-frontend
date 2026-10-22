@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/auth/password_policy.dart';
 
 class PasswordSecurityScreen extends StatefulWidget {
   const PasswordSecurityScreen({super.key});
@@ -123,7 +124,7 @@ class _PasswordSecurityScreenState
                     const SizedBox(height: 7),
 
                     Text(
-                      'Enter your current password and choose a new one.',
+                      'Enter your current password. ${PasswordPolicy.requirements}',
                       style: TextStyle(
                         fontSize: 14,
                         color: muted,
@@ -168,9 +169,8 @@ class _PasswordSecurityScreenState
                           return 'Enter a new password.';
                         }
 
-                        if (value.length < 8) {
-                          return 'Use at least 8 characters.';
-                        }
+                        final error = PasswordPolicy.validate(value);
+                        if (error != null) return error;
 
                         if (value == _currentPassword.text) {
                           return 'Choose a different password.';

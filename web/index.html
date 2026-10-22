@@ -41,6 +41,28 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="maps-config.js"></script>
+  <script src="office-directions.js"></script>
+  <script>
+    // Async Maps scripts are ready at their callback, not their load event.
+    window.initGoogleMaps = () => {
+      const flutter = document.createElement('script');
+      flutter.src = 'flutter_bootstrap.js';
+      document.body.appendChild(flutter);
+    };
+    const key = (window.GOOGLE_MAPS_WEB_API_KEY || '').trim();
+    if (key) {
+      const maps = document.createElement('script');
+      maps.async = true;
+      maps.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key)
+        + '&loading=async&callback=initGoogleMaps';
+      maps.onerror = () => {
+        document.body.textContent = 'Google Maps could not load. Check your connection and reload the page.';
+      };
+      document.head.appendChild(maps);
+    } else {
+      document.body.textContent = 'Google Maps is not configured. Set GOOGLE_MAPS_WEB_API_KEY in web/maps-config.js and restart the app.';
+    }
+  </script>
 </body>
 </html>

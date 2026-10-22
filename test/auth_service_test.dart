@@ -21,6 +21,7 @@ void main() {
 
     await auth.login('kai@example.com', 'password123');
     await auth.register(
+      emailVerificationToken: 'test-proof',
       contact: 'kai@example.com', usePhone: false,
       password: 'password123', confirmation: 'password123', accepted: true,
     );

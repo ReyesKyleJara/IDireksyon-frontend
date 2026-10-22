@@ -19,8 +19,7 @@ class ProfileAvatar extends StatefulWidget {
 }
 
 class _ProfileAvatarState extends State<ProfileAvatar> {
-  final ProfilePhotoService _photoService =
-      ProfilePhotoService.instance;
+  final ProfilePhotoService _photoService = ProfilePhotoService.instance;
 
   @override
   void initState() {
@@ -54,31 +53,35 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
-            width: widget.size,
-            height: widget.size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: colors.surfaceContainerHighest,
-              border: Border.all(
-                color: colors.outlineVariant,
-                width: 1.5,
-              ),
+          SizedBox.square(
+            dimension: widget.size,
+            child: ClipOval(
+              clipBehavior: Clip.antiAliasWithSaveLayer,
+              child: photo != null
+                  ? Image.memory(
+                      photo,
+                      width: widget.size,
+                      height: widget.size,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                      gaplessPlayback: true,
+                    )
+                  : DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: colors.surfaceContainerHighest,
+                        border: Border.all(
+                          color: colors.outlineVariant,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.person_rounded,
+                        size: widget.size * 0.52,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: photo != null
-                ? Image.memory(
-                    photo,
-                    width: widget.size,
-                    height: widget.size,
-                    fit: BoxFit.cover,
-                    gaplessPlayback: true,
-                  )
-                : Icon(
-                    Icons.person_rounded,
-                    size: widget.size * 0.52,
-                    color: colors.onSurfaceVariant,
-                  ),
           ),
           if (widget.showCameraButton)
             Positioned(

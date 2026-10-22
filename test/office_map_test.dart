@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as google;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:latlong2/latlong.dart';
@@ -12,6 +12,41 @@ import 'package:idireksyon_frontend/features/office_finder/office_finder_screen.
 import 'package:idireksyon_frontend/features/office_finder/models/office_catalog.dart';
 
 void main() {
+  for (final mode in [RouteTravelMode.walk, RouteTravelMode.transit]) {
+    test(
+      '${mode.label} requests its own route without driving preferences',
+      () async {
+        final service = OfficeMapServices(
+          client: MockClient((request) async {
+            final payload = jsonDecode(request.body) as Map<String, dynamic>;
+            expect(payload['travelMode'], mode.apiValue);
+            expect(payload.containsKey('routingPreference'), isFalse);
+            return http.Response('{"routes":[]}', 200);
+          }),
+        );
+        addTearDown(service.dispose);
+        await expectLater(
+          service.route(
+            const LatLng(14, 120),
+            const LatLng(15, 121),
+            mode: mode,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              contains(
+                mode == RouteTravelMode.transit
+                    ? 'No public transport route'
+                    : 'No walk route',
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   testWidgets('directions stay in the map and location denial is recoverable', (
     tester,
   ) async {
@@ -26,7 +61,7 @@ void main() {
         home: OfficeFinderScreen(
           initialOffice: officeCatalog.first,
           services: services,
-          tileProvider: _TestTiles(),
+          mapBuilder: _testMap,
         ),
       ),
     );
@@ -37,8 +72,23 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Get directions'));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('8 min • 2.4 km'), findsOneWidget);
-    expect(find.byType(PolylineLayer), findsOneWidget);
+    expect(find.text('Drive • 8 min • 2.4 km'), findsOneWidget);
+    expect(_lastMap.polylines.single.points.length, 3);
+    await tester.ensureVisible(find.byTooltip('Minimize panel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Minimize panel'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Expand panel'), findsOneWidget);
+    expect(find.text('Drive • 8 min • 2.4 km'), findsOneWidget);
+    expect(_lastMap.polylines.single.points.length, 3);
+    await tester.tap(find.byTooltip('Expand panel'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Route steps'),
+      100,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Route steps'), findsOneWidget);
     services.denied = true;
     await tester.pumpAndSettle();
     tester
@@ -53,7 +103,7 @@ void main() {
     await tester.tap(find.text('Refresh route'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Allow location access to continue.'), findsOneWidget);
-    expect(find.byType(PolylineLayer), findsNothing);
+    expect(_lastMap.polylines, isEmpty);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
@@ -65,44 +115,69 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
-        MaterialApp(home: OfficeFinderScreen(tileProvider: _TestTiles())),
+        MaterialApp(home: OfficeFinderScreen(mapBuilder: _testMap)),
       );
       await tester.pump(const Duration(milliseconds: 400));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     });
   }
+  test('browser route uses latitude/longitude and converts milliseconds to seconds', () {
+    final route = OfficeRoute.fromBrowserJson({
+      'points': [
+        [14.8, 120.8],
+        [14.9, 120.9],
+      ],
+      'distanceMeters': 2400,
+      'durationMillis': 480000,
+      'steps': ['Turn right'],
+    });
+    expect(route.points.first, const LatLng(14.8, 120.8));
+    expect(route.seconds, 480);
+    expect(route.meters, 2400);
+    expect(route.steps, ['Turn right']);
+    expect(
+      () => OfficeRoute.fromBrowserJson({'points': []}),
+      throwsFormatException,
+    );
+  });
+
   test(
     'requests a road route and decodes longitude/latitude and route steps',
     () async {
       final service = OfficeMapServices(
+        baseUrl: 'http://localhost:8000/api',
         client: MockClient((request) async {
-          expect(request.url.path, contains('120.8,14.8;120.9,14.9'));
-          expect(request.url.queryParameters['steps'], 'true');
+          expect(
+            request.url.toString(),
+            'http://localhost:8000/api/maps/route',
+          );
+          expect(request.method, 'POST');
+          expect(request.headers.containsKey('X-Goog-Api-Key'), isFalse);
+          final payload = jsonDecode(request.body);
+          expect(payload['origin']['location']['latLng']['latitude'], 14.8);
           return http.Response(
             jsonEncode({
-              'code': 'Ok',
               'routes': [
                 {
-                  'distance': 2400,
-                  'duration': 480,
-                  'geometry': {
-                    'coordinates': [
-                      [120.8, 14.8],
-                      [120.85, 14.82],
-                      [120.9, 14.9],
-                    ],
+                  'distanceMeters': 2400,
+                  'duration': '480s',
+                  'polyline': {
+                    'encodedPolyline':
+                        '_p~iF~ps|U_ulLnnqC_mqNvxq${String.fromCharCode(96)}@',
                   },
                   'legs': [
                     {
                       'steps': [
                         {
-                          'name': 'Main Street',
-                          'maneuver': {'type': 'turn', 'modifier': 'right'},
+                          'navigationInstruction': {
+                            'instructions': 'Turn right onto Main Street',
+                          },
                         },
                         {
-                          'name': '',
-                          'maneuver': {'type': 'arrive'},
+                          'navigationInstruction': {
+                            'instructions': 'Arrive at your destination',
+                          },
                         },
                       ],
                     },
@@ -118,7 +193,7 @@ void main() {
         const LatLng(14.8, 120.8),
         const LatLng(14.9, 120.9),
       );
-      expect(route.points[1], const LatLng(14.82, 120.85));
+      expect(route.points[1], const LatLng(40.7, -120.95));
       expect(route.meters, 2400);
       expect(route.seconds, 480);
       expect(route.steps, [
@@ -131,7 +206,8 @@ void main() {
 
   test('no route produces a recoverable error', () async {
     final service = OfficeMapServices(
-      client: MockClient((_) async => http.Response('{"code":"NoRoute"}', 200)),
+      baseUrl: 'http://localhost:8000/api',
+      client: MockClient((_) async => http.Response('{"routes":[]}', 200)),
     );
     await expectLater(
       service.route(const LatLng(14, 120), const LatLng(15, 121)),
@@ -143,10 +219,11 @@ void main() {
   test('place searches are cached', () async {
     var calls = 0;
     final service = OfficeMapServices(
+      baseUrl: 'http://localhost:8000/api',
       client: MockClient((_) async {
         calls++;
         return http.Response(
-          '[{"display_name":"Malolos","lat":"14.85","lon":"120.81"}]',
+          '{"places":[{"displayName":{"text":"Malolos"},"location":{"latitude":14.85,"longitude":120.81}}]}',
           200,
         );
       }),
@@ -169,7 +246,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
-            home: OfficeFinderScreen(tileProvider: _TestTiles()),
+            home: OfficeFinderScreen(mapBuilder: _testMap),
           ),
         );
         await tester.pump(const Duration(milliseconds: 300));
@@ -179,8 +256,19 @@ void main() {
         expect(find.text('1 office'), findsOneWidget);
         await tester.tap(find.text('DFA Consular Office Malolos').first);
         await tester.pump(const Duration(milliseconds: 300));
+        await tester.scrollUntilVisible(
+          find.text('Get directions'),
+          100,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.pumpAndSettle();
         expect(find.text('Get directions'), findsOneWidget);
         expect(find.text('Open in Maps'), findsNothing);
+        tester
+            .widget<ListView>(find.byType(ListView).last)
+            .controller!
+            .jumpTo(0);
+        await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Back to offices'));
         await tester.enterText(find.byType(TextField), 'unlisted office');
         await tester.pump();
@@ -193,10 +281,10 @@ void main() {
   }
 }
 
-class _TestTiles extends TileProvider {
-  @override
-  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
-      MemoryImage(TileProvider.transparentImage);
+late google.GoogleMap _lastMap;
+Widget _testMap(google.GoogleMap map) {
+  _lastMap = map;
+  return const SizedBox.expand();
 }
 
 class _TestServices extends OfficeMapServices {
@@ -208,11 +296,14 @@ class _TestServices extends OfficeMapServices {
   }
 
   @override
-  Future<OfficeRoute> route(LatLng origin, LatLng destination) async =>
-      OfficeRoute(
-        [origin, const LatLng(14.845, 120.815), destination],
-        2400,
-        480,
-        ['Head straight onto Main Street', 'Arrive at your destination'],
-      );
+  Future<OfficeRoute> route(
+    LatLng origin,
+    LatLng destination, {
+    RouteTravelMode mode = RouteTravelMode.drive,
+  }) async => OfficeRoute(
+    [origin, const LatLng(14.845, 120.815), destination],
+    2400,
+    480,
+    ['Head straight onto Main Street', 'Arrive at your destination'],
+  );
 }

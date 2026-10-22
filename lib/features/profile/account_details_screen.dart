@@ -1,5 +1,11 @@
-
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+
+import 'profile_camera_screen.dart';
+import 'profile_photo_crop_screen.dart';
+import 'profile_photo_source_sheet.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/profile/profile_avatar.dart';
@@ -9,8 +15,7 @@ class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});
 
   @override
-  State<AccountDetailsScreen> createState() =>
-      _AccountDetailsScreenState();
+  State<AccountDetailsScreen> createState() => _AccountDetailsScreenState();
 }
 
 class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
@@ -19,16 +24,15 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _photoService = ProfilePhotoService.instance;
 
-  late final bool _usePhone =
-      AuthService.instance.user?['email'] == null;
+  late final bool _usePhone = AuthService.instance.user?['email'] == null;
 
   late final _name = TextEditingController(
     text: AuthService.instance.user?['name'] as String? ?? '',
   );
 
   late final _contact = TextEditingController(
-    text: AuthService.instance.user?[
-            _usePhone ? 'phone' : 'email'] as String? ??
+    text:
+        AuthService.instance.user?[_usePhone ? 'phone' : 'email'] as String? ??
         '',
   );
 
@@ -68,44 +72,15 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     await _photoService.load();
     if (!mounted) return;
 
-    final action = await showModalBottomSheet<String>(
+    final action = await showModalBottomSheet<ProfilePhotoAction>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Profile photo',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: Text(
-                _photoService.hasPhoto
-                    ? 'Choose another photo'
-                    : 'Choose from gallery',
-              ),
-              onTap: () =>
-                  Navigator.pop(sheetContext, 'choose'),
-            ),
-            if (_photoService.hasPhoto)
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Remove photo'),
-                onTap: () =>
-                    Navigator.pop(sheetContext, 'remove'),
-              ),
-            const SizedBox(height: 12),
-          ],
-        ),
+      isScrollControlled: true,
+      constraints: const BoxConstraints(maxWidth: 560),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      builder: (_) => ProfilePhotoSourceSheet(hasPhoto: _photoService.hasPhoto),
     );
 
     if (!mounted || action == null) return;
@@ -113,18 +88,43 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     setState(() => _changingPhoto = true);
 
     try {
-      if (action == 'choose') {
-        final changed = await _photoService.pickFromGallery();
-        if (mounted && changed) {
-          _message('Profile photo updated.');
-        }
-      } else {
+      if (action == ProfilePhotoAction.remove) {
         await _photoService.removePhoto();
         if (mounted) _message('Profile photo removed.');
+      } else {
+        final bytes = action == ProfilePhotoAction.camera && kIsWeb
+            ? await Navigator.of(context).push<Uint8List>(
+                MaterialPageRoute(builder: (_) => const ProfileCameraScreen()),
+              )
+            : await _photoService.pickPhoto(
+                action == ProfilePhotoAction.camera
+                    ? ImageSource.camera
+                    : ImageSource.gallery,
+              );
+        if (!mounted || bytes == null) return;
+        final prepared = await _photoService.prepareForCrop(bytes);
+        if (!mounted) return;
+        final cropped = await Navigator.of(context).push<Uint8List>(
+          MaterialPageRoute(
+            builder: (_) => ProfilePhotoCropScreen(bytes: prepared),
+          ),
+        );
+        if (!mounted || cropped == null) return;
+        await _photoService.savePhoto(cropped);
+        if (mounted) _message('Profile photo updated.');
+      }
+    } on PlatformException catch (error) {
+      if (mounted) {
+        _message(
+          error.code.toLowerCase().contains('access') ||
+                  error.code.toLowerCase().contains('denied')
+              ? 'Allow camera or photo access in your device settings, then try again.'
+              : 'Could not open your camera or gallery. Try another photo source.',
+        );
       }
     } catch (_) {
       if (mounted) {
-        _message('Unable to update your profile photo.');
+        _message('Unable to update your profile photo. Try a different image.');
       }
     } finally {
       if (mounted) setState(() => _changingPhoto = false);
@@ -149,9 +149,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       final user = AuthService.instance.user;
 
       _name.text = user?['name'] as String? ?? _name.text;
-      _contact.text = user?[
-              _usePhone ? 'phone' : 'email'] as String? ??
-          _contact.text;
+      _contact.text =
+          user?[_usePhone ? 'phone' : 'email'] as String? ?? _contact.text;
 
       _message('Profile updated successfully.');
     } on AuthException catch (error) {
@@ -201,11 +200,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                     const SizedBox(height: 7),
                     Text(
                       'Make changes to your personal details.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: muted,
-                        height: 1.4,
-                      ),
+                      style: TextStyle(fontSize: 14, color: muted, height: 1.4),
                     ),
 
                     const SizedBox(height: 32),
@@ -214,16 +209,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                     Center(
                       child: Column(
                         children: [
-                          ProfileAvatar(
-                            size: 100,
-                            onTap: _changePhoto,
-                          ),
+                          ProfileAvatar(size: 100, onTap: _changePhoto),
                           const SizedBox(height: 10),
                           TextButton(
                             onPressed: _busy ? null : _changePhoto,
-                            style: TextButton.styleFrom(
-                              foregroundColor: _navy,
-                            ),
+                            style: TextButton.styleFrom(foregroundColor: _navy),
                             child: Text(
                               _photoService.hasPhoto
                                   ? 'Change photo'
@@ -262,9 +252,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
                     // EMAIL OR PHONE
                     _field(
-                      label: _usePhone
-                          ? 'Mobile number'
-                          : 'Email address',
+                      label: _usePhone ? 'Mobile number' : 'Email address',
                       controller: _contact,
                       keyboardType: _usePhone
                           ? TextInputType.phone
@@ -283,15 +271,13 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                             '',
                           );
 
-                          if (!RegExp(
-                            r'^(09\d{9}|\+639\d{9})$',
-                          ).hasMatch(normalized)) {
+                          if (!RegExp(r'^(09\d{9}|\+639\d{9})$')
+                              .hasMatch(normalized)) {
                             return 'Enter a valid Philippine mobile number.';
                           }
                         } else {
-                          if (!RegExp(
-                            r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                          ).hasMatch(contact)) {
+                          if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                              .hasMatch(contact)) {
                             return 'Enter a valid email address.';
                           }
                         }
@@ -354,10 +340,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 10),
         TextFormField(
@@ -375,21 +358,14 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               horizontal: 16,
               vertical: 17,
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: colors.outlineVariant,
-              ),
+              borderSide: BorderSide(color: colors.outlineVariant),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: _navy,
-                width: 1.5,
-              ),
+              borderSide: const BorderSide(color: _navy, width: 1.5),
             ),
           ),
         ),

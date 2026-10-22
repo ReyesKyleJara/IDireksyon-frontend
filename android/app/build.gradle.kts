@@ -1,8 +1,15 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val mapDefines = (project.findProperty("dart-defines") as String? ?: "")
+    .split(",").filter { it.isNotBlank() }
+    .map { String(Base64.getDecoder().decode(it)).split("=", limit = 2) }
+    .filter { it.size == 2 }.associate { it[0] to it[1] }
 
 android {
     namespace = "com.example.idireksyon_frontend"
@@ -19,7 +26,8 @@ android {
         applicationId = "com.example.idireksyon_frontend"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = maxOf(flutter.minSdkVersion, 24)
+        manifestPlaceholders["googleMapsApiKey"] = mapDefines["GOOGLE_MAPS_ANDROID_API_KEY"] ?: mapDefines["GOOGLE_MAPS_API_KEY"] ?: ""
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)

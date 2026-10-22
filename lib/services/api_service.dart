@@ -1,11 +1,10 @@
 import 'dart:convert';
+import '../core/api_config.dart';
 import '../models/government_id.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL', defaultValue: 'http://10.0.2.2:8000/api',
-  );
+  static final String baseUrl = ApiConfig.baseUrl;
 
   static Future<dynamic> _get(String path, {http.Client? client}) async {
     final activeClient = client ?? http.Client();

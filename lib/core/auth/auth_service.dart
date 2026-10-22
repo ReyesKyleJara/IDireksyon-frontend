@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../api_config.dart';
 
 class AuthException implements Exception {
   const AuthException(
@@ -21,20 +22,9 @@ class AuthService extends ChangeNotifier {
     http.Client? client,
     String? baseUrl,
   })  : _client = client ?? http.Client(),
-        baseUrl = baseUrl ??
-            const String.fromEnvironment(
-              'API_BASE_URL',
-              defaultValue: '',
-            ) {
-    if (this.baseUrl.isEmpty) {
-      this.baseUrl =
-          !kIsWeb &&
-                  defaultTargetPlatform ==
-                      TargetPlatform.android
-              ? 'http://10.0.2.2:8000/api'
-              : 'http://127.0.0.1:8000/api';
-    }
-  }
+        baseUrl = baseUrl == null || baseUrl.trim().isEmpty
+            ? ApiConfig.baseUrl
+            : baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
 
   static AuthService instance = AuthService();
 
@@ -79,6 +69,7 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> register({
+    String? emailVerificationToken,
     required String contact,
     required bool usePhone,
     required String password,
@@ -88,6 +79,7 @@ class AuthService extends ChangeNotifier {
       _authenticate(
         'register',
         {
+          'email_verification_token': emailVerificationToken,
           usePhone ? 'phone' : 'email':
               contact.trim(),
           'password': password,
@@ -96,6 +88,27 @@ class AuthService extends ChangeNotifier {
           'terms_accepted': accepted,
         },
       );
+
+  Future<String> sendSignupEmailCode(String email) async {
+    final data = await _post('email-verification/send', {'email': email.trim()});
+    final id = data['challenge_id'];
+    if (id is! String) {
+      throw const AuthException('The server returned an unexpected response.');
+    }
+    return id;
+  }
+
+  Future<String> verifySignupEmailCode(String challengeId, String code) async {
+    final data = await _post('email-verification/verify', {
+      'challenge_id': challengeId,
+      'code': code.trim(),
+    });
+    final proof = data['email_verification_token'];
+    if (proof is! String) {
+      throw const AuthException('The server returned an unexpected response.');
+    }
+    return proof;
+  }
 
   Future<void> _authenticate(
     String path,

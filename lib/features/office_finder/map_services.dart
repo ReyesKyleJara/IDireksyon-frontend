@@ -1,8 +1,20 @@
 import 'dart:convert';
 
+import '../../core/api_config.dart';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+
+enum RouteTravelMode {
+  drive('DRIVE', 'Drive'),
+  walk('WALK', 'Walk'),
+  transit('TRANSIT', 'Public transport');
+
+  const RouteTravelMode(this.apiValue, this.label);
+  final String apiValue;
+  final String label;
+}
 
 class MapPlace {
   const MapPlace(this.name, this.point);
@@ -17,51 +29,95 @@ class OfficeRoute {
   final double seconds;
   final List<String> steps;
 
-  factory OfficeRoute.fromJson(Map<String, dynamic> json) {
-    final coordinates = json['geometry']['coordinates'] as List<dynamic>;
-    final points = coordinates
-        .map((p) => LatLng((p[1] as num).toDouble(), (p[0] as num).toDouble()))
+  factory OfficeRoute.fromBrowserJson(Map<String, dynamic> json) {
+    final points = (json['points'] as List<dynamic>)
+        .map(
+          (point) => LatLng(
+            (point[0] as num).toDouble(),
+            (point[1] as num).toDouble(),
+          ),
+        )
         .toList();
     if (points.length < 2) {
       throw const FormatException('Missing route geometry');
     }
+    return OfficeRoute(
+      points,
+      (json['distanceMeters'] as num).toDouble(),
+      (json['durationMillis'] as num).toDouble() / 1000,
+      (json['steps'] as List<dynamic>).cast<String>(),
+    );
+  }
+
+  factory OfficeRoute.fromJson(Map<String, dynamic> json) {
+    final points = <LatLng>[];
+    final encoded = json['polyline']['encodedPolyline'] as String;
+    var index = 0, latitude = 0, longitude = 0;
+    int decode() {
+      var result = 0, shift = 0, byte = 0;
+      do {
+        if (index >= encoded.length || shift > 30) {
+          throw const FormatException('Invalid route geometry');
+        }
+        byte = encoded.codeUnitAt(index++) - 63;
+        result |= (byte & 31) << shift;
+        shift += 5;
+      } while (byte >= 32);
+      // JavaScript bitwise complements are unsigned in Dart web builds.
+      // Arithmetic keeps negative coordinate deltas signed on every platform.
+      return (result & 1) != 0 ? -(result >> 1) - 1 : result >> 1;
+    }
+
+    while (index < encoded.length) {
+      latitude += decode();
+      longitude += decode();
+      points.add(LatLng(latitude / 1e5, longitude / 1e5));
+    }
+    if (points.length < 2) {
+      throw const FormatException('Missing route geometry');
+    }
     final steps = <String>[];
-    for (final leg in json['legs'] as List<dynamic>) {
-      for (final step in leg['steps'] as List<dynamic>) {
-        final maneuver = step['maneuver'] as Map<String, dynamic>;
-        final type = maneuver['type'] as String;
-        final modifier = (maneuver['modifier'] as String? ?? '').replaceAll(
-          '_',
-          ' ',
-        );
-        final road = step['name'] as String? ?? '';
-        final action = switch (type) {
-          'depart' => 'Head $modifier',
-          'arrive' => 'Arrive at your destination',
-          'roundabout' || 'rotary' =>
-            'Take the roundabout${maneuver['exit'] == null ? '' : ', exit ${maneuver['exit']}'}',
-          _ => '${type.replaceAll('_', ' ')} $modifier',
-        };
+    for (final leg in json['legs'] as List<dynamic>? ?? []) {
+      for (final step in leg['steps'] as List<dynamic>? ?? []) {
         final instruction =
-            '${action.trim()}${road.isEmpty || type == 'arrive' ? '' : ' onto $road'}';
-        steps.add('${instruction[0].toUpperCase()}${instruction.substring(1)}');
+            step['navigationInstruction']?['instructions'] as String?;
+        if (instruction != null && instruction.isNotEmpty) {
+          steps.add(instruction);
+        } else if (step['transitDetails'] is Map<String, dynamic>) {
+          final transit = step['transitDetails'] as Map<String, dynamic>;
+          final line = transit['transitLine'];
+          final stops = transit['stopDetails'];
+          final name =
+              line?['nameShort'] ?? line?['name'] ?? 'Public transport';
+          final departure = stops?['departureStop']?['name'];
+          final arrival = stops?['arrivalStop']?['name'];
+          steps.add(
+            [
+              'Take $name',
+              if (departure != null) 'from $departure',
+              if (arrival != null) 'to $arrival',
+            ].join(' '),
+          );
+        }
       }
     }
     return OfficeRoute(
       points,
-      (json['distance'] as num).toDouble(),
-      (json['duration'] as num).toDouble(),
+      (json['distanceMeters'] as num).toDouble(),
+      double.parse((json['duration'] as String).replaceFirst('s', '')),
       steps,
     );
   }
 }
 
-/// Public endpoints are defaults for development. Use managed endpoints at scale.
+/// Google Places and Routes services used by the embedded Google map.
 class OfficeMapServices {
-  OfficeMapServices({http.Client? client}) : _client = client ?? http.Client();
+  OfficeMapServices({http.Client? client, String? baseUrl})
+    : _client = client ?? http.Client(),
+      _baseUrl = (baseUrl ?? ApiConfig.baseUrl).replaceAll(RegExp(r'/+$'), '');
+  final String _baseUrl;
   final http.Client _client;
   final Map<String, List<MapPlace>> _searchCache = {};
-  DateTime? _lastSearch;
 
   Future<LatLng> locate() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -89,45 +145,41 @@ class OfficeMapServices {
     return LatLng(position.latitude, position.longitude);
   }
 
+  Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
   Future<List<MapPlace>> search(String query) async {
     final key = query.trim().toLowerCase();
+    if (key.isEmpty) return [];
     if (_searchCache.containsKey(key)) return _searchCache[key]!;
-    // Nominatim requires explicit search, caching and at most one request/second.
-    final last = _lastSearch;
-    if (last != null && DateTime.now().difference(last).inMilliseconds < 1100) {
-      throw StateError('Please wait a moment before searching again.');
-    }
-    _lastSearch = DateTime.now();
-    const endpoint = String.fromEnvironment(
-      'GEOCODING_URL',
-      defaultValue: 'https://nominatim.openstreetmap.org/search',
-    );
     final response = await _client
-        .get(
-          Uri.parse(endpoint).replace(
-            queryParameters: {
-              'q': query,
-              'format': 'jsonv2',
-              'limit': '5',
-              'countrycodes': 'ph',
-            },
-          ),
-          headers: {
-            'User-Agent': 'IDireksyon/1.0 (idireksyon.app)',
-            'Accept-Language': 'en',
-          },
+        .post(
+          Uri.parse('$_baseUrl/maps/search'),
+          headers: _headers,
+          body: jsonEncode({
+            'textQuery': query,
+            'regionCode': 'PH',
+            'languageCode': 'en',
+            'pageSize': 5,
+          }),
         )
         .timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) {
       throw StateError('Place search is unavailable. Please try again.');
     }
-    final results = (jsonDecode(response.body) as List<dynamic>)
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final results = (body['places'] as List<dynamic>? ?? [])
         .map(
           (item) => MapPlace(
-            item['display_name'] as String,
+            [
+              item['displayName']?['text'],
+              item['formattedAddress'],
+            ].whereType<String>().join(', '),
             LatLng(
-              double.parse(item['lat'] as String),
-              double.parse(item['lon'] as String),
+              (item['location']['latitude'] as num).toDouble(),
+              (item['location']['longitude'] as num).toDouble(),
             ),
           ),
         )
@@ -136,27 +188,42 @@ class OfficeMapServices {
     return results;
   }
 
-  Future<OfficeRoute> route(LatLng origin, LatLng destination) async {
-    const endpoint = String.fromEnvironment(
-      'ROUTING_URL',
-      defaultValue: 'https://router.project-osrm.org',
-    );
-    final uri = Uri.parse(
-      '$endpoint/route/v1/driving/'
-      '${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}'
-      '?overview=full&geometries=geojson&steps=true',
-    );
+  Future<OfficeRoute> route(
+    LatLng origin,
+    LatLng destination, {
+    RouteTravelMode mode = RouteTravelMode.drive,
+  }) async {
+    Map<String, dynamic> waypoint(LatLng point) => {
+      'location': {
+        'latLng': {'latitude': point.latitude, 'longitude': point.longitude},
+      },
+    };
     final response = await _client
-        .get(uri)
+        .post(
+          Uri.parse('$_baseUrl/maps/route'),
+          headers: _headers,
+          body: jsonEncode({
+            'origin': waypoint(origin),
+            'destination': waypoint(destination),
+            'travelMode': mode.apiValue,
+            'languageCode': 'en-US',
+            'units': 'METRIC',
+          }),
+        )
         .timeout(const Duration(seconds: 20));
     if (response.statusCode != 200) {
       throw StateError('Directions are unavailable. Please try again.');
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
-    if (body['code'] != 'Ok' || (body['routes'] as List).isEmpty) {
-      throw StateError('No driving route found to this office.');
+    final routes = body['routes'] as List<dynamic>? ?? [];
+    if (routes.isEmpty) {
+      throw StateError(
+        mode == RouteTravelMode.transit
+            ? 'No public transport route is available from Google for this trip. Try Walk or Drive.'
+            : 'No ${mode.label.toLowerCase()} route found to this office.',
+      );
     }
-    return OfficeRoute.fromJson(body['routes'][0] as Map<String, dynamic>);
+    return OfficeRoute.fromJson(routes.first as Map<String, dynamic>);
   }
 
   void dispose() => _client.close();

@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/auth/password_policy.dart';
+import '../profile/privacy_policy_screen.dart';
+import '../profile/terms_of_service_screen.dart';
+import 'email_verification_screen.dart';
 import '../../core/theme/app_theme.dart';
 
 class SignupForm extends StatefulWidget {
@@ -73,6 +77,13 @@ class _SignupFormState
       );
   }
 
+  void _openLegalPage(Widget page) {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => page),
+    );
+  }
+
   void _switchMethod(bool phone) {
     if (_usePhone == phone) return;
 
@@ -129,6 +140,26 @@ class _SignupFormState
     });
 
     try {
+      if (!_usePhone) {
+        final email = _contact.text.trim();
+        final password = _password.text;
+        final confirmation = _confirmation.text;
+        final accepted = _accepted;
+        final challengeId = await AuthService.instance.sendSignupEmailCode(email);
+        if (!mounted) return;
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => EmailVerificationScreen(
+            email: email,
+            challengeId: challengeId,
+            onVerified: (proof) => AuthService.instance.register(
+              contact: email, usePhone: false, password: password,
+              confirmation: confirmation, accepted: accepted,
+              emailVerificationToken: proof,
+            ),
+          ),
+        ));
+        return;
+      }
       await AuthService.instance.register(
         contact: _contact.text,
         usePhone: _usePhone,
@@ -286,6 +317,7 @@ class _SignupFormState
                     Color(0xFF98A2B3),
               ),
               helperText: helper,
+              helperMaxLines: 3,
               helperStyle:
                   const TextStyle(
                 fontSize: 11,
@@ -749,17 +781,11 @@ class _SignupFormState
                                           .newPassword,
                                     ],
                                     helper:
-                                        'Must be at least 8 characters',
+                                        PasswordPolicy.requirements,
                                     validator:
                                         (value) {
-                                      if ((value ??
-                                                  '')
-                                              .length <
-                                          8) {
-                                        return 'Use at least 8 characters';
-                                      }
-
-                                      return _passwordServerError;
+                                      return PasswordPolicy.validate(value) ??
+                                          _passwordServerError;
                                     },
                                   ),
 
@@ -801,7 +827,7 @@ class _SignupFormState
                                     validator: (value) {
   // Don't validate confirmation yet
   // if the main password itself is invalid.
-  if (_password.text.length < 8) {
+  if (PasswordPolicy.validate(_password.text) != null) {
     return null;
   }
 
@@ -885,12 +911,12 @@ class _SignupFormState
                                                     MotionInkWell(
                                                   onTap:
                                                       () =>
-                                                          _message(
-                                                    'Terms and Privacy Policy are not available yet.',
+                                                          _openLegalPage(
+                                                    const TermsOfServiceScreen(),
                                                   ),
                                                   child:
                                                       const Text(
-                                                    'Terms and Privacy Policy',
+                                                    'Terms of Service',
                                                     style:
                                                         TextStyle(
                                                       fontSize:
@@ -904,6 +930,22 @@ class _SignupFormState
                                                 ),
                                               ),
 
+                                              const TextSpan(text: ' and '),
+                                              WidgetSpan(
+                                                child: MotionInkWell(
+                                                  onTap: () => _openLegalPage(
+                                                    const PrivacyPolicyScreen(),
+                                                  ),
+                                                  child: const Text(
+                                                    'Privacy Policy',
+                                                    style: TextStyle(
+                                                      fontSize: 12.5,
+                                                      color: _blue,
+                                                      decoration: TextDecoration.underline,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
                                               const TextSpan(
                                                 text:
                                                     '. Your information is used to personalize ID guidance and improve your experience.',

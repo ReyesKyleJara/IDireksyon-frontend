@@ -1,7 +1,8 @@
 import '../../core/widgets/app_motion.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as google;
 import 'package:latlong2/latlong.dart';
 
 import 'map_services.dart';
@@ -13,11 +14,11 @@ class OfficeFinderScreen extends StatefulWidget {
     super.key,
     this.initialOffice,
     this.services,
-    this.tileProvider,
+    this.mapBuilder,
   });
   final OfficeModel? initialOffice;
   final OfficeMapServices? services;
-  final TileProvider? tileProvider;
+  final Widget Function(google.GoogleMap)? mapBuilder;
 
   @override
   State<OfficeFinderScreen> createState() => _OfficeFinderScreenState();
@@ -26,19 +27,19 @@ class OfficeFinderScreen extends StatefulWidget {
 class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   static const _blue = Color(0xFF174B85);
   static const _center = LatLng(14.8527, 120.8160);
-  final _map = MapController();
+  google.GoogleMapController? _map;
   final _sheet = DraggableScrollableController();
   final _search = TextEditingController();
   late final OfficeMapServices _services;
   OfficeModel? _selected;
   LatLng? _position;
   OfficeRoute? _route;
+  RouteTravelMode _travelMode = RouteTravelMode.drive;
   List<MapPlace> _places = [];
   String _category = 'All offices';
   String? _message;
   bool _busy = false;
   bool _searching = false;
-  bool _tileError = false;
   int _searchVersion = 0;
   int _routeVersion = 0;
   double _sheetSize = .32;
@@ -69,7 +70,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   void dispose() {
     _search.dispose();
     _sheet.dispose();
-    _map.dispose();
+    _map?.dispose();
     if (widget.services == null) _services.dispose();
     super.dispose();
   }
@@ -77,20 +78,45 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   LatLng _point(OfficeModel office) =>
       LatLng(office.latitude, office.longitude);
 
-  void _collapse() {
+  void _collapse({double size = .32}) {
     FocusScope.of(context).unfocus();
     if (_sheet.isAttached) {
       if (AppMotion.reduced(context)) {
-        _sheet.jumpTo(.32);
+        _sheet.jumpTo(size);
         return;
       }
       _sheet.animateTo(
-        .32,
+        size,
         duration: AppMotion.duration(context),
         curve: Curves.easeOutCubic,
       );
     }
   }
+
+  void _toggleSheet() {
+    if (!_sheet.isAttached) return;
+    FocusScope.of(context).unfocus();
+    final target = _sheetSize < .24 ? .48 : .14;
+    if (AppMotion.reduced(context)) {
+      _sheet.jumpTo(target);
+    } else {
+      _sheet.animateTo(
+        target,
+        duration: AppMotion.duration(context),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  IconData get _modeIcon => switch (_travelMode) {
+    RouteTravelMode.drive => Icons.directions_car_outlined,
+    RouteTravelMode.walk => Icons.directions_walk,
+    RouteTravelMode.transit => Icons.directions_transit,
+  };
+
+  String get _routeEstimate => _route == null
+      ? _travelMode.label
+      : '${_travelMode.label} • ${(_route!.seconds / 60).ceil()} min • ${(_route!.meters / 1000).toStringAsFixed(1)} km';
 
   void _select(OfficeModel office) {
     _routeVersion++;
@@ -99,25 +125,115 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
       _route = null;
       _message = null;
     });
-    _collapse();
+    _collapse(size: .48);
     _fit([_point(office)]);
   }
 
   void _fit(List<LatLng> points) {
     if (points.isEmpty) return;
-    final size = MediaQuery.sizeOf(context);
-    _map.fitCamera(
-      CameraFit.coordinates(
-        coordinates: points,
-        maxZoom: points.length == 1 ? 15 : 14,
-        padding: EdgeInsets.fromLTRB(
-          55,
-          (size.height * .4).clamp(150, 250),
-          70,
-          size.height * .32 + 35,
+    final controller = _map;
+    if (controller == null) return;
+    if (points.length == 1) {
+      controller.animateCamera(
+        google.CameraUpdate.newLatLngZoom(_googlePoint(points.first), 15),
+      );
+      return;
+    }
+    final latitudes = points.map((p) => p.latitude);
+    final longitudes = points.map((p) => p.longitude);
+    final south = latitudes.reduce((a, b) => a < b ? a : b);
+    final north = latitudes.reduce((a, b) => a > b ? a : b);
+    final west = longitudes.reduce((a, b) => a < b ? a : b);
+    final east = longitudes.reduce((a, b) => a > b ? a : b);
+    controller.animateCamera(
+      google.CameraUpdate.newLatLngBounds(
+        google.LatLngBounds(
+          southwest: google.LatLng(south - .0001, west - .0001),
+          northeast: google.LatLng(north + .0001, east + .0001),
         ),
+        50,
       ),
     );
+  }
+
+  google.LatLng _googlePoint(LatLng point) =>
+      google.LatLng(point.latitude, point.longitude);
+
+  Widget _buildMap(
+    List<OfficeModel> offices,
+    OfficeModel? selected,
+    BoxConstraints constraints,
+    bool dark,
+  ) {
+    final map = google.GoogleMap(
+      initialCameraPosition: google.CameraPosition(
+        target: _googlePoint(selected == null ? _center : _point(selected)),
+        zoom: 12,
+      ),
+      padding: EdgeInsets.only(
+        top: constraints.maxHeight > 500 ? 230 : 150,
+        bottom: constraints.maxHeight * _sheetSize + 12,
+      ),
+      compassEnabled: false,
+      zoomControlsEnabled: false,
+      myLocationButtonEnabled: false,
+      mapToolbarEnabled: false,
+      rotateGesturesEnabled: false,
+      minMaxZoomPreference: const google.MinMaxZoomPreference(5, 18),
+      onMapCreated: (controller) {
+        if (!mounted) {
+          controller.dispose();
+          return;
+        }
+        _map = controller;
+        _fit(
+          selected == null ? offices.map(_point).toList() : [_point(selected)],
+        );
+      },
+      onTap: (_) => FocusScope.of(context).unfocus(),
+      markers: {
+        for (final office in {...offices, ?selected})
+          google.Marker(
+            markerId: google.MarkerId('office-${office.id}'),
+            position: _googlePoint(_point(office)),
+            infoWindow: google.InfoWindow(
+              title: office.name,
+              snippet: office.address,
+            ),
+            icon: google.BitmapDescriptor.defaultMarkerWithHue(
+              selected?.id == office.id
+                  ? google.BitmapDescriptor.hueAzure
+                  : google.BitmapDescriptor.hueRed,
+            ),
+            onTap: () => _select(office),
+          ),
+        for (var i = 0; i < _places.length; i++)
+          google.Marker(
+            markerId: google.MarkerId('place-$i'),
+            position: _googlePoint(_places[i].point),
+            infoWindow: google.InfoWindow(title: _places[i].name),
+          ),
+        if (_position != null)
+          google.Marker(
+            markerId: const google.MarkerId('current-position'),
+            position: _googlePoint(_position!),
+            icon: google.BitmapDescriptor.defaultMarkerWithHue(
+              google.BitmapDescriptor.hueBlue,
+            ),
+            infoWindow: const google.InfoWindow(title: 'Your location'),
+          ),
+      },
+      polylines: {
+        if (_route != null)
+          google.Polyline(
+            polylineId: const google.PolylineId('office-route'),
+            points: _route!.points.map(_googlePoint).toList(),
+            color: dark ? const Color(0xFF83B9FF) : _blue,
+            width: 6,
+          ),
+      },
+    );
+    return widget.mapBuilder?.call(map) ?? map;
   }
 
   Future<void> _locate() async {
@@ -152,10 +268,14 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
       final origin = await _services.locate();
       if (!mounted || version != _routeVersion) return;
       setState(() => _position = origin);
-      final route = await _services.route(origin, _point(office));
+      final route = await _services.route(
+        origin,
+        _point(office),
+        mode: _travelMode,
+      );
       if (!mounted || version != _routeVersion) return;
       setState(() => _route = route);
-      _collapse();
+      if (_sheetSize >= .24) _collapse();
       _fit(route.points);
     } catch (error) {
       if (version == _routeVersion) {
@@ -244,159 +364,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
           return Stack(
             children: [
               Positioned.fill(
-                child: FlutterMap(
-                  mapController: _map,
-                  options: MapOptions(
-                    initialCenter: selected == null
-                        ? _center
-                        : _point(selected),
-                    initialZoom: 12,
-                    minZoom: 5,
-                    maxZoom: 18,
-                    backgroundColor: dark
-                        ? const Color(0xFF252B31)
-                        : const Color(0xFFE9E9E3),
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                    ),
-                    onMapReady: () => _fit(
-                      selected == null
-                          ? offices.map(_point).toList()
-                          : [_point(selected)],
-                    ),
-                    onTap: (_, _) => FocusScope.of(context).unfocus(),
-                  ),
-                  children: [
-                    for (final layer in ['Base', 'Reference'])
-                      TileLayer(
-                        tileProvider: widget.tileProvider,
-                        key: ValueKey('$dark-$layer-$_tileError'),
-                        urlTemplate:
-                            'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${dark ? 'Dark' : 'Light'}_Gray_$layer/MapServer/tile/{z}/{y}/{x}',
-                        userAgentPackageName: 'com.bayanid.idireksyon',
-                        maxNativeZoom: 16,
-                        errorTileCallback: (_, _, _) {
-                          if (!_tileError && mounted) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (mounted && !_tileError) {
-                                setState(() => _tileError = true);
-                              }
-                            });
-                          }
-                        },
-                      ),
-                    if (_route != null)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: _route!.points,
-                            color: dark ? const Color(0xFF83B9FF) : _blue,
-                            strokeWidth: 6,
-                            borderStrokeWidth: 2,
-                            borderColor: colors.surface,
-                          ),
-                        ],
-                      ),
-                    MarkerLayer(
-                      markers: [
-                        for (final office in {...offices, ?selected})
-                          Marker(
-                            point: _point(office),
-                            width: 56,
-                            height: 64,
-                            child: Semantics(
-                              label: office.name,
-                              button: true,
-                              child: GestureDetector(
-                                onTap: () => _select(office),
-                                child: AnimatedContainer(
-                                  duration: AppMotion.duration(
-                                    context,
-                                    AppMotion.quick,
-                                  ),
-                                  margin: EdgeInsets.all(
-                                    selected?.id == office.id ? 2 : 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: selected?.id == office.id
-                                        ? _blue
-                                        : surface,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: selected?.id == office.id
-                                          ? Colors.white
-                                          : _blue,
-                                      width: 2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: .18,
-                                        ),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    office.serviceTag.contains('Passport')
-                                        ? Icons.badge_outlined
-                                        : Icons.account_balance_rounded,
-                                    color: selected?.id == office.id
-                                        ? Colors.white
-                                        : dark
-                                        ? const Color(0xFF83B9FF)
-                                        : _blue,
-                                    size: 23,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        for (final place in _places)
-                          Marker(
-                            point: place.point,
-                            width: 44,
-                            height: 44,
-                            child: Tooltip(
-                              message: place.name,
-                              child: const Icon(
-                                Icons.location_on,
-                                color: Color(0xFFC84648),
-                                size: 40,
-                              ),
-                            ),
-                          ),
-                        if (_position != null)
-                          Marker(
-                            point: _position!,
-                            width: 28,
-                            height: 28,
-                            child: Semantics(
-                              label: 'Your location',
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF3488EF),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 4,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _blue.withValues(alpha: .25),
-                                      spreadRadius: 7,
-                                      blurRadius: 8,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
+                child: _buildMap(offices, selected, constraints, dark),
               ),
               Positioned(
                 top: 0,
@@ -533,7 +501,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                             ],
                           ),
                         ),
-                        if (_message != null || _tileError)
+                        if (_message != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: _panel(
@@ -544,23 +512,16 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        _message ?? 'Map tiles could not load. Check your connection.',
+                                        _message!,
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
-                                    if (_message == null)
-                                      TextButton(
-                                        onPressed: () =>
-                                            setState(() => _tileError = false),
-                                        child: const Text('Retry'),
-                                      )
-                                    else
-                                      IconButton(
-                                        tooltip: 'Dismiss message',
-                                        onPressed: () =>
-                                            setState(() => _message = null),
-                                        icon: const Icon(Icons.close, size: 18),
-                                      ),
+                                    IconButton(
+                                      tooltip: 'Dismiss message',
+                                      onPressed: () =>
+                                          setState(() => _message = null),
+                                      icon: const Icon(Icons.close, size: 18),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -582,17 +543,14 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                       children: [
                         IconButton(
                           tooltip: 'Zoom in',
-                          onPressed: () => _map.move(
-                            _map.camera.center,
-                            (_map.camera.zoom + 1).clamp(5, 18),
-                          ),
+                          onPressed: () =>
+                              _map?.animateCamera(google.CameraUpdate.zoomIn()),
                           icon: const Icon(Icons.add),
                         ),
                         IconButton(
                           tooltip: 'Zoom out',
-                          onPressed: () => _map.move(
-                            _map.camera.center,
-                            (_map.camera.zoom - 1).clamp(5, 18),
+                          onPressed: () => _map?.animateCamera(
+                            google.CameraUpdate.zoomOut(),
                           ),
                           icon: const Icon(Icons.remove),
                         ),
@@ -621,27 +579,6 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                     ),
                   ),
                 ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: constraints.maxHeight * _sheetSize + 3,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: surface.withValues(alpha: .94),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'Esri, HERE, Garmin | © OpenStreetMap contributors',
-                      style: TextStyle(fontSize: 9),
-                    ),
-                  ),
-                ),
-              ),
               NotificationListener<DraggableScrollableNotification>(
                 onNotification: (notification) {
                   setState(() => _sheetSize = notification.extent);
@@ -650,116 +587,161 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                 child: DraggableScrollableSheet(
                   controller: _sheet,
                   initialChildSize: .32,
-                  minChildSize: .18,
+                  minChildSize: .14,
                   maxChildSize: .78,
                   snap: true,
-                  snapSizes: const [.32, .78],
-                  builder: (context, scrollController) => Container(
-                    decoration: BoxDecoration(
-                      color: surface,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(28),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: .1),
-                          blurRadius: 24,
-                          offset: const Offset(0, -4),
+                  snapSizes: const [.14, .32, .48, .78],
+                  // Intercept only the visible sheet, leaving the exposed map interactive.
+                  builder: (context, scrollController) => PointerInterceptor(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(28),
                         ),
-                      ],
-                    ),
-                    child: ListView(
-                      controller: scrollController,
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        10,
-                        20,
-                        MediaQuery.paddingOf(context).bottom + 24,
-                      ),
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 38,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: colors.outlineVariant,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: .1),
+                            blurRadius: 24,
+                            offset: const Offset(0, -4),
                           ),
+                        ],
+                      ),
+                      child: ListView(
+                        controller: scrollController,
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          10,
+                          20,
+                          MediaQuery.paddingOf(context).bottom + 24,
                         ),
-                        const SizedBox(height: 16),
-                        if (selected != null)
-                          ..._details(selected, colors)
-                        else ...[
+                        children: [
                           Row(
                             children: [
-                              const Expanded(
-                                child: Text(
-                                  'Find your office',
-                                  style: TextStyle(
-                                    fontFamily: 'Bricolage Grotesque',
-                                    fontSize: 23,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _sheetSize < .24
+                                          ? (selected?.name ?? 'Offices')
+                                          : (selected == null
+                                                ? 'Offices'
+                                                : 'Office details'),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    if (_sheetSize < .24)
+                                      Text(
+                                        selected == null
+                                            ? '${offices.length} offices'
+                                            : _routeEstimate,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
+                              IconButton(
+                                tooltip: _sheetSize < .24
+                                    ? 'Expand panel'
+                                    : 'Minimize panel',
+                                onPressed: _toggleSheet,
+                                icon: Icon(
+                                  _sheetSize < .24
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_sheetSize >= .24) ...[
+                            if (selected != null)
+                              ..._details(selected, colors)
+                            else ...[
+                              Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'Find your office',
+                                      style: TextStyle(
+                                        fontFamily: 'Bricolage Grotesque',
+                                        fontSize: 23,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${offices.length} ${offices.length == 1 ? 'office' : 'offices'}',
+                                    style: TextStyle(
+                                      color: colors.onSurfaceVariant,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
                               Text(
-                                '${offices.length} ${offices.length == 1 ? 'office' : 'offices'}',
+                                'Explore Bulacan • Tap a pin or choose an office',
                                 style: TextStyle(
                                   color: colors.onSurfaceVariant,
                                   fontSize: 12,
                                 ),
                               ),
+                              const SizedBox(height: 16),
+                              for (final office in offices)
+                                _officeCard(office, colors),
+                              if (offices.isEmpty && _places.isEmpty) ...[
+                                const Icon(
+                                  Icons.travel_explore_rounded,
+                                  size: 34,
+                                ),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  'No matching offices',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Try another name or search for a place in the Philippines.',
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 10),
+                                if (_search.text.trim().length >= 2)
+                                  TextButton.icon(
+                                    onPressed: _searching
+                                        ? null
+                                        : _searchPlaces,
+                                    icon: const Icon(Icons.search),
+                                    label: const Text('Search places on map'),
+                                  ),
+                              ],
+                              for (final place in _places)
+                                ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.place_outlined),
+                                  title: Text(
+                                    place.name,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  onTap: () {
+                                    _collapse();
+                                    _fit([place.point]);
+                                  },
+                                ),
                             ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Explore Bulacan • Tap a pin or choose an office',
-                            style: TextStyle(
-                              color: colors.onSurfaceVariant,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          for (final office in offices)
-                            _officeCard(office, colors),
-                          if (offices.isEmpty && _places.isEmpty) ...[
-                            const Icon(Icons.travel_explore_rounded, size: 34),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'No matching offices',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Try another name or search for a place in the Philippines.',
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 10),
-                            if (_search.text.trim().length >= 2)
-                              TextButton.icon(
-                                onPressed: _searching ? null : _searchPlaces,
-                                icon: const Icon(Icons.search),
-                                label: const Text('Search places on map'),
-                              ),
                           ],
-                          for (final place in _places)
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.place_outlined),
-                              title: Text(
-                                place.name,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onTap: () {
-                                _collapse();
-                                _fit([place.point]);
-                              },
-                            ),
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -771,12 +753,14 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     );
   }
 
-  Widget _panel(Color color, {required Widget child}) => Material(
-    color: color,
-    elevation: 4,
-    shadowColor: Colors.black.withValues(alpha: .18),
-    borderRadius: BorderRadius.circular(20),
-    child: child,
+  Widget _panel(Color color, {required Widget child}) => PointerInterceptor(
+    child: Material(
+      color: color,
+      elevation: 4,
+      shadowColor: Colors.black.withValues(alpha: .18),
+      borderRadius: BorderRadius.circular(20),
+      child: child,
+    ),
   );
 
   Widget _officeCard(OfficeModel office, ColorScheme colors) => Padding(
@@ -885,11 +869,33 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
         ),
         if (_route != null)
           Chip(
-            avatar: const Icon(Icons.directions_car_outlined, size: 16),
-            label: Text(
-              '${(_route!.seconds / 60).ceil()} min • ${(_route!.meters / 1000).toStringAsFixed(1)} km',
-            ),
+            avatar: Icon(_modeIcon, size: 16),
+            label: Text(_routeEstimate),
             side: BorderSide.none,
+          ),
+      ],
+    ),
+    const SizedBox(height: 10),
+    Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        for (final mode in RouteTravelMode.values)
+          ChoiceChip(
+            label: Text(mode.label),
+            selected: _travelMode == mode,
+            onSelected: _busy
+                ? null
+                : (_) {
+                    if (_travelMode == mode) return;
+                    final recalculate = _route != null;
+                    setState(() {
+                      _travelMode = mode;
+                      _route = null;
+                      _message = null;
+                    });
+                    if (recalculate) _directions();
+                  },
           ),
       ],
     ),
@@ -914,10 +920,20 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     const SizedBox(height: 12),
     Text(
       _route == null
-          ? 'Driving directions from your current location, right here in IDireksyon.'
-          : 'Driving route • Estimate excludes live traffic. Expand for route steps.',
+          ? '${_travelMode.label} directions from your current location.'
+          : '${_travelMode.label} estimate • Expand for route steps.',
       style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
     ),
+    if (_travelMode == RouteTravelMode.transit)
+      const Text(
+        'Public transport depends on Google coverage; local jeepney and tricycle routes may be missing.',
+        style: TextStyle(fontSize: 12),
+      ),
+    if (_travelMode == RouteTravelMode.walk)
+      const Text(
+        'Walking routes may lack sidewalks or pedestrian paths. Use caution.',
+        style: TextStyle(fontSize: 12),
+      ),
     const SizedBox(height: 8),
     Text(
       'Listed hours: ${office.operatingHours.replaceFirst('Today: ', '')} • Confirm before visiting',
