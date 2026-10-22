@@ -1,3 +1,4 @@
+import '../roadmap/saved_goals_screen.dart';
 
 import 'package:flutter/material.dart';
 
@@ -31,9 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _openAccountDetails() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const AccountDetailsScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const AccountDetailsScreen()),
     );
 
     if (mounted) {
@@ -45,9 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _openPasswordSecurity() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const PasswordSecurityScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const PasswordSecurityScreen()),
     );
   }
 
@@ -55,9 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _openInventory() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const ManageInventoryScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const ManageInventoryScreen()),
     );
 
     if (mounted) {
@@ -69,9 +64,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _openHelpFaq() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const HelpFaqScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const HelpFaqScreen()),
     );
   }
 
@@ -79,9 +72,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _openAbout() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const AboutIDireksyonScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const AboutIDireksyonScreen()),
     );
   }
 
@@ -89,9 +80,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _openPrivacyPolicy() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const PrivacyPolicyScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
     );
   }
 
@@ -99,82 +88,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _openTermsOfService() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const TermsOfServiceScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const TermsOfServiceScreen()),
     );
   }
-  
 
-Future<void> _confirmLogout() async {
-  if (_loggingOut) return;
+  Future<void> _confirmLogout() async {
+    if (_loggingOut) return;
 
-  final shouldLogout = await showDialog<bool>(
-    context: context,
-    barrierDismissible: true,
-    builder: (dialogContext) {
-      final colors = Theme.of(dialogContext).colorScheme;
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        final colors = Theme.of(dialogContext).colorScheme;
 
-      return AlertDialog(
-        backgroundColor: colors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-        contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        title: const Text(
-          'Log out of IDireksyon?',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
+        return AlertDialog(
+          backgroundColor: colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
           ),
-        ),
-        content: Text(
-          "You'll need to sign in again to access your account.",
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.5,
-            color: colors.onSurfaceVariant,
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          title: const Text(
+            'Log out of IDireksyon?',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext, false);
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: colors.onSurfaceVariant,
+          content: Text(
+            "You'll need to sign in again to access your account.",
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: colors.onSurfaceVariant,
             ),
-            child: const Text('Stay here'),
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(dialogContext, true);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: ProfileScreen.primaryBlue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: colors.onSurfaceVariant,
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              child: const Text('Stay here'),
             ),
-            child: const Text('Log out'),
-          ),
-        ],
-      );
-    },
-  );
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: ProfileScreen.primaryBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Log out'),
+            ),
+          ],
+        );
+      },
+    );
 
-  if (!mounted || shouldLogout != true) return;
+    if (!mounted || shouldLogout != true) return;
 
-  await _logout();
-}
-
+    await _logout();
+  }
 
   // LOGOUT
   Future<void> _logout() async {
@@ -187,23 +169,16 @@ Future<void> _confirmLogout() async {
     try {
       await AuthService.instance.logout();
     } on AuthException {
-      message =
-          'Logged out on this device. Could not confirm logout with the server.';
+      message = 'Logged out on this device. Could not confirm logout with the server.';
     }
 
     if (!mounted) return;
 
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      '/login',
-      (_) => false,
-    );
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
 
     if (message != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -230,26 +205,23 @@ Future<void> _confirmLogout() async {
                 builder: (context, _) {
                   final user = AuthService.instance.user;
 
-                  final name =
-                      (user?['name'] ?? 'Your account').toString();
+                  final name = (user?['name'] ?? 'Your account').toString();
 
-                  final contact = (user?['email'] ??
-                          user?['phone'] ??
-                          'No contact information')
-                      .toString();
+                  final contact =
+                      (user?['email'] ??
+                              user?['phone'] ??
+                              'No contact information')
+                          .toString();
 
                   return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                     child: Row(
                       children: [
                         const ProfileAvatar(size: 76),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 name,
@@ -266,10 +238,7 @@ Future<void> _confirmLogout() async {
                                 contact,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: muted,
-                                ),
+                                style: TextStyle(fontSize: 12, color: muted),
                               ),
                             ],
                           ),
@@ -298,8 +267,7 @@ Future<void> _confirmLogout() async {
                           height: 52,
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius:
-                                BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: const Icon(
                             Icons.folder_copy_outlined,
@@ -310,8 +278,7 @@ Future<void> _confirmLogout() async {
                         const SizedBox(width: 14),
                         const Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'My IDs & Documents',
@@ -345,6 +312,16 @@ Future<void> _confirmLogout() async {
               // MY ACCOUNT
               _heading('MY ACCOUNT', muted),
               _group(colors, [
+                if (AuthService.instance.token != null)
+                  _entry(
+                    Icons.route_outlined,
+                    'My Roadmaps',
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SavedGoalsScreen(),
+                      ),
+                    ),
+                  ),
                 _entry(
                   Icons.person_outline_rounded,
                   'Personal information',
@@ -360,11 +337,7 @@ Future<void> _confirmLogout() async {
               // HELP & INFORMATION
               _heading('HELP & INFORMATION', muted),
               _group(colors, [
-                _entry(
-                  Icons.help_outline_rounded,
-                  'Help & FAQs',
-                  _openHelpFaq,
-                ),
+                _entry(Icons.help_outline_rounded, 'Help & FAQs', _openHelpFaq),
                 _entry(
                   Icons.info_outline_rounded,
                   'About IDireksyon',
@@ -385,44 +358,33 @@ Future<void> _confirmLogout() async {
               const SizedBox(height: 24),
 
               // LOG OUT
-              
-OutlinedButton.icon(
-  onPressed: _loggingOut ? null : _confirmLogout,
-  icon: const Icon(
-    Icons.logout_rounded,
-    size: 19,
-  ),
-  label: Text(
-    _loggingOut ? 'Logging out…' : 'Log out',
-    style: const TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w700,
-    ),
-  ),
-  style: OutlinedButton.styleFrom(
-    foregroundColor: ProfileScreen.primaryBlue,
-    backgroundColor: colors.surface,
-    minimumSize: const Size.fromHeight(52),
-    side: BorderSide(
-      color: colors.outlineVariant,
-      width: 1,
-    ),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-    ),
-  ),
-),
-
+              OutlinedButton.icon(
+                onPressed: _loggingOut ? null : _confirmLogout,
+                icon: const Icon(Icons.logout_rounded, size: 19),
+                label: Text(
+                  _loggingOut ? 'Logging out…' : 'Log out',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: ProfileScreen.primaryBlue,
+                  backgroundColor: colors.surface,
+                  minimumSize: const Size.fromHeight(52),
+                  side: BorderSide(color: colors.outlineVariant, width: 1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
 
               const SizedBox(height: 15),
 
               Text(
                 'IDireksyon',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: muted,
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: muted, fontSize: 11),
               ),
             ],
           ),
@@ -448,19 +410,12 @@ OutlinedButton.icon(
   }
 
   // PROFILE MENU ENTRY
-  _ProfileEntry _entry(
-    IconData icon,
-    String label,
-    VoidCallback onTap,
-  ) {
+  _ProfileEntry _entry(IconData icon, String label, VoidCallback onTap) {
     return _ProfileEntry(icon, label, onTap);
   }
 
   // GROUPED SETTINGS
-  Widget _group(
-    ColorScheme colors,
-    List<_ProfileEntry> entries,
-  ) {
+  Widget _group(ColorScheme colors, List<_ProfileEntry> entries) {
     return Material(
       color: colors.surface,
       borderRadius: BorderRadius.circular(20),
@@ -520,11 +475,7 @@ OutlinedButton.icon(
 
 // PROFILE ENTRY MODEL
 class _ProfileEntry {
-  const _ProfileEntry(
-    this.icon,
-    this.label,
-    this.onTap,
-  );
+  const _ProfileEntry(this.icon, this.label, this.onTap);
 
   final IconData icon;
   final String label;
