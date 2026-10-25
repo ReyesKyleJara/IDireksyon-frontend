@@ -1,3 +1,4 @@
+import 'auth_mascot_peek.dart';
 import '../../core/widgets/app_motion.dart';
 
 import 'package:flutter/material.dart';
@@ -482,6 +483,7 @@ class _SignupFormState
         backgroundColor:
             AppTheme.pageBackground,
         body: SafeArea(
+          child: AuthMascotPeek(
           child: LayoutBuilder(
             builder:
                 (
@@ -537,9 +539,13 @@ class _SignupFormState
                                     CrossAxisAlignment
                                         .stretch,
                                 children: [
-                                  const SizedBox(
-                                    height:
-                                        32,
+                                  SizedBox(
+                                    // Keep a clear stage for the mascot and tip.
+                                    // Release it while typing or using large text.
+                                    height: MediaQuery.viewInsetsOf(context).bottom == 0 &&
+                                        !MediaQuery.disableAnimationsOf(context) &&
+                                        MediaQuery.textScalerOf(context).scale(16) <= 22.4
+                                        ? 176 : 32,
                                   ),
 
                                   Center(
@@ -1115,6 +1121,7 @@ class _SignupFormState
                 ),
               );
             },
+          ),
           ),
         ),
       ),

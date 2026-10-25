@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
-
-import 'package:flutter_svg/flutter_svg.dart';
+import 'onboarding_mascot_scene.dart';
+import 'onboarding_speech_bubble.dart';
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key}) : isRequirements = false;
-
   const OnboardingScreen.requirements({super.key}) : isRequirements = true;
 
   final bool isRequirements;
-
   static const Color primaryBlue = Color(0xFF0B4295);
+
+  void _continue(BuildContext context) {
+    if (isRequirements) {
+      Navigator.of(context)
+          .pushNamedAndRemoveUntil('/welcome', (route) => false);
+    } else {
+      Navigator.of(context).pushNamed('/onboarding/requirements');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,156 +26,138 @@ class OnboardingScreen extends StatelessWidget {
       backgroundColor: AppTheme.pageBackground,
       body: SafeArea(
         child: LayoutBuilder(
-          builder: (context, constraints) {
-            final panelHeight =
-                327.0 + (MediaQuery.textScalerOf(context).scale(24) - 24) * 5;
-            final pageHeight = constraints.maxHeight.clamp(
-              panelHeight + 313.0,
-              double.infinity,
-            );
-
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: pageHeight),
-                child: Column(
-                  children: [
-                    SizedBox(
-                      height: pageHeight - panelHeight,
-                      width: double.infinity,
-                      child: Stack(
-                        clipBehavior: Clip.none,
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(28, 16, 28, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Positioned(
-                            top: 0,
-                            bottom: -22,
-                            left: 0,
-                            right: 0,
-                            child: Image.asset(
-                              isRequirements
-                                  ? 'assets/onboarding pictures/onboarding-requirements.png'
-                                  : 'assets/onboarding pictures/onboarding-hero.png',
-                              fit: BoxFit.cover,
-                              alignment: Alignment.topCenter,
-                              excludeFromSemantics: true,
+                          SizedBox(
+                            height: 36,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: isRequirements
+                                  ? IconButton(
+                                      tooltip: 'Back',
+                                      padding: EdgeInsets.zero,
+                                      onPressed: () =>
+                                          Navigator.of(context).maybePop(),
+                                      icon: const Icon(
+                                        Icons.arrow_back_rounded,
+                                        color: primaryBlue,
+                                        size: 22,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ),
+                          const Spacer(),
+                          _message(),
+                          const SizedBox(height: 8),
+                          OnboardingMascotScene(
+                            isRequirements: isRequirements,
+                            height: (constraints.maxHeight * .36).clamp(
+                              210.0,
+                              300.0,
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          const Spacer(),
+                          Semantics(
+                            label: 'Page ${isRequirements ? 2 : 1} of 2',
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(2, (index) {
+                                final active =
+                                    index == (isRequirements ? 1 : 0);
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  width: active ? 22 : 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: active
+                                        ? primaryBlue
+                                        : const Color(0xFFD4DEEA),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          FilledButton(
+                            onPressed: () => _continue(context),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: primaryBlue,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(double.infinity, 54),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: Text(
+                              isRequirements ? 'Get Started' : 'Next',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Container(
-                      width: double.infinity,
-                      constraints: BoxConstraints(minHeight: panelHeight),
-                      decoration: const BoxDecoration(
-                        color: AppTheme.pageBackground,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(22),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x10000000),
-                            blurRadius: 4,
-                            offset: Offset(0, -1),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 520),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 50, 16, 52),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    SvgPicture.asset(
-                                      'assets/onboarding pictures/Group 105.svg',
-                                      width: 50,
-                                      height: 35,
-                                      excludeFromSemantics: true,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Flexible(
-                                      child: Text(
-                                        'IDireksyon',
-                                        style: TextStyle(
-                                          fontFamily: 'Bricolage Grotesque',
-                                          fontSize: 32,
-                                          height: 1.1,
-                                          fontWeight: FontWeight.w800,
-                                          color: primaryBlue,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  isRequirements
-                                      ? 'Track Your Requirements in\nOne Place'
-                                      : 'Simplify Your Government\nID Journey',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontFamily: 'Bricolage Grotesque',
-                                    fontSize: 24,
-                                    height: 1.25,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  isRequirements
-                                      ? 'No more confusion. Just a clear step-by-step roadmap'
-                                      : 'Know exactly what to get, where to go, and what to prepare',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 13,
-                                    height: 1.3,
-                                  ),
-                                ),
-                                const SizedBox(height: 64),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton(
-                                    onPressed: () {
-                                      if (isRequirements) {
-                                        Navigator.of(context)
-                                            .pushNamedAndRemoveUntil(
-                                              '/welcome',
-                                              (route) => false,
-                                            );
-                                      } else {
-                                        Navigator.of(
-                                          context,
-                                        ).pushNamed('/onboarding/requirements');
-                                      }
-                                    },
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: primaryBlue,
-                                      foregroundColor: Colors.white,
-                                      minimumSize: const Size(0, 44),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      isRequirements ? 'Get Started' : 'Next',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            );
-          },
+            ),
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _message() {
+    return OnboardingSpeechBubble(
+      child: Column(
+        children: [
+          Text(
+            isRequirements
+                ? 'Let’s get you prepared.'
+                : 'Hi! I’m Diro, your ID guide.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: 'Bricolage Grotesque',
+              fontSize: 25,
+              height: 1.18,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF163D70),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            isRequirements
+                ? 'Keep your requirements in one place. I’ll guide you through what to prepare, step by step.'
+                : 'I’ll help you find the government ID you need, where to go, and how to get there.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.55,
+              color: Color(0xFF526579),
+            ),
+          ),
+        ],
       ),
     );
   }

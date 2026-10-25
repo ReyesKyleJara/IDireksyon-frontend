@@ -1,12 +1,12 @@
 /// Keep in sync with the backend password defaults.
 class PasswordPolicy {
   static const requirements =
-      'Use 8–128 characters with uppercase and lowercase letters, a number, and a symbol.';
+      'Use 8–20 characters with uppercase and lowercase letters, a number, and a symbol.';
 
   static String? validate(String? value) {
     final password = value ?? '';
-    if (password.length < 8 || password.length > 128) {
-      return 'Use 8–128 characters.';
+    if (password.length < 8 || password.length > 20) {
+      return 'Use 8–20 characters.';
     }
     if (!RegExp(r'[A-Z]').hasMatch(password) ||
         !RegExp(r'[a-z]').hasMatch(password)) {

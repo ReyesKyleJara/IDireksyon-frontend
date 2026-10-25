@@ -15,11 +15,13 @@ void main() {
       ),
     );
     await tester.tap(find.text('Log In'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
     expect(find.byType(LoginScreen), findsOneWidget);
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Log In'));
     await tester.tap(find.widgetWithText(FilledButton, 'Log In'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Enter your password'), findsNWidgets(2));
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.first, 'resident@example.com');
@@ -59,7 +61,8 @@ void main() {
         home: const LoginScreen(),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Log In'));
     expect(
       find.widgetWithText(FilledButton, 'Log In').hitTestable(),

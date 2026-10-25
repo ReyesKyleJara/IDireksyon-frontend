@@ -1,3 +1,4 @@
+import 'auth_mascot_peek.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -210,6 +211,7 @@ class _LoginScreenState
         backgroundColor:
             AppTheme.pageBackground,
         body: SafeArea(
+          child: AuthMascotPeek(
           child: LayoutBuilder(
             builder:
                 (context, constraints) {
@@ -718,6 +720,7 @@ class _LoginScreenState
                 ),
               );
             },
+          ),
           ),
         ),
       ),
