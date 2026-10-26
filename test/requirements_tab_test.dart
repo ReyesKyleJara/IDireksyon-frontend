@@ -21,6 +21,52 @@ Future<void> showRequirements(WidgetTester tester, GovernmentIdDetails data) => 
 );
 
 void main() {
+  testWidgets('inventory recognizes linked items and uses the best OR path', (tester) async {
+    final data = record(sets: [scenario(1, 'All applicants', [{
+      'id': 52, 'title': 'Proof of Identity / Supporting Document',
+      'ways': [
+        {'required_count': 2, 'items': [
+          {'type': 'document', 'document_id': 28, 'name': 'PSA Birth Certificate'},
+          {'type': 'custom', 'name': 'Government-issued ID'},
+        ]},
+        {'required_count': 1, 'items': [
+          {'type': 'government_id', 'government_id_id': 55, 'name': 'Philippine Passport'},
+        ]},
+      ],
+    }])]);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: RequirementsTab(
+      governmentId: data,
+      loadInventory: () async => {
+        'government_ids': [{'id': 55, 'owned': true}],
+        'documents': [{'id': 28, 'owned': true}],
+      },
+    ))));
+    await tester.pumpAndSettle();
+    expect(find.text('100% inventory readiness'), findsOneWidget);
+    expect(find.text('50% complete'), findsOneWidget);
+    expect(find.text('100% complete'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('inventory failure is unavailable rather than zero and can retry', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: RequirementsTab(
+      governmentId: record(sets: [scenario(1, 'All applicants', [
+        requirement('Passport', [{'type': 'government_id', 'government_id_id': 55, 'name': 'Passport'}]),
+      ])]),
+      loadInventory: () async {
+        if (++calls == 1) throw Exception('Offline');
+        return {'government_ids': [{'id': 55, 'owned': true}], 'documents': []};
+      },
+    ))));
+    await tester.pumpAndSettle();
+    expect(find.text('0% inventory readiness'), findsNothing);
+    await tester.tap(find.text('Could not load inventory readiness. Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('100% inventory readiness'), findsOneWidget);
+    expect(calls, 2);
+  });
+
   testWidgets('pins the ID title and tabs when requirements scroll', (tester) async {
     await tester.pumpWidget(MaterialApp(home: IdDetailsScreen(
       idName: 'Passport', governmentId: 34,

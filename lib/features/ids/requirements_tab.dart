@@ -1,18 +1,45 @@
 import 'package:flutter/material.dart';
 import '../../models/government_id.dart';
+import '../../core/auth/auth_service.dart';
+import '../../services/requirement_readiness.dart';
 
 Color _accent(BuildContext context) => Theme.of(context).brightness == Brightness.dark
     ? const Color(0xFFA8CCFA) : const Color(0xFF174B85);
 
 class RequirementsTab extends StatefulWidget {
   final GovernmentIdDetails governmentId;
-  const RequirementsTab({super.key, required this.governmentId});
+  final Future<Map<String, dynamic>> Function()? loadInventory;
+  const RequirementsTab({super.key, required this.governmentId, this.loadInventory});
   @override
   State<RequirementsTab> createState() => _RequirementsTabState();
 }
 
 class _RequirementsTabState extends State<RequirementsTab> {
   int? selectedSetId;
+  RequirementReadiness? inventory;
+  bool inventoryError = false;
+  bool loadingInventory = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInventory();
+  }
+
+  Future<void> _loadInventory() async {
+    if (widget.loadInventory == null && AuthService.instance.token == null) return;
+    setState(() { loadingInventory = true; inventoryError = false; inventory = null; });
+    try {
+      final data = await (widget.loadInventory?.call() ?? AuthService.instance.getInventory());
+      final parsed = RequirementReadiness.fromInventory(data);
+      if (mounted) setState(() { inventory = parsed; });
+    } catch (_) {
+      if (mounted) setState(() { inventoryError = true; });
+    } finally {
+      if (mounted) setState(() { loadingInventory = false; });
+    }
+  }
+
   @override
   void didUpdateWidget(covariant RequirementsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -78,11 +105,16 @@ class _RequirementsTabState extends State<RequirementsTab> {
           child: Text('Prepare each requirement below. Where choices are offered, only the stated number is needed.',
             style: TextStyle(fontSize: 13, height: 1.5, color: colors.onSurfaceVariant)),
         ),
+        if (loadingInventory) const Text('Loading inventory readiness…'),
+        if (inventoryError) TextButton(onPressed: _loadInventory,
+          child: const Text('Could not load inventory readiness. Retry')),
+        if (inventory != null) const Text(
+          'Based on linked inventory items. Custom requirements need review. Check document conditions, validity and copies separately.'),
         if (selected.groups.isEmpty)
           const Padding(padding: EdgeInsets.only(top: 24),
             child: Text('Requirements for this application are not available yet.')),
         for (final group in selected.groups)
-          _RequirementSection(key: ValueKey((selected.id, group.id)), group: group),
+          _RequirementSection(key: ValueKey((selected.id, group.id)), group: group, inventory: inventory),
       ],
     );
   }
@@ -90,7 +122,8 @@ class _RequirementsTabState extends State<RequirementsTab> {
 
 class _RequirementSection extends StatelessWidget {
   final RequirementGroup group;
-  const _RequirementSection({super.key, required this.group});
+  final RequirementReadiness? inventory;
+  const _RequirementSection({super.key, required this.group, this.inventory});
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +146,8 @@ class _RequirementSection extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(left: 26),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (inventory != null)
+              Text('${(inventory!.group(group) * 100).round()}% inventory readiness'),
             if (group.conditionType != 'always')
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -140,6 +175,8 @@ class _RequirementSection extends StatelessWidget {
                   child: Text('Option ${index + 1}', style: TextStyle(fontSize: 13,
                     fontWeight: FontWeight.w600, color: colors.onSurface)),
                 ),
+              if (inventory != null)
+                Text('${(inventory!.way(group.ways[index]) * 100).round()}% complete'),
               _WayView(key: ValueKey((group.ways[index].id, index)),
                 way: group.ways[index], heading: group.displayName,
                 alternative: hasAlternatives),
