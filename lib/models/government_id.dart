@@ -9,6 +9,8 @@ class GovernmentIdDetails {
   final String name;
   final String? issuedBy, description, purpose, validity, requirements;
   final List<RequirementSet> requirementSets;
+  final List<CatalogFee> fees;
+  final String? legacyFee;
 
   GovernmentIdDetails.fromJson(Map<String, dynamic> json)
       : id = _integer(json['id']) ?? (throw const FormatException('Missing ID')),
@@ -18,7 +20,9 @@ class GovernmentIdDetails {
         purpose = _text(json['purpose']),
         validity = json['validity_type'] == 'not_applicable' ? null : _text(json['validity']),
         requirements = _text(json['requirements']),
-        requirementSets = _rows(json['requirement_sets'], RequirementSet.fromJson);
+        requirementSets = _rows(json['requirement_sets'], RequirementSet.fromJson),
+        fees = _rows(json['fees'], CatalogFee.fromJson),
+        legacyFee = _text(json['fee']);
 }
 
 class RequirementSet {
@@ -108,5 +112,45 @@ class RequirementItem {
       if (copies != null) '$copies ${copies == 1 ? 'copy' : 'copies'}',
     ];
     return parts.isEmpty ? null : parts.join(' · ');
+  }
+}
+
+
+class CatalogFee {
+  final int? id;
+  final String label, type, currency;
+  final num? amountMin, amountMax;
+  final String? description, notes;
+  final bool isOptional;
+  final List<CatalogFee> options;
+
+  static num? _amount(dynamic value) => value is num ? value : value is String ? num.tryParse(value) : null;
+
+  CatalogFee.fromJson(Map<String, dynamic> json)
+      : id = _integer(json['id']),
+        label = _text(json['label']) ?? 'Fee',
+        type = _text(json['type']) ?? 'varies',
+        currency = _text(json['currency']) ?? 'PHP',
+        amountMin = _amount(json['amount_min']),
+        amountMax = _amount(json['amount_max']),
+        description = _text(json['description']),
+        notes = _text(json['notes']),
+        isOptional = json['is_optional'] == true,
+        options = _rows(json['options'], CatalogFee.fromJson);
+
+  String get displayAmount {
+    final prefix = currency == 'PHP' ? '₱' : '$currency ';
+    String money(num value) {
+      final parts = value.toStringAsFixed(2).split('.');
+      final digits = parts[0].replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (match) => '${match[1]},');
+      return '$prefix$digits.${parts[1]}';
+    }
+    return switch (type) {
+      'options' => 'Choose one',
+      'free' => 'Free',
+      'fixed' when amountMin != null => money(amountMin!),
+      'range' when amountMin != null && amountMax != null => '${money(amountMin!)}–${money(amountMax!)}',
+      _ => 'Varies',
+    };
   }
 }

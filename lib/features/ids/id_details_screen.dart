@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../models/government_id.dart';
 import '../../services/api_service.dart';
 import 'requirements_tab.dart';
+import 'fees_tab.dart';
 
 class IdDetailsScreen extends StatefulWidget {
   final String idName;
@@ -266,91 +267,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
   // COST
   // ============================================================
 
-  Widget _buildCostTab() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: softBlue,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: const Icon(
-                  Icons.payments_outlined,
-                  color: primaryBlue,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total Estimated Cost',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF687385),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      '₱2,350.00',
-                      style: TextStyle(
-                        fontSize: 24,
-                        color: primaryBlue,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 26),
-
-        _buildSectionTitle(
-          title: 'Cost Overview',
-          subtitle: 'Estimated expenses for your application',
-        ),
-
-        const SizedBox(height: 14),
-
-        _buildCostRow(label: 'Application Fee', amount: '₱950.00'),
-        _buildCostRow(label: 'Processing Fee', amount: '₱1,400.00'),
-
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 10),
-          child: Divider(color: Color(0xFFE7E9ED)),
-        ),
-
-        _buildCostRow(
-          label: 'Estimated Total',
-          amount: '₱2,350.00',
-          isTotal: true,
-        ),
-
-        const SizedBox(height: 22),
-
-        _buildImportantNotes(
-          'Fees shown are estimates and may change. Always verify the current fees with the issuing agency.',
-        ),
-      ],
-    );
-  }
+  Widget _buildCostTab() => FeesTab(record: _record);
 
   // ============================================================
   // OFFICES
@@ -571,38 +488,6 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCostRow({
-    required String label,
-    required String amount,
-    bool isTotal = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: isTotal ? 12 : 11.5,
-                fontWeight: isTotal ? FontWeight.w800 : FontWeight.w500,
-                color: const Color(0xFF4D5665),
-              ),
-            ),
-          ),
-          Text(
-            amount,
-            style: TextStyle(
-              fontSize: isTotal ? 13 : 11.5,
-              fontWeight: FontWeight.w800,
-              color: isTotal ? primaryBlue : const Color(0xFF293244),
             ),
           ),
         ],
