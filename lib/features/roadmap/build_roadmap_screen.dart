@@ -4,10 +4,17 @@ import 'package:flutter/material.dart';
 
 import 'confirm_documents_screen.dart';
 import 'id_journey.dart';
+import '../../models/government_id.dart';
+import '../../services/api_service.dart';
 
 class BuildRoadmapScreen extends StatefulWidget {
-  const BuildRoadmapScreen({super.key, this.existingJourneys = const []});
+  const BuildRoadmapScreen({
+    super.key,
+    this.existingJourneys = const [],
+    this.loadIds,
+  });
   final List<IdJourney> existingJourneys;
+  final Future<List<GovernmentIdDetails>> Function()? loadIds;
 
   static const primaryBlue = Color(0xFF12499A);
 
@@ -16,24 +23,25 @@ class BuildRoadmapScreen extends StatefulWidget {
 }
 
 class _BuildRoadmapScreenState extends State<BuildRoadmapScreen> {
-  final Set<String> _selectedIds = {'Passport ID'};
+  final Set<int> _selectedIds = {};
+  late Future<List<GovernmentIdDetails>> _catalog;
 
-  final List<_RoadmapId> _ids = const [
-    _RoadmapId('PhilSys ID', Icons.badge_outlined),
-    _RoadmapId('Passport ID', Icons.menu_book_outlined),
-    _RoadmapId('SSS ID', Icons.credit_card_outlined),
-    _RoadmapId('PhilHealth ID', Icons.health_and_safety_outlined),
-    _RoadmapId('UMID', Icons.credit_card_outlined),
-    _RoadmapId('TIN ID', Icons.receipt_long_outlined),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _catalog = _loadCandidates();
+  }
 
-  void _toggleId(String title) {
+  Future<List<GovernmentIdDetails>> _loadCandidates() async {
+    final records =
+        await (widget.loadIds?.call() ?? ApiService.getGovernmentIds());
+    // Only acquisition targets are filtered; the shared catalog stays complete.
+    return records.where((record) => record.includeInSmartSequencing).toList();
+  }
+
+  void _toggleId(int id) {
     setState(() {
-      if (_selectedIds.contains(title)) {
-        _selectedIds.remove(title);
-      } else {
-        _selectedIds.add(title);
-      }
+      if (!_selectedIds.add(id)) _selectedIds.remove(id);
     });
   }
 
@@ -52,109 +60,167 @@ class _BuildRoadmapScreenState extends State<BuildRoadmapScreen> {
           icon: Icon(Icons.arrow_back_rounded, color: colors.onSurface),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'What IDs do you want to\nacquire?',
-                  style: TextStyle(
-                    fontSize: 24,
-                    height: 1.25,
-                    fontWeight: FontWeight.w800,
-                    color: colors.onSurface,
+      body: FutureBuilder<List<GovernmentIdDetails>>(
+        future: _catalog,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Unable to load roadmap candidates.'),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _catalog = _loadCandidates();
+                    }),
+                    child: const Text('Retry'),
                   ),
+                ],
+              ),
+            );
+          }
+          final records = snapshot.data ?? [];
+          if (records.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'No acquisition targets are currently available for roadmap planning.',
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Select one or more IDs you want to include in\nthis journey.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.35,
-                    color: colors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: BuildRoadmapScreen.primaryBlue.withValues(
-                      alpha: 0.08,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Text(
-                    '${_selectedIds.length} ID${_selectedIds.length == 1 ? '' : 's'} selected',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: BuildRoadmapScreen.primaryBlue,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 17),
-                SizedBox(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _ids.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final id = _ids[index];
-                      return _IdOptionCard(
-                        id: id,
-                        selected: _selectedIds.contains(id.title),
-                        onTap: () => _toggleId(id.title),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: ElevatedButton(
-                    onPressed: _selectedIds.isEmpty
-                        ? null
-                        : () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ConfirmDocumentsScreen(
-                                  targetIds: _selectedIds.toList(),
-                                  existingJourneys: widget.existingJourneys,
-                                ),
-                              ),
-                            );
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: BuildRoadmapScreen.primaryBlue,
-                      disabledBackgroundColor: colors.surfaceContainerHighest,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Next',
+              ),
+            );
+          }
+          final ids = records
+              .map(
+                (record) =>
+                    _RoadmapId(record.id, record.name, Icons.badge_outlined),
+              )
+              .toList();
+          return SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'What IDs do you want to\nacquire?',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 24,
+                        height: 1.25,
+                        fontWeight: FontWeight.w800,
+                        color: colors.onSurface,
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Select one or more IDs you want to include in\nthis journey.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: BuildRoadmapScreen.primaryBlue.withValues(
+                          alpha: 0.08,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        '${_selectedIds.length} ID${_selectedIds.length == 1 ? '' : 's'} selected',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: BuildRoadmapScreen.primaryBlue,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 17),
+                    SizedBox(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: ids.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final id = ids[index];
+                          return _IdOptionCard(
+                            id: id,
+                            selected: _selectedIds.contains(id.id),
+                            onTap: () => _toggleId(id.id),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: ElevatedButton(
+                        onPressed: _selectedIds.isEmpty
+                            ? null
+                            : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ConfirmDocumentsScreen(
+                                      targetIds: records
+                                          .where(
+                                            (record) => _selectedIds.contains(
+                                              record.id,
+                                            ),
+                                          )
+                                          .map((record) => record.name)
+                                          .toList(),
+                                      targetCatalogIds: records
+                                          .where(
+                                            (record) => _selectedIds.contains(
+                                              record.id,
+                                            ),
+                                          )
+                                          .map((record) => record.id)
+                                          .toList(),
+                                      existingJourneys: widget.existingJourneys,
+                                    ),
+                                  ),
+                                );
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: BuildRoadmapScreen.primaryBlue,
+                          disabledBackgroundColor:
+                              colors.surfaceContainerHighest,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Next',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -246,7 +312,9 @@ class _IdOptionCard extends StatelessWidget {
 }
 
 class _RoadmapId {
-  const _RoadmapId(this.title, this.icon);
+  const _RoadmapId(this.id, this.title, this.icon);
+
+  final int id;
 
   final String title;
   final IconData icon;

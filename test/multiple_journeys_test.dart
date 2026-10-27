@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idireksyon_frontend/core/theme/app_theme.dart';
@@ -9,6 +12,7 @@ void main() {
   testWidgets('minimize, add a different journey, and reopen the original', (
     tester,
   ) async {
+    await http.runWithClient(() async {
     final original = IdJourney();
     await tester.pumpWidget(
       MaterialApp(
@@ -22,8 +26,8 @@ void main() {
     expect(find.text('0%'), findsOneWidget);
     await tester.tap(find.text('Add another ID journey'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Passport ID'));
-    await tester.tap(find.text('PhilSys ID'));
+    await tester.tap(find.text('PhilSys National ID'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Next'));
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
@@ -42,17 +46,19 @@ void main() {
     expect(active.journeys.length, 2);
     expect(identical(active.journeys.first, original), isTrue);
     expect(original.minimized, isTrue);
-    expect(active.journeys.last.targetIds, ['PhilSys ID']);
+    expect(active.journeys.last.targetIds, ['PhilSys National ID']);
+    expect(active.journeys.last.targetCatalogIds, [56]);
     expect(active.journeys.last.ownedItems, contains('Birth Certificate'));
     await tester.tap(find.text('Expand progress'));
     await tester.pumpAndSettle();
     expect(original.minimized, isFalse);
     await tester.tap(find.text('Home').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('My ID Journey').last);
+    await tester.tap(find.text('Roadmap').last);
     await tester.pumpAndSettle();
     expect(original.minimized, isFalse);
     expect(tester.takeException(), isNull);
+    }, () => MockClient((request) async => http.Response(jsonEncode({'data': [{'id': 56, 'name': 'PhilSys National ID'}, {'id': 55, 'name': 'Philippine Passport'}]}), 200)));
   });
 
   testWidgets('canceling another journey preserves the original card', (

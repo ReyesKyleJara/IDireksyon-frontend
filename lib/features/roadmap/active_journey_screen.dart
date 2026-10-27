@@ -5,11 +5,9 @@ import 'package:flutter/material.dart';
 import '../../core/widgets/page_header.dart';
 import '../loading/loading_screen.dart';
 import '../ids/id_details_screen.dart';
-import '../office_finder/office_finder_screen.dart';
 import '../shell/resident_app_shell.dart';
 import 'build_roadmap_screen.dart';
 import 'id_journey.dart';
-import 'suggested_roadmap_screen.dart';
 
 class JourneyLoadingScreen extends StatelessWidget {
   const JourneyLoadingScreen({
@@ -139,42 +137,18 @@ class _JourneyCard extends StatelessWidget {
   final VoidCallback onToggle;
 
   List<({String title, String detail, IconData icon, Widget page})> get _steps {
-    if (journey.targetIds.length == 1 &&
-        journey.targetIds.first == 'Passport ID') {
-      return [
-        (
-          title: 'Birth Certificate',
-          detail: 'Prepare your PSA copy and supporting documents.',
-          icon: Icons.workspace_premium_outlined,
-          page: const PsaBirthCertificateGuideScreen(),
-        ),
-        (
-          title: 'PhilSys National ID Registration',
-          detail: 'Review the requirements for your National ID.',
-          icon: Icons.badge_outlined,
-          page: const IdDetailsScreen(idName: 'PhilSys ID'),
-        ),
-        (
-          title: 'Passport Application',
-          detail: 'Check requirements and plan your DFA appointment.',
-          icon: Icons.menu_book_outlined,
-          page: const IdDetailsScreen(idName: 'Passport ID'),
-        ),
-        (
-          title: 'Find DFA Office',
-          detail: 'Find an office for your passport application.',
-          icon: Icons.location_on_outlined,
-          page: const OfficeFinderScreen(),
-        ),
-      ];
-    }
     return [
-      for (final id in journey.targetIds)
+      for (var index = 0; index < journey.targetIds.length; index++)
         (
-          title: id,
+          title: journey.targetIds[index],
           detail: 'Review the requirements and application guide for this ID.',
           icon: Icons.badge_outlined,
-          page: IdDetailsScreen(idName: id),
+          page: IdDetailsScreen(
+            idName: journey.targetIds[index],
+            governmentId: index < journey.targetCatalogIds.length
+                ? journey.targetCatalogIds[index]
+                : null,
+          ),
         ),
     ];
   }

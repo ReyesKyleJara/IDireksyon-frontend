@@ -2,12 +2,15 @@
 class IdJourney {
   IdJourney({
     List<String> targetIds = const ['Passport ID'],
+    List<int> targetCatalogIds = const [],
     List<String> ownedItems = const [],
     this.progress = 0,
   }) : targetIds = List.unmodifiable(targetIds),
+       targetCatalogIds = List.unmodifiable(targetCatalogIds),
        ownedItems = List.unmodifiable(ownedItems);
 
   final List<String> targetIds;
+  final List<int> targetCatalogIds;
   final List<String> ownedItems;
 
   /// Readiness from 0 to 1; new journeys start with no completed steps.

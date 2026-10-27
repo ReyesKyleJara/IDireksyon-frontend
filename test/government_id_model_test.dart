@@ -2,6 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idireksyon_frontend/models/government_id.dart';
 
 void main() {
+  test('sequencing inclusion defaults to true and only explicit false excludes', () {
+    for (final json in <Map<String, dynamic>>[
+      {'id': 1}, {'id': 1, 'include_in_smart_sequencing': true},
+    ]) { expect(GovernmentIdDetails.fromJson(json).includeInSmartSequencing, isTrue); }
+    expect(GovernmentIdDetails.fromJson({'id': 1, 'include_in_smart_sequencing': false}).includeInSmartSequencing, isFalse);
+  });
+
   test('parses scenarios alternatives references qualifications and submission details', () {
     final record = GovernmentIdDetails.fromJson({
       'id': 34, 'name': 'Passport', 'requirements': 'Old summary',

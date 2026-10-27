@@ -5,6 +5,17 @@ import 'package:http/testing.dart';
 import 'package:idireksyon_frontend/services/api_service.dart';
 
 void main() {
+  test('normal catalog retains excluded records and details remain accessible', () async {
+    final client = MockClient((request) async {
+      final record = {'id': 34, 'name': 'Reference ID', 'include_in_smart_sequencing': false};
+      return http.Response(jsonEncode({'data': request.url.path.endsWith('/34') ? record : [record]}), 200);
+    });
+    addTearDown(client.close);
+    final directory = await ApiService.getGovernmentIds(client: client);
+    expect(directory.single.includeInSmartSequencing, isFalse);
+    expect((await ApiService.getGovernmentId(34, client: client)).id, 34);
+  });
+
   test('loads the directory and requests the selected numeric ID', () async {
     final paths = <String>[];
     final client = MockClient((request) async {

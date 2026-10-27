@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:idireksyon_frontend/models/government_id.dart';
 import 'package:idireksyon_frontend/features/roadmap/active_journey_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idireksyon_frontend/core/theme/app_theme.dart';
@@ -11,7 +12,7 @@ void main() {
   for (final page in <Widget>[
     const RoadmapScreen(),
     const ActiveJourneyScreen(),
-    const BuildRoadmapScreen(),
+    BuildRoadmapScreen(loadIds: () async => [GovernmentIdDetails.fromJson({'id': 1, 'name': 'Philippine Passport'})]),
     const ConfirmDocumentsScreen(),
     const SuggestedRoadmapScreen(),
     const PsaBirthCertificateGuideScreen(),

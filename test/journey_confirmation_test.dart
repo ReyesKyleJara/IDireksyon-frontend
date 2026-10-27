@@ -1,3 +1,8 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:idireksyon_frontend/features/shell/resident_app_shell.dart';
+import 'package:idireksyon_frontend/features/ids/id_details_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:idireksyon_frontend/features/loading/loading_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,10 +14,11 @@ void main() {
   testWidgets('Confirmation loads journey and keeps it when switching tabs', (
     tester,
   ) async {
+    await http.runWithClient(() async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.lightTheme,
-        home: const SuggestedRoadmapScreen(),
+        home: const SuggestedRoadmapScreen(targetIds: ['Philippine Passport'], targetCatalogIds: [55]),
       ),
     );
     final confirm = find.text('Confirm Suggested Journey');
@@ -25,20 +31,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ActiveJourneyScreen), findsOneWidget);
     expect(
-      tester
-          .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
-          .currentIndex,
+      tester.widget<ResidentAppShell>(find.byType(ResidentAppShell)).initialIndex,
       1,
     );
     await tester.tap(find.text('Home').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('My ID Journey').last);
+    await tester.tap(find.text('Roadmap').last);
     await tester.pumpAndSettle();
     expect(find.text('Your next steps'), findsOneWidget);
-    await tester.ensureVisible(find.text('Birth Certificate'));
-    await tester.tap(find.text('Birth Certificate'));
+    expect(find.text('Birth Certificate'), findsNothing);
+    await tester.ensureVisible(find.text('Philippine Passport').last);
+    await tester.tap(find.text('Philippine Passport').last);
     await tester.pumpAndSettle();
-    expect(find.byType(PsaBirthCertificateGuideScreen), findsOneWidget);
+    expect(find.byType(IdDetailsScreen), findsOneWidget);
+    expect(tester.widget<IdDetailsScreen>(find.byType(IdDetailsScreen)).governmentId, 55);
     expect(tester.takeException(), isNull);
+    }, () => MockClient((request) async => http.Response(jsonEncode({'data': request.url.path.endsWith('/55') ? {'id': 55, 'name': 'Philippine Passport'} : [{'id': 55, 'name': 'Philippine Passport'}]}), 200)));
   });
 }

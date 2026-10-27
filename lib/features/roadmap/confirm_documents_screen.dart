@@ -9,9 +9,11 @@ class ConfirmDocumentsScreen extends StatefulWidget {
   const ConfirmDocumentsScreen({
     super.key,
     this.targetIds = const ['Passport ID'],
+    this.targetCatalogIds = const [],
     this.existingJourneys = const [],
   });
   final List<String> targetIds;
+  final List<int> targetCatalogIds;
   final List<IdJourney> existingJourneys;
 
   static const primaryBlue = Color(0xFF12499A);
@@ -100,6 +102,7 @@ class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
                         MaterialPageRoute(
                           builder: (_) => SuggestedRoadmapScreen(
                             targetIds: widget.targetIds,
+                            targetCatalogIds: widget.targetCatalogIds,
                             ownedItems: _ownedItems.toList(),
                             existingJourneys: widget.existingJourneys,
                           ),

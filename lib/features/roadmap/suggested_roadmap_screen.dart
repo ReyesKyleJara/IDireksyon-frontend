@@ -3,57 +3,33 @@ import 'package:flutter/material.dart';
 import 'active_journey_screen.dart';
 import 'id_journey.dart';
 import '../ids/id_details_screen.dart';
-import '../office_finder/office_finder_screen.dart';
 
 class SuggestedRoadmapScreen extends StatelessWidget {
   const SuggestedRoadmapScreen({
     super.key,
     this.targetIds = const ['Passport ID'],
+    this.targetCatalogIds = const [],
     this.ownedItems = const [],
     this.existingJourneys = const [],
   });
   final List<String> targetIds;
+  final List<int> targetCatalogIds;
   final List<String> ownedItems;
   final List<IdJourney> existingJourneys;
 
-  List<_RoadmapStep> get _steps =>
-      targetIds.length == 1 && targetIds.first == 'Passport ID'
-      ? _passportSteps
-      : [
-          for (final id in targetIds)
-            _RoadmapStep(
-              title: id,
-              subtitle:
-                  'Review the requirements and application guide for this ID.',
-              icon: Icons.badge_outlined,
-            ),
-        ];
+  List<_RoadmapStep> get _steps => [
+    for (var index = 0; index < targetIds.length; index++)
+      _RoadmapStep(
+        title: targetIds[index],
+        governmentId: index < targetCatalogIds.length
+            ? targetCatalogIds[index]
+            : null,
+        subtitle: 'Review the requirements and application guide for this ID.',
+        icon: Icons.badge_outlined,
+      ),
+  ];
 
   static const primaryBlue = Color(0xFF12499A);
-
-  static const _passportSteps = [
-    _RoadmapStep(
-      title: 'Birth Certificate',
-      subtitle:
-          'Confirm if you have the original PSA copy and prepare photocopies',
-      icon: Icons.workspace_premium_outlined,
-    ),
-    _RoadmapStep(
-      title: 'PhilSys National ID Registration',
-      subtitle: 'Get a National ID first before getting a Passport',
-      icon: Icons.fact_check_outlined,
-    ),
-    _RoadmapStep(
-      title: 'Passport Application',
-      subtitle: 'Reserve your appointment through the DFA website',
-      icon: Icons.edit_note_outlined,
-    ),
-    _RoadmapStep(
-      title: 'Find DFA Office',
-      subtitle: 'Find the nearest DFA Office and process your application',
-      icon: Icons.location_on_outlined,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +97,7 @@ class SuggestedRoadmapScreen extends StatelessWidget {
                         builder: (_) => JourneyLoadingScreen(
                           journey: IdJourney(
                             targetIds: targetIds,
+                            targetCatalogIds: targetCatalogIds,
                             ownedItems: ownedItems,
                           ),
                           existingJourneys: existingJourneys,
@@ -357,17 +334,10 @@ class _StepRow extends StatelessWidget {
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => switch (step.title) {
-                          'Birth Certificate' =>
-                            const PsaBirthCertificateGuideScreen(),
-                          'Find DFA Office' => const OfficeFinderScreen(),
-                          'Passport Application' => const IdDetailsScreen(
-                            idName: 'Passport ID',
-                          ),
-                          'PhilSys National ID Registration' =>
-                            const IdDetailsScreen(idName: 'PhilSys ID'),
-                          _ => IdDetailsScreen(idName: step.title),
-                        },
+                        builder: (_) => IdDetailsScreen(
+                          idName: step.title,
+                          governmentId: step.governmentId,
+                        ),
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
@@ -717,11 +687,13 @@ class _ChecklistItem extends StatelessWidget {
 
 class _RoadmapStep {
   const _RoadmapStep({
+    this.governmentId,
     required this.title,
     required this.subtitle,
     required this.icon,
   });
 
+  final int? governmentId;
   final String title;
   final String subtitle;
   final IconData icon;
