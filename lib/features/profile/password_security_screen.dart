@@ -1,19 +1,17 @@
-
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/password_policy.dart';
+import '../auth/forgot_password_screen.dart';
 
 class PasswordSecurityScreen extends StatefulWidget {
   const PasswordSecurityScreen({super.key});
 
   @override
-  State<PasswordSecurityScreen> createState() =>
-      _PasswordSecurityScreenState();
+  State<PasswordSecurityScreen> createState() => _PasswordSecurityScreenState();
 }
 
-class _PasswordSecurityScreenState
-    extends State<PasswordSecurityScreen> {
+class _PasswordSecurityScreenState extends State<PasswordSecurityScreen> {
   static const _navy = Color(0xFF1E3A8A);
 
   final _formKey = GlobalKey<FormState>();
@@ -38,9 +36,7 @@ class _PasswordSecurityScreenState
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _changePassword() async {
@@ -73,9 +69,7 @@ class _PasswordSecurityScreenState
       }
     } catch (_) {
       if (mounted) {
-        _showMessage(
-          'Unable to change your password. Please try again.',
-        );
+        _showMessage('Unable to change your password. Please try again.');
       }
     } finally {
       if (mounted) {
@@ -125,11 +119,7 @@ class _PasswordSecurityScreenState
 
                     Text(
                       'Enter your current password. ${PasswordPolicy.requirements}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: muted,
-                        height: 1.4,
-                      ),
+                      style: TextStyle(fontSize: 14, color: muted, height: 1.4),
                     ),
 
                     const SizedBox(height: 36),
@@ -155,6 +145,25 @@ class _PasswordSecurityScreenState
                     const SizedBox(height: 23),
 
                     // NEW PASSWORD
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ForgotPasswordScreen(
+                                    initialEmail:
+                                        AuthService.instance.user?['email']
+                                            as String? ??
+                                        '',
+                                  ),
+                                ),
+                              ),
+                        child: const Text('Forgot password?'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     _passwordField(
                       label: 'New password',
                       controller: _newPassword,
@@ -241,11 +250,7 @@ class _PasswordSecurityScreenState
                     Text(
                       'Your current password is required to make this change.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: muted,
-                        height: 1.4,
-                      ),
+                      style: TextStyle(fontSize: 12, color: muted, height: 1.4),
                     ),
                   ],
                 ),
@@ -271,10 +276,7 @@ class _PasswordSecurityScreenState
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
 
         const SizedBox(height: 10),
@@ -286,8 +288,7 @@ class _PasswordSecurityScreenState
           enableSuggestions: false,
           autocorrect: false,
           validator: validator,
-          autovalidateMode:
-              AutovalidateMode.onUserInteraction,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           decoration: InputDecoration(
             errorMaxLines: 3,
             filled: true,
@@ -299,33 +300,24 @@ class _PasswordSecurityScreenState
 
             // SHOW / HIDE PASSWORD
             suffixIcon: IconButton(
-              onPressed:
-                  _saving ? null : onVisibilityPressed,
+              onPressed: _saving ? null : onVisibilityPressed,
               icon: Icon(
                 hidden
                     ? Icons.visibility_off_outlined
                     : Icons.visibility_outlined,
                 color: colors.onSurfaceVariant,
               ),
-              tooltip:
-                  hidden ? 'Show password' : 'Hide password',
+              tooltip: hidden ? 'Show password' : 'Hide password',
             ),
 
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: colors.outlineVariant,
-              ),
+              borderSide: BorderSide(color: colors.outlineVariant),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: _navy,
-                width: 1.5,
-              ),
+              borderSide: const BorderSide(color: _navy, width: 1.5),
             ),
           ),
         ),

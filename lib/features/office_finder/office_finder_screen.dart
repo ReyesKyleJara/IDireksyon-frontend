@@ -809,6 +809,8 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
+                    _officeHours(office, colors),
+                    const SizedBox(height: 6),
                     Text(
                       office.serviceTag,
                       style: TextStyle(
@@ -827,6 +829,27 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
       ),
     ),
   );
+
+  Widget _officeHours(OfficeModel office, ColorScheme colors) {
+    final hours = office.operatingHours.replaceFirst('Today: ', '').trim();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.access_time_rounded,
+          size: 16,
+          color: colors.onSurfaceVariant,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            hours.isEmpty ? 'Office hours unavailable' : 'Office hours: $hours',
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
 
   List<Widget> _details(OfficeModel office, ColorScheme colors) => [
     Row(
@@ -856,6 +879,13 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     Text(
       office.address,
       style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
+    ),
+    const SizedBox(height: 8),
+    _officeHours(office, colors),
+    const SizedBox(height: 4),
+    Text(
+      'Confirm office hours before visiting; holiday schedules may vary.',
+      style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
     ),
     const SizedBox(height: 12),
     Wrap(
@@ -934,11 +964,6 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
         'Walking routes may lack sidewalks or pedestrian paths. Use caution.',
         style: TextStyle(fontSize: 12),
       ),
-    const SizedBox(height: 8),
-    Text(
-      'Listed hours: ${office.operatingHours.replaceFirst('Today: ', '')} • Confirm before visiting',
-      style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-    ),
     if (_route != null) ...[
       const SizedBox(height: 18),
       const Text(
