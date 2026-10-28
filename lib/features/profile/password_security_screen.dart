@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/password_policy.dart';
+import '../auth/forgot_password_screen.dart';
 
 class PasswordSecurityScreen extends StatefulWidget {
   const PasswordSecurityScreen({super.key});
@@ -153,6 +154,24 @@ class _PasswordSecurityScreenState
                     ),
 
                     const SizedBox(height: 23),
+
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ForgotPasswordScreen(
+                                    initialEmail:
+                                        AuthService.instance.user?['email'] as String? ?? '',
+                                  ),
+                                ),
+                              ),
+                        child: const Text('Forgot password?'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
                     // NEW PASSWORD
                     _passwordField(

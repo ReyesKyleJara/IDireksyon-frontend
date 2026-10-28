@@ -68,6 +68,15 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<String> sendPasswordResetEmail(String email) async {
+    final data = await _post('forgot-password', {'email': email.trim()});
+    final message = data['message'];
+    if (message is! String || message.trim().isEmpty) {
+      throw const AuthException('The server returned an unexpected response.');
+    }
+    return message;
+  }
+
   Future<void> register({
     String? emailVerificationToken,
     required String contact,

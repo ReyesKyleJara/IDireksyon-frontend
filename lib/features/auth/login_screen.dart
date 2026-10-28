@@ -1,4 +1,5 @@
 import 'auth_mascot_peek.dart';
+import 'forgot_password_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -562,9 +563,15 @@ class _LoginScreenState
                                 child:
                                     TextButton(
                                   onPressed:
-                                      () =>
-                                          _showMessage(
-                                    'Password recovery is not available yet.',
+                                      () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => ForgotPasswordScreen(
+                                        initialEmail: RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                            .hasMatch(_identifier.text.trim())
+                                            ? _identifier.text.trim()
+                                            : '',
+                                      ),
+                                    ),
                                   ),
                                   style:
                                       TextButton
