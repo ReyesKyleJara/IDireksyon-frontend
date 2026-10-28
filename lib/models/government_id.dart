@@ -10,6 +10,7 @@ List<T> _rows<T>(dynamic value, T Function(Map<String, dynamic>) parse) =>
 class GovernmentIdDetails {
   final int id;
   final bool includeInSmartSequencing;
+  final String applicationAvailability;
   final String name;
   final String? issuedBy, description, purpose, validity, requirements;
   final List<RequirementSet> requirementSets;
@@ -20,6 +21,7 @@ class GovernmentIdDetails {
     : id = _integer(json['id']) ?? (throw const FormatException('Missing ID')),
       name = _text(json['name']) ?? 'Government ID',
       includeInSmartSequencing = json['include_in_smart_sequencing'] != false,
+      applicationAvailability = _text(json['application_availability']) ?? 'available',
       issuedBy = _text(json['issued_by']),
       description = _text(json['description']),
       purpose = _text(json['purpose']),
