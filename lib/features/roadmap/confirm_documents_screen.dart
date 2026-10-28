@@ -1,7 +1,7 @@
-import '../../core/widgets/app_motion.dart';
-
 import 'package:flutter/material.dart';
 
+import '../../core/auth/auth_service.dart';
+import '../profile/manage_inventory_screen.dart';
 import 'suggested_roadmap_screen.dart';
 import 'id_journey.dart';
 
@@ -15,240 +15,155 @@ class ConfirmDocumentsScreen extends StatefulWidget {
   final List<String> targetIds;
   final List<int> targetCatalogIds;
   final List<IdJourney> existingJourneys;
-
   static const primaryBlue = Color(0xFF12499A);
-
   @override
   State<ConfirmDocumentsScreen> createState() => _ConfirmDocumentsScreenState();
 }
 
 class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
-  final Set<String> _ownedItems = {'Birth Certificate'};
+  List<({String type, int id, String name})> _owned = [];
+  bool _loading = true;
+  String? _error;
 
-  final List<_DocumentOption> _ownedIds = const [
-    _DocumentOption('PhilSys ID', Icons.badge_outlined),
-    _DocumentOption('Passport ID', Icons.menu_book_outlined),
-    _DocumentOption('TIN ID', Icons.receipt_long_outlined),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
-  final List<_DocumentOption> _ownedDocuments = const [
-    _DocumentOption('Birth Certificate', Icons.description_outlined),
-    _DocumentOption('Barangay Clearance', Icons.verified_user_outlined),
-    _DocumentOption('School ID', Icons.school_outlined),
-  ];
-
-  void _toggleItem(String title) {
+  Future<void> _load() async {
     setState(() {
-      if (_ownedItems.contains(title)) {
-        _ownedItems.remove(title);
-      } else {
-        _ownedItems.add(title);
-      }
+      _loading = true;
+      _error = null;
+      _owned = [];
     });
+    try {
+      final data = await AuthService.instance.getInventory();
+      final owned = <({String type, int id, String name})>[];
+      for (final type in ['government_id', 'document']) {
+        final rows =
+            data[type == 'government_id' ? 'government_ids' : 'documents'];
+        if (rows is! List) throw const FormatException('Invalid Inventory');
+        for (final row in rows) {
+          if (row is! Map ||
+              row['id'] is! int ||
+              row['name'] is! String ||
+              row['owned'] is! bool) {
+            throw const FormatException('Invalid Inventory item');
+          }
+          if (row['owned'] == true) {
+            owned.add((
+              type: type,
+              id: row['id'] as int,
+              name: row['name'] as String,
+            ));
+          }
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _owned = owned;
+          _loading = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = error is AuthException
+              ? error.message
+              : 'Unable to load saved Inventory.';
+        });
+      }
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_rounded, color: colors.onSurface),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Confirm your current\ndocuments',
-                  style: TextStyle(
-                    fontSize: 24,
-                    height: 1.25,
-                    fontWeight: FontWeight.w800,
-                    color: colors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Review your owned IDs and supporting documents\nbefore we generate your roadmap.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.35,
-                    color: colors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 17),
-                _buildSection('Owned IDs', _ownedIds, colors),
-                const SizedBox(height: 21),
-                _buildSection('Owned Documents', _ownedDocuments, colors),
-                const SizedBox(height: 24),
-                Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SuggestedRoadmapScreen(
-                            targetIds: widget.targetIds,
-                            targetCatalogIds: widget.targetCatalogIds,
-                            ownedItems: _ownedItems.toList(),
-                            existingJourneys: widget.existingJourneys,
-                          ),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ConfirmDocumentsScreen.primaryBlue,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Save & Continue',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(),
+    body: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Confirm your current\ndocuments',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSection(
-    String title,
-    List<_DocumentOption> options,
-    ColorScheme colors,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: colors.onSurface,
-          ),
-        ),
-        const SizedBox(height: 6),
-        ...options.map(
-          (option) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _DocumentOptionCard(
-              option: option,
-              selected: _ownedItems.contains(option.title),
-              onTap: () => _toggleItem(option.title),
+            const SizedBox(height: 8),
+            const Text(
+              'These are your saved Inventory items. Ownership can only be changed in Manage Inventory.',
             ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DocumentOptionCard extends StatelessWidget {
-  const _DocumentOptionCard({
-    required this.option,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _DocumentOption option;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Material(
-      color: colors.brightness == Brightness.dark
-          ? colors.surfaceContainer
-          : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: MotionInkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: AnimatedContainer(
-          duration: AppMotion.duration(context),
-          curve: AppMotion.curve,
-          constraints: const BoxConstraints(minHeight: 60),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            border: Border.all(color: colors.outlineVariant),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                option.icon,
-                size: 25,
-                color: selected
-                    ? ConfirmDocumentsScreen.primaryBlue
-                    : colors.onSurfaceVariant,
-              ),
-              const SizedBox(width: 17),
-              Expanded(
-                child: Text(
-                  option.title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: colors.onSurface,
-                  ),
-                ),
-              ),
-              AnimatedContainer(
-                duration: AppMotion.duration(context, AppMotion.quick),
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? ConfirmDocumentsScreen.primaryBlue
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selected
-                        ? ConfirmDocumentsScreen.primaryBlue
-                        : colors.onSurfaceVariant,
-                    width: selected ? 1 : 1.2,
-                  ),
-                ),
-                child: selected
-                    ? const Icon(Icons.check, size: 13, color: Colors.white)
-                    : null,
+            const SizedBox(height: 17),
+            if (_loading) const Text('Loading saved Inventory…'),
+            if (_error != null) ...[
+              Text(_error!),
+              TextButton(
+                onPressed: _load,
+                child: const Text('Retry Inventory'),
               ),
             ],
-          ),
+            if (!_loading && _error == null) ...[
+              for (final type in ['government_id', 'document']) ...[
+                Text(
+                  type == 'government_id' ? 'Owned IDs' : 'Owned Documents',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                for (final item in _owned.where((item) => item.type == type))
+                  Card(
+                    child: ListTile(
+                      key: ValueKey((item.type, item.id)),
+                      leading: Icon(
+                        type == 'government_id'
+                            ? Icons.badge_outlined
+                            : Icons.description_outlined,
+                      ),
+                      title: Text(item.name),
+                      trailing: const Icon(Icons.check_circle_outline),
+                    ),
+                  ),
+                if (!_owned.any((item) => item.type == type))
+                  const Text('No saved items.'),
+                const SizedBox(height: 16),
+              ],
+            ],
+            OutlinedButton(
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ManageInventoryScreen(),
+                  ),
+                );
+                if (mounted) await _load();
+              },
+              child: const Text('Manage Inventory'),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _loading || _error != null
+                  ? null
+                  : () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SuggestedRoadmapScreen(
+                          targetIds: widget.targetIds,
+                          targetCatalogIds: widget.targetCatalogIds,
+                          ownedItems: _owned.map((item) => item.name).toList(),
+                          existingJourneys: widget.existingJourneys,
+                        ),
+                      ),
+                    ),
+              child: const Text('Save & Continue'),
+            ),
+            const Text(
+              'Continue uses saved Inventory without changing ownership.',
+            ),
+          ],
         ),
       ),
-    );
-  }
-}
-
-class _DocumentOption {
-  const _DocumentOption(this.title, this.icon);
-
-  final String title;
-  final IconData icon;
+    ),
+  );
 }

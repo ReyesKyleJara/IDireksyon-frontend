@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'active_journey_screen.dart';
 import 'id_journey.dart';
+import 'roadmap_plan_panel.dart';
+import '../../models/roadmap_plan.dart';
 import '../ids/id_details_screen.dart';
 
-class SuggestedRoadmapScreen extends StatelessWidget {
+class SuggestedRoadmapScreen extends StatefulWidget {
   const SuggestedRoadmapScreen({
     super.key,
     this.targetIds = const ['Passport ID'],
@@ -17,6 +19,18 @@ class SuggestedRoadmapScreen extends StatelessWidget {
   final List<String> ownedItems;
   final List<IdJourney> existingJourneys;
 
+  @override
+  State<SuggestedRoadmapScreen> createState() => _SuggestedRoadmapScreenState();
+
+  static const primaryBlue = Color(0xFF12499A);
+}
+
+class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
+  RoadmapPlan? _plan;
+  List<String> get targetIds => widget.targetIds;
+  List<int> get targetCatalogIds => widget.targetCatalogIds;
+  List<String> get ownedItems => widget.ownedItems;
+  List<IdJourney> get existingJourneys => widget.existingJourneys;
   List<_RoadmapStep> get _steps => [
     for (var index = 0; index < targetIds.length; index++)
       _RoadmapStep(
@@ -73,7 +87,12 @@ class SuggestedRoadmapScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 _TargetCard(colors: colors, title: targetIds.join(' + ')),
                 const SizedBox(height: 8),
-                SizedBox(
+                if (targetCatalogIds.isNotEmpty)
+                  RoadmapPlanPanel(
+                    targetIds: targetCatalogIds,
+                    onPlan: (plan) { if (mounted) setState(() => _plan = plan); },
+                  )
+                else SizedBox(
                   child: ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -92,7 +111,7 @@ class SuggestedRoadmapScreen extends StatelessWidget {
                   width: double.infinity,
                   constraints: const BoxConstraints(minHeight: 48),
                   child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pushReplacement(
+                    onPressed: targetCatalogIds.isNotEmpty && (_plan == null || _plan!.blocked) ? null : () => Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
                         builder: (_) => JourneyLoadingScreen(
                           journey: IdJourney(

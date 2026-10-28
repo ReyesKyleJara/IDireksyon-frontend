@@ -1,3 +1,5 @@
+import 'fixtures/roadmap_auth.dart';
+import 'package:idireksyon_frontend/core/auth/auth_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -11,6 +13,9 @@ import 'package:idireksyon_frontend/features/roadmap/active_journey_screen.dart'
 import 'package:idireksyon_frontend/features/roadmap/suggested_roadmap_screen.dart';
 
 void main() {
+  late AuthService previousAuth;
+  setUp(() { previousAuth = AuthService.instance; AuthService.instance = journeyAuth(); });
+  tearDown(() { AuthService.instance.dispose(); AuthService.instance = previousAuth; });
   testWidgets('Confirmation loads journey and keeps it when switching tabs', (
     tester,
   ) async {
@@ -21,6 +26,7 @@ void main() {
         home: const SuggestedRoadmapScreen(targetIds: ['Philippine Passport'], targetCatalogIds: [55]),
       ),
     );
+    await tester.pumpAndSettle(); // Wait for the saved-Inventory plan before confirming.
     final confirm = find.text('Confirm Suggested Journey');
     await tester.ensureVisible(confirm);
     await tester.tap(confirm);
@@ -40,8 +46,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Your next steps'), findsOneWidget);
     expect(find.text('Birth Certificate'), findsNothing);
-    await tester.ensureVisible(find.text('Philippine Passport').last);
-    await tester.tap(find.text('Philippine Passport').last);
+    await tester.ensureVisible(find.text('Preview Guide').last);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -200));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Preview Guide').last);
     await tester.pumpAndSettle();
     expect(find.byType(IdDetailsScreen), findsOneWidget);
     expect(tester.widget<IdDetailsScreen>(find.byType(IdDetailsScreen)).governmentId, 55);

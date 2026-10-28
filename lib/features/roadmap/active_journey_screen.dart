@@ -8,6 +8,7 @@ import '../ids/id_details_screen.dart';
 import '../shell/resident_app_shell.dart';
 import 'build_roadmap_screen.dart';
 import 'id_journey.dart';
+import 'roadmap_plan_panel.dart';
 
 class JourneyLoadingScreen extends StatelessWidget {
   const JourneyLoadingScreen({
@@ -242,7 +243,9 @@ class _JourneyCard extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 14),
-            for (var i = 0; i < steps.length; i++) ...[
+            if (journey.targetCatalogIds.isNotEmpty)
+              RoadmapPlanPanel(targetIds: journey.targetCatalogIds)
+            else for (var i = 0; i < steps.length; i++) ...[
               Material(
                 color: i == 0
                     ? (dark

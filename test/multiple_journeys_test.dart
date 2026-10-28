@@ -1,3 +1,5 @@
+import 'fixtures/roadmap_auth.dart';
+import 'package:idireksyon_frontend/core/auth/auth_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -9,6 +11,9 @@ import 'package:idireksyon_frontend/features/roadmap/id_journey.dart';
 import 'package:idireksyon_frontend/features/shell/resident_app_shell.dart';
 
 void main() {
+  late AuthService previousAuth;
+  setUp(() { previousAuth = AuthService.instance; AuthService.instance = journeyAuth(); });
+  tearDown(() { AuthService.instance.dispose(); AuthService.instance = previousAuth; });
   testWidgets('minimize, add a different journey, and reopen the original', (
     tester,
   ) async {
@@ -48,7 +53,7 @@ void main() {
     expect(original.minimized, isTrue);
     expect(active.journeys.last.targetIds, ['PhilSys National ID']);
     expect(active.journeys.last.targetCatalogIds, [56]);
-    expect(active.journeys.last.ownedItems, contains('Birth Certificate'));
+    expect(active.journeys.last.ownedItems, isEmpty);
     await tester.tap(find.text('Expand progress'));
     await tester.pumpAndSettle();
     expect(original.minimized, isFalse);

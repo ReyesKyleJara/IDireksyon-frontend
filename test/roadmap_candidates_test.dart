@@ -1,3 +1,5 @@
+import 'fixtures/roadmap_auth.dart';
+import 'package:idireksyon_frontend/core/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idireksyon_frontend/models/government_id.dart';
@@ -15,6 +17,9 @@ GovernmentIdDetails catalog(int id, String name, {bool? include, String? availab
 });
 
 void main() {
+  late AuthService previousAuth;
+  setUp(() { previousAuth = AuthService.instance; AuthService.instance = journeyAuth(); });
+  tearDown(() { AuthService.instance.dispose(); AuthService.instance = previousAuth; });
   testWidgets('allowed candidates retain other metadata and real IDs reach the suggested journey', (tester) async {
     final records = [catalog(55, 'Allowed', include: true), catalog(70, 'Excluded', include: false), catalog(56, 'Legacy')];
     await tester.pumpWidget(MaterialApp(home: BuildRoadmapScreen(loadIds: () async => records)));

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../api_config.dart';
+import '../../models/roadmap_plan.dart';
 
 class AuthException implements Exception {
   const AuthException(
@@ -35,6 +36,7 @@ class AuthService extends ChangeNotifier {
   // Session is currently kept in memory.
   // Restarting the app requires signing in again.
   String? token;
+  int inventoryRevision = 0;
   Map<String, dynamic>? _user;
 
   Map<String, dynamic>? get user => _user;
@@ -75,6 +77,18 @@ class AuthService extends ChangeNotifier {
       throw const AuthException('The server returned an unexpected response.');
     }
     return message;
+  }
+
+  Future<RoadmapPlan> roadmapPlan(List<int> targets) async {
+    if (token == null) throw const AuthException('Please sign in again.');
+    final response = await _post('roadmap-plan', {'target_government_id_ids': targets});
+    try {
+      final plan = RoadmapPlan.fromJson(Map<String, dynamic>.from(response['data'] as Map));
+      if (!listEquals(plan.targetIds, targets)) throw const FormatException();
+      return plan;
+    } catch (_) {
+      throw const AuthException('The server returned an unexpected roadmap response.');
+    }
   }
 
   Future<void> register({
@@ -485,6 +499,8 @@ class AuthService extends ChangeNotifier {
         );
       }
 
+      inventoryRevision++;
+      notifyListeners();
       return body['data']
           as Map<String, dynamic>;
     } on TimeoutException {
