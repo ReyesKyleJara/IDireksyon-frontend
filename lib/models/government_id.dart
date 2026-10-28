@@ -11,6 +11,9 @@ class GovernmentIdDetails {
   final int id;
   final bool includeInSmartSequencing;
   final String applicationAvailability;
+  final String guidanceMode;
+  final String? level, category, acquisitionType, targetGroup, officialLink;
+  bool get isInformational => guidanceMode == 'informational_only';
   final String name;
   final String? issuedBy, description, purpose, validity, requirements;
   final List<RequirementSet> requirementSets;
@@ -22,6 +25,12 @@ class GovernmentIdDetails {
       name = _text(json['name']) ?? 'Government ID',
       includeInSmartSequencing = json['include_in_smart_sequencing'] != false,
       applicationAvailability = _text(json['application_availability']) ?? 'available',
+      guidanceMode = _text(json['guidance_mode']) ?? 'guided',
+      level = _text(json['level']),
+      category = _text(json['category']),
+      acquisitionType = _text(json['acquisition_type']),
+      targetGroup = _text(json['target_group']),
+      officialLink = _text(json['official_link']),
       issuedBy = _text(json['issued_by']),
       description = _text(json['description']),
       purpose = _text(json['purpose']),

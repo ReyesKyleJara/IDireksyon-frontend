@@ -28,6 +28,7 @@ class RoadmapPlanStep {
     : type = json['type'] as String,
       id = json['id'] as int,
       name = json['name'] as String,
+      guidanceMode = json['guidance_mode'] as String? ?? 'guided',
       blocked = json['blocked'] as bool,
       selected = json['selected'] as bool,
       issues = List<String>.from(json['issues'] as List),
@@ -50,7 +51,8 @@ class RoadmapPlanStep {
     }
   }
 
-  final String type, name;
+  final String type, name, guidanceMode;
+  bool get isInformational => guidanceMode == 'informational_only';
   final int id;
   final bool blocked, selected;
   final List<String> issues;

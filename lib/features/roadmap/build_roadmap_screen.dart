@@ -36,7 +36,7 @@ class _BuildRoadmapScreenState extends State<BuildRoadmapScreen> {
     final records =
         await (widget.loadIds?.call() ?? ApiService.getGovernmentIds());
     // Only acquisition targets are filtered; the shared catalog stays complete.
-    return records.where((record) => record.includeInSmartSequencing &&
+    return records.where((record) => record.includeInSmartSequencing && record.guidanceMode == 'guided' &&
         (record.applicationAvailability == 'available' ||
          record.applicationAvailability == 'limited_conditional')).toList();
   }

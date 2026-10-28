@@ -2,6 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idireksyon_frontend/models/government_id.dart';
 
 void main() {
+  test('legacy guidance defaults to guided and informational classification retains the toggle', () {
+    expect(GovernmentIdDetails.fromJson({'id': 1}).guidanceMode, 'guided');
+    final record = GovernmentIdDetails.fromJson({'id': 1, 'guidance_mode': 'informational_only', 'include_in_smart_sequencing': true});
+    expect(record.isInformational, isTrue);
+    expect(record.includeInSmartSequencing, isTrue);
+  });
+
   test('availability preserves explicit values and defaults legacy payloads to available', () {
     expect(GovernmentIdDetails.fromJson({'id': 1}).applicationAvailability, 'available');
     for (final availability in ['available', 'limited_conditional', 'temporarily_unavailable', 'discontinued']) {

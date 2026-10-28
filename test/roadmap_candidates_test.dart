@@ -9,10 +9,10 @@ import 'package:idireksyon_frontend/features/roadmap/suggested_roadmap_screen.da
 import 'package:idireksyon_frontend/features/ids/ids_screen.dart';
 import 'package:idireksyon_frontend/features/ids/id_details_screen.dart';
 
-GovernmentIdDetails catalog(int id, String name, {bool? include, String? availability}) => GovernmentIdDetails.fromJson({
+GovernmentIdDetails catalog(int id, String name, {bool? include, String? availability, String? guidance}) => GovernmentIdDetails.fromJson({
   'id': id, 'name': name, 'include_in_smart_sequencing': ?include,
   'application_availability': ?availability, 'acquisition_type': 'profession_based',
-  'guidance_mode': 'informational_only', 'target_group': 'Special group',
+  'guidance_mode': ?guidance, 'target_group': 'Special group',
   'prerequisites': [{'type': 'custom', 'name': 'Uncompleted activity'}],
 });
 
@@ -52,14 +52,26 @@ void main() {
       catalog(4, 'Discontinued target', include: true, availability: 'discontinued'),
       catalog(5, 'Opted out target', include: false, availability: 'available'),
       catalog(6, 'Legacy target'),
+      catalog(7, 'Informational toggle yes', include: true, guidance: 'informational_only'),
+      catalog(8, 'Informational toggle no', include: false, guidance: 'informational_only'),
     ];
     await tester.pumpWidget(MaterialApp(home: BuildRoadmapScreen(loadIds: () async => records)));
     await tester.pumpAndSettle();
     for (final name in ['Available target', 'Conditional target', 'Legacy target']) {
       expect(find.text(name), findsOneWidget);
     }
-    for (final name in ['Temporary target', 'Discontinued target', 'Opted out target']) {
+    for (final name in ['Temporary target', 'Discontinued target', 'Opted out target', 'Informational toggle yes', 'Informational toggle no']) {
       expect(find.text(name), findsNothing);
+    }
+  });
+
+  testWidgets('changing informational record back to guided restores candidacy without changing the toggle', (tester) async {
+    for (final guidance in ['informational_only', 'guided']) {
+      final record = catalog(8, 'Restored guidance', include: true, availability: 'available', guidance: guidance);
+      await tester.pumpWidget(MaterialApp(home: BuildRoadmapScreen(key: UniqueKey(), loadIds: () async => [record])));
+      await tester.pumpAndSettle();
+      expect(find.text('Restored guidance'), guidance == 'guided' ? findsOneWidget : findsNothing);
+      expect(record.includeInSmartSequencing, isTrue);
     }
   });
 

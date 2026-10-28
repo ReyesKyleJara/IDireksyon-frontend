@@ -117,7 +117,7 @@ class RoadmapPlanView extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Text(
-            'Prerequisite path blocked. Resolve the unavailable or invalid dependency before proceeding.',
+            'Prerequisite path blocked. Review the notices below before proceeding.',
           ),
         ),
       for (var i = 0; i < plan.steps.length; i++)
@@ -128,7 +128,7 @@ class RoadmapPlanView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'STEP ${i + 1} • ${plan.steps[i].type == 'document' ? 'Document' : 'Government ID'}',
+                  plan.steps[i].isInformational ? 'Informational Record' : 'STEP ${i + 1} • ${plan.steps[i].type == 'document' ? 'Document' : 'Government ID'}',
                 ),
                 Text(
                   plan.steps[i].name,
@@ -137,7 +137,7 @@ class RoadmapPlanView extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                Text(
+                if (!plan.steps[i].isInformational) Text(
                   plan.steps[i].selected
                       ? 'Selected target'
                       : 'Required prerequisite — obtain first',
@@ -145,15 +145,15 @@ class RoadmapPlanView extends StatelessWidget {
                 for (final issue in plan.steps[i].issues)
                   Text('Blocked: $issue'),
                 const SizedBox(height: 8),
-                Text(
+                if (!plan.steps[i].isInformational) Text(
                   'Prerequisite Readiness: ${plan.steps[i].readiness['satisfied']} of ${plan.steps[i].readiness['total']} verified'
                   '${plan.steps[i].readiness['percentage'] == null ? ' — no automatically verifiable prerequisites' : ' — ${plan.steps[i].readiness['percentage']}%'}',
                 ),
-                for (final row in plan.steps[i].prerequisites)
+                if (!plan.steps[i].isInformational) for (final row in plan.steps[i].prerequisites)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
-                      '${row['name']}: ${switch (row['status']) {
+                      '${row['name']}: ${row['status'] == 'missing' && row['resolution'] == 'reference_only' ? 'Not in Inventory — reference prerequisite. ${row['message']}' : switch (row['status']) {
                         'satisfied' => 'Already in Inventory',
                         'missing' => 'Missing — must come first',
                         _ => 'Needs manual confirmation',
@@ -170,7 +170,7 @@ class RoadmapPlanView extends StatelessWidget {
                         ),
                       ),
                     ),
-                    child: const Text('Preview Guide'),
+                    child: Text(plan.steps[i].isInformational ? 'View information' : 'Preview Guide'),
                   ),
               ],
             ),

@@ -61,8 +61,57 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       future: _detail,
       builder: (context, snapshot) {
         _record = snapshot.connectionState == ConnectionState.done && !snapshot.hasError ? snapshot.data : null;
+        if (widget.governmentId != null && snapshot.connectionState != ConnectionState.done) {
+          return Scaffold(appBar: AppBar(title: Text(widget.idName)), body: const Center(child: CircularProgressIndicator()));
+        }
+        if (_record?.isInformational == true) return _buildInformationalScreen(context, _record!);
         return _buildScreen(context, snapshot);
       },
+    );
+  }
+
+  Widget _buildInformationalScreen(BuildContext context, GovernmentIdDetails record) {
+    final facts = <(String, String?)>[
+      ('Name', record.name),
+      ('Issuing Agency', record.issuedBy),
+      ('Government Level', const {'national': 'National', 'barangay': 'Barangay', 'municipal': 'Municipal / LGU'}[record.level] ?? record.level),
+      ('Category', const {'identity_id': 'Identity ID', 'sector_specific': 'Sector-Specific ID', 'driving_credential': 'Driving Credential',
+        'professional_credential': 'Professional Credential', 'tax_id': 'Tax ID', 'travel_document': 'Travel Document'}[record.category] ?? record.category),
+      ('About / Description', record.description),
+      ('Purpose', record.purpose),
+      ('Application Availability', const {
+        'available': 'Available', 'limited_conditional': 'Limited / Conditional',
+        'temporarily_unavailable': 'Temporarily Unavailable', 'discontinued': 'Not Issued Anymore',
+      }[record.applicationAvailability] ?? record.applicationAvailability),
+      ('Acquisition Type', const {
+        'general_public': 'General Public', 'profession_based': 'Profession-Based',
+        'employment_based': 'Employment-Based', 'sector_specific': 'Sector-Specific',
+        'special_eligibility': 'Special Eligibility',
+      }[record.acquisitionType] ?? record.acquisitionType),
+      ('Target Group / Qualification', record.targetGroup),
+      ('Validity', record.validity),
+      ('Official reference', record.officialLink),
+    ];
+    return Scaffold(
+      appBar: AppBar(title: Text(record.name)),
+      body: ListView(padding: const EdgeInsets.all(20), children: [
+        Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Informational Record', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            const Text('IDireksyon provides reference information for this credential but does not currently provide step-by-step acquisition guidance.'),
+          ],
+        ))),
+        for (final (label, value) in facts) if (value != null) Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            SelectableText(value),
+          ]),
+        ),
+      ]),
     );
   }
 
