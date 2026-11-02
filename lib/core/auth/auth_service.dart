@@ -349,6 +349,26 @@ class AuthService extends ChangeNotifier {
     );
   }
 
+  // Clears the session only after the server confirms the deletion, so a
+  // failed request leaves the resident signed in.
+  Future<void> deleteAccount({
+    required String password,
+  }) async {
+    if (token == null) {
+      throw const AuthException(
+        'Please sign in again.',
+      );
+    }
+
+    await _post(
+      'account/delete',
+      {'password': password},
+    );
+
+    token = null;
+    user = null;
+  }
+
   Future<Map<String, dynamic>>
       getInventory() async {
     if (token == null) {

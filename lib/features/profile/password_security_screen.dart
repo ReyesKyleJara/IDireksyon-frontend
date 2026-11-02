@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/password_policy.dart';
+import '../../core/profile/profile_photo_service.dart';
 import '../auth/forgot_password_screen.dart';
 
 class PasswordSecurityScreen extends StatefulWidget {
@@ -83,6 +84,39 @@ class _PasswordSecurityScreenState
         setState(() => _saving = false);
       }
     }
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    FocusScope.of(context).unfocus();
+
+    final deletedUser = AuthService.instance.user;
+    final deleted = await showDialog<bool>(
+      context: context,
+      builder: (_) => const _DeleteAccountDialog(),
+    );
+
+    if (!mounted || deleted != true) return;
+
+    try {
+      await ProfilePhotoService.instance.forget(deletedUser);
+    } catch (_) {
+      // The account is already gone; a leftover local photo is harmless.
+    }
+
+    if (!mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/login',
+      (_) => false,
+    );
+
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Your account has been deleted.'),
+      ),
+    );
   }
 
   @override
@@ -266,6 +300,52 @@ class _PasswordSecurityScreenState
                         height: 1.4,
                       ),
                     ),
+
+                    const SizedBox(height: 40),
+                    Divider(color: colors.outlineVariant),
+                    const SizedBox(height: 28),
+
+                    // DELETE ACCOUNT
+                    const Text(
+                      'Delete account',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+
+                    const SizedBox(height: 7),
+
+                    Text(
+                      'Permanently delete your IDireksyon account, profile, and saved IDs and documents. This cannot be undone.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: muted,
+                        height: 1.4,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    OutlinedButton.icon(
+                      onPressed: _saving ? null : _confirmDeleteAccount,
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      label: const Text(
+                        'Delete account',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colors.error,
+                        side: BorderSide(color: colors.error),
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -349,6 +429,184 @@ class _PasswordSecurityScreenState
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _password = TextEditingController();
+
+  bool _hidden = true;
+  bool _deleting = false;
+  String? _passwordError;
+  String? _error;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _delete() async {
+    setState(() {
+      _passwordError = null;
+      _error = null;
+    });
+
+    if (_deleting || !_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() => _deleting = true);
+
+    try {
+      await AuthService.instance.deleteAccount(
+        password: _password.text,
+      );
+
+      if (mounted) Navigator.pop(context, true);
+    } on AuthException catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _deleting = false;
+        _passwordError = error.field('password');
+        _error = _passwordError == null ? error.message : null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _deleting = false;
+        _error = 'Unable to delete your account. Please try again.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return PopScope(
+      canPop: !_deleting,
+      child: AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: const Text(
+          'Delete your account?',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Your profile and saved IDs and documents will be permanently deleted. This cannot be undone.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                TextFormField(
+                  controller: _password,
+                  enabled: !_deleting,
+                  obscureText: _hidden,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  autofocus: true,
+                  onFieldSubmitted: (_) => _delete(),
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Enter your password to confirm.'
+                      : null,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    errorText: _passwordError,
+                    errorMaxLines: 3,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    suffixIcon: IconButton(
+                      onPressed: _deleting
+                          ? null
+                          : () => setState(() => _hidden = !_hidden),
+                      icon: Icon(
+                        _hidden
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                      tooltip: _hidden ? 'Show password' : 'Hide password',
+                    ),
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colors.error,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _deleting ? null : () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              foregroundColor: colors.onSurfaceVariant,
+            ),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _deleting ? null : _delete,
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: colors.onError,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: _deleting
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      color: colors.onError,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text('Delete permanently'),
+          ),
+        ],
+      ),
     );
   }
 }
