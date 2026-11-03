@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../ids/id_details_screen.dart';
 
 import '../../core/auth/auth_service.dart';
 
@@ -512,6 +513,11 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
                   ),
                 ),
 
+                IconButton(tooltip: 'View information for ${item.name}', icon: const Icon(Icons.info_outline),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => IdDetailsScreen(
+                    idName: item.name, governmentId: item.id,
+                    recordType: item.type == _InventoryType.document ? 'document' : 'government_id',
+                  )))),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
                   width: 24,

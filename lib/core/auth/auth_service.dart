@@ -3,14 +3,13 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
 import '../api_config.dart';
 import '../../models/roadmap_plan.dart';
+import '../../services/application_preparation.dart';
 
 class AuthException implements Exception {
-  const AuthException(
-    this.message, {
-    this.fieldErrors = const {},
-  });
+  const AuthException(this.message, {this.fieldErrors = const {}});
 
   final String message;
   final Map<String, String> fieldErrors;
@@ -19,13 +18,11 @@ class AuthException implements Exception {
 }
 
 class AuthService extends ChangeNotifier {
-  AuthService({
-    http.Client? client,
-    String? baseUrl,
-  })  : _client = client ?? http.Client(),
-        baseUrl = baseUrl == null || baseUrl.trim().isEmpty
-            ? ApiConfig.baseUrl
-            : baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+  AuthService({http.Client? client, String? baseUrl})
+    : _client = client ?? http.Client(),
+      baseUrl = baseUrl == null || baseUrl.trim().isEmpty
+          ? ApiConfig.baseUrl
+          : baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
 
   static AuthService instance = AuthService();
 
@@ -37,6 +34,7 @@ class AuthService extends ChangeNotifier {
   // Restarting the app requires signing in again.
   String? token;
   int inventoryRevision = 0;
+  int preparationRevision = 0;
   Map<String, dynamic>? _user;
 
   Map<String, dynamic>? get user => _user;
@@ -47,17 +45,102 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> login(
-    String identifier,
-    String password,
-  ) =>
-      _authenticate(
-        'login',
-        {
-          'identifier': identifier.trim(),
-          'password': password,
-        },
+  Future<Map<String, dynamic>> getRequirementPreparation(
+    String recordType,
+    int recordId,
+  ) => _requirementPreparation(recordType, recordId);
+
+  Future<Map<String, dynamic>> saveRequirementPreparation(
+    String recordType,
+    int recordId,
+    int itemId,
+    bool prepared,
+  ) => _requirementPreparation(
+    recordType,
+    recordId,
+    change: {'item_id': itemId, 'prepared': prepared},
+  );
+
+  Future<Map<String, dynamic>> _requirementPreparation(
+    String recordType,
+    int recordId, {
+    Map<String, dynamic>? change,
+  }) async {
+    final session = token;
+    if (session == null) throw const AuthException('Please sign in again.');
+    if (!['government_id', 'document'].contains(recordType) || recordId <= 0) {
+      throw const AuthException('Invalid application.');
+    }
+    final uri = Uri.parse(
+      '$baseUrl/auth/requirement-preparation/$recordType/$recordId',
+    );
+    final headers = {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $session',
+      'Content-Type': 'application/json',
+    };
+    try {
+      final response =
+          await (change == null
+                  ? _client.get(uri, headers: headers)
+                  : _client.put(
+                      uri,
+                      headers: headers,
+                      body: jsonEncode(change),
+                    ))
+              .timeout(const Duration(seconds: 20));
+      if (token != session) {
+        throw const AuthException(
+          'Your session changed. Please reload this checklist.',
+        );
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw const AuthException(
+          'Could not save or load your checklist. Please try again.',
+        );
+      }
+      final body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic> ||
+          body['data'] is! Map<String, dynamic>) {
+        throw const FormatException();
+      }
+      final data = body['data'] as Map<String, dynamic>;
+      if (data['record_type'] != recordType || data['record_id'] != recordId) {
+        throw const FormatException();
+      }
+      ApplicationPreparation.fromJson(data);
+      if (change != null) {
+        final rows = data['items'] as List;
+        if (!rows.any(
+          (row) =>
+              row['item_id'] == change['item_id'] &&
+              row['prepared'] == change['prepared'],
+        )) {
+          throw const FormatException();
+        }
+        preparationRevision++;
+        notifyListeners();
+      }
+      return data;
+    } on TimeoutException {
+      throw const AuthException(
+        'The connection timed out. Please reload and try again.',
       );
+    } on http.ClientException {
+      throw const AuthException(
+        'Cannot connect to the server. Please try again.',
+      );
+    } on FormatException {
+      throw const AuthException(
+        'The server returned an unexpected checklist response.',
+      );
+    }
+  }
+
+  Future<void> login(String identifier, String password) => _authenticate(
+    'login',
+    {'identifier': identifier.trim(), 'password': password},
+  );
 
   Future<void> logout() async {
     try {
@@ -81,13 +164,19 @@ class AuthService extends ChangeNotifier {
 
   Future<RoadmapPlan> roadmapPlan(List<int> targets) async {
     if (token == null) throw const AuthException('Please sign in again.');
-    final response = await _post('roadmap-plan', {'target_government_id_ids': targets});
+    final response = await _post('roadmap-plan', {
+      'target_government_id_ids': targets,
+    });
     try {
-      final plan = RoadmapPlan.fromJson(Map<String, dynamic>.from(response['data'] as Map));
+      final plan = RoadmapPlan.fromJson(
+        Map<String, dynamic>.from(response['data'] as Map),
+      );
       if (!listEquals(plan.targetIds, targets)) throw const FormatException();
       return plan;
     } catch (_) {
-      throw const AuthException('The server returned an unexpected roadmap response.');
+      throw const AuthException(
+        'The server returned an unexpected roadmap response.',
+      );
     }
   }
 
@@ -98,22 +187,18 @@ class AuthService extends ChangeNotifier {
     required String password,
     required String confirmation,
     required bool accepted,
-  }) =>
-      _authenticate(
-        'register',
-        {
-          'email_verification_token': emailVerificationToken,
-          usePhone ? 'phone' : 'email':
-              contact.trim(),
-          'password': password,
-          'password_confirmation':
-              confirmation,
-          'terms_accepted': accepted,
-        },
-      );
+  }) => _authenticate('register', {
+    'email_verification_token': emailVerificationToken,
+    usePhone ? 'phone' : 'email': contact.trim(),
+    'password': password,
+    'password_confirmation': confirmation,
+    'terms_accepted': accepted,
+  });
 
   Future<String> sendSignupEmailCode(String email) async {
-    final data = await _post('email-verification/send', {'email': email.trim()});
+    final data = await _post('email-verification/send', {
+      'email': email.trim(),
+    });
     final id = data['challenge_id'];
     if (id is! String) {
       throw const AuthException('The server returned an unexpected response.');
@@ -133,20 +218,14 @@ class AuthService extends ChangeNotifier {
     return proof;
   }
 
-  Future<void> _authenticate(
-    String path,
-    Map<String, dynamic> body,
-  ) async {
+  Future<void> _authenticate(String path, Map<String, dynamic> body) async {
     final data = await _post(path, body);
 
     final newToken = data['token'];
     final newUser = data['user'];
 
-    if (newToken is! String ||
-        newUser is! Map<String, dynamic>) {
-      throw const AuthException(
-        'The server returned an unexpected response.',
-      );
+    if (newToken is! String || newUser is! Map<String, dynamic>) {
+      throw const AuthException('The server returned an unexpected response.');
     }
 
     token = newToken;
@@ -161,29 +240,21 @@ class AuthService extends ChangeNotifier {
     required List<int> documentIds,
   }) async {
     if (token == null) {
-      throw const AuthException(
-        'Please sign in again.',
-      );
+      throw const AuthException('Please sign in again.');
     }
 
-    final data = await _post(
-      'profile-setup',
-      {
-        'name': name.trim(),
-        'date_of_birth': dateOfBirth,
-        'barangay_id': barangayId,
-        'government_id_ids':
-            governmentIdIds,
-        'document_ids': documentIds,
-      },
-    );
+    final data = await _post('profile-setup', {
+      'name': name.trim(),
+      'date_of_birth': dateOfBirth,
+      'barangay_id': barangayId,
+      'government_id_ids': governmentIdIds,
+      'document_ids': documentIds,
+    });
 
     final profile = data['user'];
 
     if (profile is! Map<String, dynamic>) {
-      throw const AuthException(
-        'The server returned an unexpected response.',
-      );
+      throw const AuthException('The server returned an unexpected response.');
     }
 
     user = profile;
@@ -196,24 +267,16 @@ class AuthService extends ChangeNotifier {
     try {
       final response = await _client
           .post(
-            Uri.parse(
-              '${baseUrl.replaceAll(RegExp(r'/$'), '')}/auth/$path',
-            ),
+            Uri.parse('${baseUrl.replaceAll(RegExp(r'/$'), '')}/auth/$path'),
             headers: {
               'Accept': 'application/json',
-              'Content-Type':
-                  'application/json',
-              if (path != 'login' &&
-                  path != 'register' &&
-                  token != null)
-                'Authorization':
-                    'Bearer $token',
+              'Content-Type': 'application/json',
+              if (path != 'login' && path != 'register' && token != null)
+                'Authorization': 'Bearer $token',
             },
             body: jsonEncode(body),
           )
-          .timeout(
-            const Duration(seconds: 20),
-          );
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode >= 500) {
         throw const AuthException(
@@ -227,71 +290,49 @@ class AuthService extends ChangeNotifier {
         );
       }
 
-      final decoded =
-          jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
 
-      if (decoded
-          is! Map<String, dynamic>) {
+      if (decoded is! Map<String, dynamic>) {
         throw const FormatException();
       }
 
-      final data =
-          Map<String, dynamic>.from(
-        decoded,
-      );
+      final data = Map<String, dynamic>.from(decoded);
 
-      if (response.statusCode < 200 ||
-          response.statusCode >= 300) {
-        final fieldErrors =
-            <String, String>{};
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final fieldErrors = <String, String>{};
 
         final errors = data['errors'];
 
         if (errors is Map) {
-          for (final entry
-              in errors.entries) {
-            final key =
-                entry.key.toString();
+          for (final entry in errors.entries) {
+            final key = entry.key.toString();
             final value = entry.value;
 
-            if (value is List &&
-                value.isNotEmpty) {
-              fieldErrors[key] =
-                  value.first.toString();
-            } else if (value is String &&
-                value.isNotEmpty) {
+            if (value is List && value.isNotEmpty) {
+              fieldErrors[key] = value.first.toString();
+            } else if (value is String && value.isNotEmpty) {
               fieldErrors[key] = value;
             }
           }
         }
 
-        final message =
-            fieldErrors.isNotEmpty
-                ? fieldErrors
-                    .values.first
-                : data['message']
-                        ?.toString() ??
-                    'Unable to complete the request. Please try again.';
+        final message = fieldErrors.isNotEmpty
+            ? fieldErrors.values.first
+            : data['message']?.toString() ??
+                  'Unable to complete the request. Please try again.';
 
-        throw AuthException(
-          message,
-          fieldErrors: fieldErrors,
-        );
+        throw AuthException(message, fieldErrors: fieldErrors);
       }
 
       return data;
     } on TimeoutException {
-      throw const AuthException(
-        'The connection timed out. Please try again.',
-      );
+      throw const AuthException('The connection timed out. Please try again.');
     } on http.ClientException {
       throw const AuthException(
         'Cannot connect to the server. Check your connection and try again.',
       );
     } on FormatException {
-      throw const AuthException(
-        'The server returned an unexpected response.',
-      );
+      throw const AuthException('The server returned an unexpected response.');
     }
   }
 
@@ -301,27 +342,18 @@ class AuthService extends ChangeNotifier {
     required bool usePhone,
   }) async {
     if (token == null) {
-      throw const AuthException(
-        'Please sign in again.',
-      );
+      throw const AuthException('Please sign in again.');
     }
 
-    final data =
-        await _post(
-      'account',
-      {
-        'name': name.trim(),
-        usePhone ? 'phone' : 'email':
-            contact.trim(),
-      },
-    );
+    final data = await _post('account', {
+      'name': name.trim(),
+      usePhone ? 'phone' : 'email': contact.trim(),
+    });
 
     final profile = data['user'];
 
     if (profile is! Map<String, dynamic>) {
-      throw const AuthException(
-        'The server returned an unexpected response.',
-      );
+      throw const AuthException('The server returned an unexpected response.');
     }
 
     user = profile;
@@ -333,28 +365,19 @@ class AuthService extends ChangeNotifier {
     required String confirmation,
   }) async {
     if (token == null) {
-      throw const AuthException(
-        'Please sign in again.',
-      );
+      throw const AuthException('Please sign in again.');
     }
 
-    await _post(
-      'password',
-      {
-        'current_password': current,
-        'password': password,
-        'password_confirmation':
-            confirmation,
-      },
-    );
+    await _post('password', {
+      'current_password': current,
+      'password': password,
+      'password_confirmation': confirmation,
+    });
   }
 
-  Future<Map<String, dynamic>>
-      getInventory() async {
+  Future<Map<String, dynamic>> getInventory() async {
     if (token == null) {
-      throw const AuthException(
-        'Please sign in again.',
-      );
+      throw const AuthException('Please sign in again.');
     }
 
     try {
@@ -364,15 +387,11 @@ class AuthService extends ChangeNotifier {
               '${baseUrl.replaceAll(RegExp(r'/$'), '')}/auth/inventory',
             ),
             headers: {
-              'Accept':
-                  'application/json',
-              'Authorization':
-                  'Bearer $token',
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $token',
             },
           )
-          .timeout(
-            const Duration(seconds: 20),
-          );
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode >= 500) {
         throw const AuthException(
@@ -380,55 +399,41 @@ class AuthService extends ChangeNotifier {
         );
       }
 
-      final body =
-          jsonDecode(response.body);
+      final body = jsonDecode(response.body);
 
-      if (response.statusCode < 200 ||
-          response.statusCode >= 300) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         throw AuthException(
           body is Map<String, dynamic>
-              ? body['message']
-                      ?.toString() ??
-                  'Unable to load inventory.'
+              ? body['message']?.toString() ?? 'Unable to load inventory.'
               : 'Unable to load inventory.',
         );
       }
 
-      if (body
-              is! Map<String, dynamic> ||
-          body['data']
-              is! Map<String, dynamic>) {
+      if (body is! Map<String, dynamic> ||
+          body['data'] is! Map<String, dynamic>) {
         throw const AuthException(
           'The server returned an unexpected inventory response.',
         );
       }
 
-      return body['data']
-          as Map<String, dynamic>;
+      return body['data'] as Map<String, dynamic>;
     } on TimeoutException {
-      throw const AuthException(
-        'The connection timed out. Please try again.',
-      );
+      throw const AuthException('The connection timed out. Please try again.');
     } on http.ClientException {
       throw const AuthException(
         'Cannot connect to the server. Check your connection and try again.',
       );
     } on FormatException {
-      throw const AuthException(
-        'The server returned an unexpected response.',
-      );
+      throw const AuthException('The server returned an unexpected response.');
     }
   }
 
-  Future<Map<String, dynamic>>
-      saveInventory({
+  Future<Map<String, dynamic>> saveInventory({
     required List<int> governmentIdIds,
     required List<int> documentIds,
   }) async {
     if (token == null) {
-      throw const AuthException(
-        'Please sign in again.',
-      );
+      throw const AuthException('Please sign in again.');
     }
 
     try {
@@ -438,62 +443,41 @@ class AuthService extends ChangeNotifier {
               '${baseUrl.replaceAll(RegExp(r'/$'), '')}/auth/inventory',
             ),
             headers: {
-              'Accept':
-                  'application/json',
-              'Content-Type':
-                  'application/json',
-              'Authorization':
-                  'Bearer $token',
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
             },
             body: jsonEncode({
-              'government_id_ids':
-                  governmentIdIds,
-              'document_ids':
-                  documentIds,
+              'government_id_ids': governmentIdIds,
+              'document_ids': documentIds,
             }),
           )
-          .timeout(
-            const Duration(seconds: 20),
-          );
+          .timeout(const Duration(seconds: 20));
 
-      final body =
-          jsonDecode(response.body);
+      final body = jsonDecode(response.body);
 
-      if (response.statusCode < 200 ||
-          response.statusCode >= 300) {
-        String message =
-            'Unable to save inventory.';
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        String message = 'Unable to save inventory.';
 
-        if (body
-            is Map<String, dynamic>) {
-          final errors =
-              body['errors'];
+        if (body is Map<String, dynamic>) {
+          final errors = body['errors'];
 
-          if (errors is Map &&
-              errors.isNotEmpty) {
-            final first =
-                errors.values.first;
+          if (errors is Map && errors.isNotEmpty) {
+            final first = errors.values.first;
 
-            if (first is List &&
-                first.isNotEmpty) {
-              message =
-                  first.first.toString();
+            if (first is List && first.isNotEmpty) {
+              message = first.first.toString();
             }
-          } else if (body['message'] !=
-              null) {
-            message =
-                body['message']
-                    .toString();
+          } else if (body['message'] != null) {
+            message = body['message'].toString();
           }
         }
 
         throw AuthException(message);
       }
 
-      if (body
-              is! Map<String, dynamic> ||
-          body['data']
-              is! Map<String, dynamic>) {
+      if (body is! Map<String, dynamic> ||
+          body['data'] is! Map<String, dynamic>) {
         throw const AuthException(
           'The server returned an unexpected inventory response.',
         );
@@ -501,39 +485,26 @@ class AuthService extends ChangeNotifier {
 
       inventoryRevision++;
       notifyListeners();
-      return body['data']
-          as Map<String, dynamic>;
+      return body['data'] as Map<String, dynamic>;
     } on TimeoutException {
-      throw const AuthException(
-        'The connection timed out. Please try again.',
-      );
+      throw const AuthException('The connection timed out. Please try again.');
     } on http.ClientException {
       throw const AuthException(
         'Cannot connect to the server. Check your connection and try again.',
       );
     } on FormatException {
-      throw const AuthException(
-        'The server returned an unexpected response.',
-      );
+      throw const AuthException('The server returned an unexpected response.');
     }
   }
 
-  Future<List<Map<String, dynamic>>>
-      getBarangays() async {
+  Future<List<Map<String, dynamic>>> getBarangays() async {
     try {
       final response = await _client
           .get(
-            Uri.parse(
-              '${baseUrl.replaceAll(RegExp(r'/$'), '')}/barangays',
-            ),
-            headers: {
-              'Accept':
-                  'application/json',
-            },
+            Uri.parse('${baseUrl.replaceAll(RegExp(r'/$'), '')}/barangays'),
+            headers: {'Accept': 'application/json'},
           )
-          .timeout(
-            const Duration(seconds: 20),
-          );
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode >= 500) {
         throw const AuthException(
@@ -541,19 +512,13 @@ class AuthService extends ChangeNotifier {
         );
       }
 
-      final body =
-          jsonDecode(response.body);
+      final body = jsonDecode(response.body);
 
-      if (response.statusCode < 200 ||
-          response.statusCode >= 300) {
-        throw const AuthException(
-          'Unable to load barangays.',
-        );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw const AuthException('Unable to load barangays.');
       }
 
-      if (body
-              is! Map<String, dynamic> ||
-          body['data'] is! List) {
+      if (body is! Map<String, dynamic> || body['data'] is! List) {
         throw const AuthException(
           'The server returned an unexpected barangay response.',
         );
@@ -561,25 +526,16 @@ class AuthService extends ChangeNotifier {
 
       return (body['data'] as List)
           .whereType<Map>()
-          .map(
-            (item) =>
-                Map<String, dynamic>.from(
-              item,
-            ),
-          )
+          .map((item) => Map<String, dynamic>.from(item))
           .toList();
     } on TimeoutException {
-      throw const AuthException(
-        'The connection timed out. Please try again.',
-      );
+      throw const AuthException('The connection timed out. Please try again.');
     } on http.ClientException {
       throw const AuthException(
         'Cannot connect to the server. Check your connection and try again.',
       );
     } on FormatException {
-      throw const AuthException(
-        'The server returned an unexpected response.',
-      );
+      throw const AuthException('The server returned an unexpected response.');
     }
   }
 }

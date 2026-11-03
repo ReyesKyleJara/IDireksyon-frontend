@@ -170,7 +170,7 @@ void main() {
       expect(find.textContaining('Needs manual confirmation'), findsOneWidget);
       expect(find.textContaining('Applies when: If required'), findsOneWidget);
       expect(find.textContaining('Already in Inventory'), findsOneWidget);
-      expect(find.text('Preview Guide'), findsNWidgets(2));
+      expect(find.text('Preview Guide'), findsNWidgets(3)); // Document dependencies now open their own detail.
     },
   );
 

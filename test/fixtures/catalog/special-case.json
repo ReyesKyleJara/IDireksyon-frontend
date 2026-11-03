@@ -1,0 +1,364 @@
+{
+    "id": 1,
+    "name": "PSA Birth Certificate — fixture",
+    "description": null,
+    "purpose": null,
+    "level": null,
+    "category": null,
+    "eligibility": null,
+    "validity": null,
+    "validity_type": null,
+    "processing_time": null,
+    "guidance_mode": "guided",
+    "application_availability": "available",
+    "acquisition_type": "general_public",
+    "target_group": null,
+    "include_in_smart_sequencing": true,
+    "requirements": null,
+    "fee": null,
+    "record_type": "document",
+    "research_metadata": {
+        "status": "draft"
+    },
+    "request_paths": [
+        {
+            "id": 1,
+            "application_type": "copy",
+            "application_type_custom": null,
+            "applicant_type": "all",
+            "applicant_type_custom": null,
+            "label": "In Person",
+            "channel": "outlet",
+            "provider": null,
+            "portal_url": null,
+            "fulfillment": [],
+            "appointment": "unknown",
+            "applicability": null,
+            "processing": null,
+            "requirement_sets": [
+                {
+                    "id": 1,
+                    "application_type": "copy",
+                    "application_type_label": "Repeat / Certified Copy",
+                    "applicant_type": "all",
+                    "applicant_type_label": "All Applicants",
+                    "display_label": "All Applicants • Repeat / Certified Copy",
+                    "min_age": null,
+                    "max_age": null,
+                    "groups": []
+                }
+            ],
+            "fees": [
+                {
+                    "id": 1,
+                    "label": "SYNTHETIC assessment",
+                    "type": "fixed",
+                    "amount_min": "12.00",
+                    "amount_max": null,
+                    "currency": "PHP",
+                    "description": null,
+                    "notes": null,
+                    "is_optional": false,
+                    "options": []
+                }
+            ],
+            "offices": [
+                {
+                    "id": 1,
+                    "name": "SYNTHETIC civil registry counter",
+                    "address": null,
+                    "municipality": null,
+                    "province": null,
+                    "source_url": null,
+                    "service_notes": null,
+                    "services": {
+                        "new_application_status": "unknown",
+                        "renewal_status": "unknown",
+                        "replacement_status": "unknown"
+                    },
+                    "schedules": []
+                }
+            ],
+            "guide": [
+                {
+                    "id": 1,
+                    "title": "Normal copy step",
+                    "short_description": null,
+                    "type": "general",
+                    "blocks": []
+                }
+            ],
+            "troubleshooting": [
+                {
+                    "title": "Legacy note",
+                    "body": "Keep this note"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "application_type": "copy",
+            "application_type_custom": null,
+            "applicant_type": "all",
+            "applicant_type_custom": null,
+            "label": "Online",
+            "channel": "online",
+            "provider": null,
+            "portal_url": null,
+            "fulfillment": [],
+            "appointment": "unknown",
+            "applicability": null,
+            "processing": null,
+            "requirement_sets": [
+                {
+                    "id": 2,
+                    "application_type": "copy",
+                    "application_type_label": "Repeat / Certified Copy",
+                    "applicant_type": "all",
+                    "applicant_type_label": "All Applicants",
+                    "display_label": "All Applicants • Repeat / Certified Copy",
+                    "min_age": null,
+                    "max_age": null,
+                    "groups": []
+                }
+            ],
+            "fees": [
+                {
+                    "id": 1,
+                    "label": "SYNTHETIC assessment",
+                    "type": "fixed",
+                    "amount_min": "12.00",
+                    "amount_max": null,
+                    "currency": "PHP",
+                    "description": null,
+                    "notes": null,
+                    "is_optional": false,
+                    "options": []
+                }
+            ],
+            "offices": [
+                {
+                    "id": 1,
+                    "name": "SYNTHETIC civil registry counter",
+                    "address": null,
+                    "municipality": null,
+                    "province": null,
+                    "source_url": null,
+                    "service_notes": null,
+                    "services": {
+                        "new_application_status": "unknown",
+                        "renewal_status": "unknown",
+                        "replacement_status": "unknown"
+                    },
+                    "schedules": []
+                }
+            ],
+            "guide": [],
+            "troubleshooting": []
+        }
+    ],
+    "special_cases": [
+        {
+            "id": "d0845159-bf80-443c-8165-bb0cc7b51e2d",
+            "title": "Delayed Registration of Birth",
+            "description": "Edited fixture description",
+            "action_label": "Learn about delayed registration",
+            "assistance_title": "Don't have a Birth Certificate yet?",
+            "assistance_description": "If you do not have any PSA, NSO, or Local Civil Registry birth record, you may need to apply for Delayed Registration of Birth first.",
+            "introduction": "SYNTHETIC FIXTURE — not government guidance.",
+            "before_you_begin": "FIXTURE: No physical copy does not prove an unregistered birth. Distinguish an existing registration without a copy, a local registration without a PSA record, and a birth never registered. Verify existing records or endorsement before registration.",
+            "notes": "FIXTURE: confirm local instructions with the relevant civil registrar.",
+            "status": "draft",
+            "sources": [
+                {
+                    "title": "Fixture official source",
+                    "url": "https://example.gov.ph/fixture",
+                    "checked_on": "2026-10-29"
+                }
+            ],
+            "fee_ids": [
+                1
+            ],
+            "office_ids": [
+                1
+            ],
+            "requirements": [
+                {
+                    "rule": "all",
+                    "condition_type": "always",
+                    "ways": [
+                        {
+                            "required_count": 1,
+                            "qualification_type": "none",
+                            "qualification_scope": "every",
+                            "items": [
+                                {
+                                    "type": "custom",
+                                    "custom_name": "Fixture case-only evidence",
+                                    "submission_format": "original",
+                                    "government_id_id": null,
+                                    "document_id": null,
+                                    "submission_format_custom": null
+                                }
+                            ],
+                            "qualification_custom": null
+                        }
+                    ],
+                    "condition_custom": null
+                }
+            ],
+            "steps": [
+                {
+                    "title": "Fixture: verify whether the birth was registered",
+                    "type": "general",
+                    "blocks": [
+                        {
+                            "type": "instructions",
+                            "content": {
+                                "items": [
+                                    {
+                                        "body": {
+                                            "type": "doc",
+                                            "content": [
+                                                {
+                                                    "type": "paragraph",
+                                                    "content": [
+                                                        {
+                                                            "type": "text",
+                                                            "text": "Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. Long fixture instruction. "
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "title": "Fixture: ask the appropriate office for verified next steps",
+                    "type": "general",
+                    "blocks": []
+                }
+            ],
+            "requirement_sets": [
+                {
+                    "id": 1,
+                    "application_type": "new",
+                    "application_type_label": "First-Time Application",
+                    "applicant_type": "all",
+                    "applicant_type_label": "All Applicants",
+                    "display_label": "Delayed Registration of Birth",
+                    "min_age": null,
+                    "max_age": null,
+                    "groups": [
+                        {
+                            "id": 1,
+                            "title": null,
+                            "rule": "all",
+                            "condition_type": "always",
+                            "condition_label": null,
+                            "ways": [
+                                {
+                                    "id": null,
+                                    "required_count": 1,
+                                    "qualification_type": "none",
+                                    "qualification_scope": "every",
+                                    "qualification_custom": null,
+                                    "qualification_label": null,
+                                    "items": [
+                                        {
+                                            "id": null,
+                                            "type": "custom",
+                                            "government_id_id": null,
+                                            "document_id": null,
+                                            "name": "Fixture case-only evidence",
+                                            "quantity": null,
+                                            "submission_format": "original",
+                                            "submission_label": "Original",
+                                            "copies": null,
+                                            "instructions": null
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "fees": [
+                {
+                    "id": 1,
+                    "label": "SYNTHETIC assessment",
+                    "type": "fixed",
+                    "amount_min": "12.00",
+                    "amount_max": null,
+                    "currency": "PHP",
+                    "description": null,
+                    "notes": null,
+                    "is_optional": false,
+                    "options": []
+                }
+            ],
+            "offices": [
+                {
+                    "id": 1,
+                    "name": "SYNTHETIC civil registry counter",
+                    "address": null,
+                    "municipality": null,
+                    "province": null,
+                    "source_url": null,
+                    "service_notes": null,
+                    "services": {
+                        "new_application_status": "unknown",
+                        "renewal_status": "unknown",
+                        "replacement_status": "unknown"
+                    },
+                    "schedules": []
+                }
+            ]
+        }
+    ],
+    "resident_notice": "Research is not yet reviewed. Confirm current instructions with the issuing agency.",
+    "issued_by": null,
+    "requirement_sets": [
+        {
+            "id": 1,
+            "application_type": "copy",
+            "application_type_label": "Repeat / Certified Copy",
+            "applicant_type": "all",
+            "applicant_type_label": "All Applicants",
+            "display_label": "All Applicants • Repeat / Certified Copy",
+            "min_age": null,
+            "max_age": null,
+            "groups": []
+        },
+        {
+            "id": 2,
+            "application_type": "copy",
+            "application_type_label": "Repeat / Certified Copy",
+            "applicant_type": "all",
+            "applicant_type_label": "All Applicants",
+            "display_label": "All Applicants • Repeat / Certified Copy",
+            "min_age": null,
+            "max_age": null,
+            "groups": []
+        }
+    ],
+    "fees": [
+        {
+            "id": 1,
+            "label": "SYNTHETIC assessment",
+            "type": "fixed",
+            "amount_min": "12.00",
+            "amount_max": null,
+            "currency": "PHP",
+            "description": null,
+            "notes": null,
+            "is_optional": false,
+            "options": []
+        }
+    ]
+}

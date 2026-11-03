@@ -1,245 +1,752 @@
-import '../../core/widgets/app_motion.dart';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'id_details_screen.dart';
+import '../../core/auth/auth_service.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_motion.dart';
 import '../../models/government_id.dart';
 import '../../services/api_service.dart';
+import '../../services/requirement_readiness.dart';
+import '../../services/checklist_readiness_summary.dart';
+import 'id_details_screen.dart';
 
 class IdsScreen extends StatefulWidget {
+  final bool documents;
+  final String? initialFilter;
+  // An injected loader supplies the complete catalog in widget tests.
   final Future<List<GovernmentIdDetails>> Function()? loadIds;
   final Future<GovernmentIdDetails> Function(int)? loadDetail;
-  const IdsScreen({super.key, this.loadIds, this.loadDetail});
+  // Typed loader also keeps same-number ID/document records distinct in tests.
+  final Future<GovernmentIdDetails> Function(String, int)? loadRecordDetail;
+  final Future<Map<String, dynamic>> Function()? loadInventory;
+
+  const IdsScreen({
+    super.key,
+    this.documents = false,
+    this.initialFilter,
+    this.loadIds,
+    this.loadDetail,
+    this.loadRecordDetail,
+    this.loadInventory,
+  });
 
   @override
   State<IdsScreen> createState() => _IdsScreenState();
 }
 
 class _IdsScreenState extends State<IdsScreen> {
-  late Future<List<GovernmentIdDetails>> _ids;
+  late Future<List<GovernmentIdDetails>> _catalog;
+  late final AuthService _auth;
+  RequirementReadiness? _inventory;
+  bool _inventoryLoading = false;
+  int _inventoryRequest = 0;
+  final _detailRequests = <(String, int), Future<GovernmentIdDetails>>{};
+  final _candidateDetails = <(String, int), GovernmentIdDetails>{};
+  int _revision = -1;
+  String? _token;
   String _search = '';
+  String _filter = 'All';
+  static const _blue = AppTheme.primaryBlue;
 
   @override
   void initState() {
     super.initState();
-    _ids = _load();
+    _filter = widget.initialFilter ?? (widget.documents ? 'Documents' : 'All');
+    _catalog = _load();
+    _auth = AuthService.instance;
+    _auth.addListener(_refreshInventory);
+    _refreshInventory();
   }
 
-  Future<List<GovernmentIdDetails>> _load() =>
-      widget.loadIds?.call() ?? ApiService.getGovernmentIds();
+  Future<List<GovernmentIdDetails>> _load() async {
+    if (widget.loadIds != null) return widget.loadIds!();
+    final catalogs = await Future.wait([
+      ApiService.getGovernmentIds(),
+      ApiService.getDocuments(),
+    ]);
+    return catalogs.expand((rows) => rows).toList();
+  }
 
-  static const primaryBlue = Color(0xFF174B85);
+  void _refreshInventory() {
+    final unchanged =
+        _revision == _auth.inventoryRevision && _token == _auth.token;
+    // A failed request is retryable on the next interaction, even without an
+    // inventory revision. Successful and in-flight requests are not repeated.
+    if (unchanged && (_inventory != null || _inventoryLoading)) return;
+    _revision = _auth.inventoryRevision;
+    _token = _auth.token;
+    unawaited(_loadInventory());
+  }
 
-  void _open(BuildContext context, GovernmentIdDetails record) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => IdDetailsScreen(idName: record.name, governmentId: record.id, loadDetail: widget.loadDetail)),
-    );
+  Future<void> _loadInventory() async {
+    final request = ++_inventoryRequest;
+    _inventoryLoading = true;
+    if (mounted) setState(() => _inventory = null);
+    try {
+      if (widget.loadInventory == null && _token == null) return;
+      final data = await (widget.loadInventory?.call() ?? _auth.getInventory());
+      final inventory = RequirementReadiness.fromInventory(data);
+      if (mounted && request == _inventoryRequest) {
+        setState(() => _inventory = inventory);
+        unawaited(_loadCandidateDetails());
+      }
+    } catch (_) {
+      // Missing personal readiness never prevents catalog browsing.
+    } finally {
+      if (request == _inventoryRequest) _inventoryLoading = false;
+    }
+  }
+
+  List<GovernmentIdDetails> _candidates(List<GovernmentIdDetails> records) {
+    final result = <GovernmentIdDetails>[];
+    // Editorial names locate real catalog records; numeric IDs come from APIs.
+    const choices = [
+      ('government_id', ['philsys national id', 'national id']),
+      ('government_id', ['philippine passport', 'passport']),
+      ('document', ['nbi clearance']),
+      ('document', ['national police clearance']),
+    ];
+    for (final (type, names) in choices) {
+      final record = records
+          .where(
+            (r) =>
+                r.recordType == type &&
+                names.contains(r.name.trim().toLowerCase()) &&
+                _supported(r) &&
+                r.guidanceMode == 'guided',
+          )
+          .firstOrNull;
+      if (record == null) continue;
+      final owned = type == 'document'
+          ? _inventory?.documents
+          : _inventory?.governmentIds;
+      if (owned?.contains(record.id) == true) continue;
+      result.add(record);
+    }
+    return result;
+  }
+
+  Future<GovernmentIdDetails> _detailFor(GovernmentIdDetails record) {
+    final key = (record.recordType, record.id);
+    return _detailRequests.putIfAbsent(key, () => _fetchDetail(record));
+  }
+
+  Future<GovernmentIdDetails> _fetchDetail(GovernmentIdDetails record) async {
+    final key = (record.recordType, record.id);
+    try {
+      final detail = await Future.sync(
+        () =>
+            widget.loadRecordDetail?.call(record.recordType, record.id) ??
+            widget.loadDetail?.call(record.id) ??
+            (record.recordType == 'document'
+                ? ApiService.getDocument(record.id)
+                : ApiService.getGovernmentId(record.id)),
+      );
+      if (detail.id != record.id || detail.recordType != record.recordType) {
+        throw const FormatException('Mismatched directory detail');
+      }
+      return detail;
+    } catch (_) {
+      _detailRequests.remove(key);
+      rethrow;
+    }
+  }
+
+  Future<void> _loadCandidateDetails() async {
+    try {
+      final catalogRequest = _catalog;
+      final records = await catalogRequest;
+      if (!mounted || _inventory == null || catalogRequest != _catalog) return;
+      await Future.wait(
+        _candidates(records).map((record) async {
+          try {
+            final detail = await _detailFor(record);
+            if (mounted && catalogRequest == _catalog) {
+              setState(
+                () =>
+                    _candidateDetails[(record.recordType, record.id)] = detail,
+              );
+            }
+          } catch (_) {
+            // One unavailable guide must not discard other useful suggestions.
+          }
+        }),
+      );
+    } catch (_) {
+      // The catalog already owns its loading/error UI.
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<GovernmentIdDetails>>(
-      future: _ids,
-      builder: (context, snapshot) {
-        return _directory(context, snapshot.data ?? [],
-          loading: snapshot.connectionState != ConnectionState.done,
-          failed: snapshot.hasError,
-        );
-      },
+  void dispose() {
+    _auth.removeListener(_refreshInventory);
+    super.dispose();
+  }
+
+  bool _supported(GovernmentIdDetails record) =>
+      !record.isInformational &&
+      [
+        'available',
+        'limited_conditional',
+      ].contains(record.applicationAvailability);
+
+  // Presentation summary of the same group/way inventory completion used in
+  // RequirementsTab. This never infers applicability or evaluates eligibility.
+  ({double completion, bool ready, String status, String message})? _readiness(
+    GovernmentIdDetails record,
+  ) {
+    final inventory = _inventory;
+    final detail = _candidateDetails[(record.recordType, record.id)];
+    if (inventory == null ||
+        detail == null ||
+        !_supported(record) ||
+        !_supported(detail) ||
+        detail.guidanceMode != 'guided') {
+      return null;
+    }
+    final owned = record.recordType == 'document'
+        ? inventory.documents
+        : inventory.governmentIds;
+    if (owned.contains(record.id)) return null;
+    return summarizeChecklistReadiness(record, detail, inventory);
+  }
+
+  void _open(GovernmentIdDetails record) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => IdDetailsScreen(
+          idName: record.name,
+          governmentId: record.id,
+          recordType: record.recordType,
+          loadDetail: (_) => _detailFor(record),
+        ),
+      ),
+    );
+    if (mounted) _refreshInventory();
+  }
+
+  IconData _icon(GovernmentIdDetails record) => record.recordType == 'document'
+      ? Icons.description_outlined
+      : Icons.badge_outlined;
+
+  Widget _heading(String title, [String? subtitle]) => Padding(
+    padding: const EdgeInsets.only(top: 14, bottom: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+
+  Color _accent(bool documents) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return dark ? const Color(0xFFA8CCFA) : _blue;
+  }
+
+  Widget _iconTile(IconData icon, bool documents) {
+    final accent = _accent(documents);
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: .09),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Icon(icon, color: accent, size: 20),
     );
   }
 
-  Widget _directory(BuildContext context, List<GovernmentIdDetails> records,
-      {required bool loading, required bool failed}) {
-    final query = _search.toLowerCase().trim();
-    final visible = records.where((record) =>
-      record.name.toLowerCase().contains(query) ||
-      (record.issuedBy ?? '').toLowerCase().contains(query)).toList();
+  Widget _surface({
+    required Widget child,
+    required VoidCallback onTap,
+    Color? tint,
+  }) {
     final colors = Theme.of(context).colorScheme;
-    final dark = colors.brightness == Brightness.dark;
-    final background = dark ? colors.surface : const Color(0xFFFCFCF8);
-    return ColoredBox(
-      color: background,
-      child: SafeArea(
-        child: ListView.builder(
-          key: const PageStorageKey('id-directory-list'),
-          padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-          itemCount: 1 + (loading || failed ? 0 : visible.length),
-          itemBuilder: (context, index) {
-            if (index > 0) return _idCard(context, visible[index - 1], index - 1);
-            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('ID Directory', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: colors.onSurface)),
-              const SizedBox(height: 5),
-              Text('Browse supported government IDs\nand application guides.',
-                style: TextStyle(fontSize: 13, height: 1.45, color: colors.onSurfaceVariant)),
-              const SizedBox(height: 18),
-              TextField(
-                onChanged: (value) => setState(() { _search = value; }),
-                decoration: InputDecoration(
-                  hintText: 'Search IDs or Agencies',
-                  hintStyle: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-                  prefixIcon: Icon(Icons.search_rounded, size: 19, color: colors.onSurfaceVariant),
-                  filled: true,
-                  fillColor: dark ? colors.surfaceContainer : Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9),
-                    borderSide: BorderSide(color: colors.outlineVariant)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9),
-                    borderSide: const BorderSide(color: primaryBlue, width: 1.5)),
+    final base = colors.brightness == Brightness.dark
+        ? colors.surfaceContainer
+        : Colors.white;
+    return Material(
+      color: tint == null
+          ? base
+          : Color.alphaBlend(tint.withValues(alpha: .035), base),
+      elevation: colors.brightness == Brightness.dark ? 0 : .4,
+      shadowColor: const Color(0x18174B85),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .4)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: MotionInkWell(onTap: onTap, child: child),
+    );
+  }
+
+  Widget _row(GovernmentIdDetails record, {bool suggestion = false}) {
+    final colors = Theme.of(context).colorScheme;
+    final readiness = suggestion ? _readiness(record) : null;
+    final status = readiness?.status;
+    final ready = readiness?.ready == true;
+    final badgeBackground = ready
+        ? AppTheme.completedGreen.withValues(alpha: .1)
+        : AppTheme.accentGold;
+    final badgeForeground = ready
+        ? (colors.brightness == Brightness.dark
+              ? const Color(0xFF81C784)
+              : AppTheme.completedGreen)
+        : AppTheme.navy;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: _surface(
+        tint: null,
+        onTap: () => _open(record),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            children: [
+              _iconTile(_icon(record), record.recordType == 'document'),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      record.name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (status != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeBackground,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: badgeForeground,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        readiness!.message,
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.3,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ] else
+                      Text(
+                        record.recordType == 'document'
+                            ? 'Document • ${record.issuedBy ?? 'Certification'}'
+                            : 'Government ID${record.issuedBy == null ? '' : ' • ${record.issuedBy}'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              if (loading) ...[
-                const SizedBox(height: 24),
-                const LinearProgressIndicator(minHeight: 2),
-                const SizedBox(height: 12),
-                Text('Loading government IDs…', style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
-              ] else if (failed) ...[
-                const SizedBox(height: 24),
-                const Text('Could not load the ID directory.'),
-                TextButton(onPressed: () {
-                  final request = _load();
-                  setState(() { _ids = request; });
-                }, child: const Text('Retry')),
-              ] else ...[
-                if (visible.isNotEmpty) ...[
-                  const SizedBox(height: 22),
-                  const Text('Featured IDs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 12),
-                  LayoutBuilder(builder: (context, constraints) {
-                    final width = ((constraints.maxWidth - 24) / 4).clamp(88.0, 150.0).toDouble();
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        for (var i = 0; i < visible.take(4).length; i++)
-                          _featured(context, visible[i], i, width),
-                      ]),
-                    );
-                  }),
-                ],
-                const SizedBox(height: 24),
-                const Text('All IDs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                if (visible.isEmpty)
-                  Padding(padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(records.isEmpty ? 'No Government IDs are available yet.' : 'No matching IDs.')),
-              ],
-            ]);
-          },
-        ),
-      ),
-    );
-  }
-
-  static const _pastels = [Color(0xFFCDDEFB), Color(0xFFF7DDD7), Color(0xFFE0EED1), Color(0xFFD4DFF7)];
-
-  Widget _featured(BuildContext context, GovernmentIdDetails record, int index, double width) {
-    final colors = Theme.of(context).colorScheme;
-    final tint = _pastels[index % _pastels.length];
-    final dark = colors.brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: SizedBox(width: width, child: Material(
-        color: dark ? Color.alphaBlend(tint.withValues(alpha: 0.15), colors.surfaceContainer) : tint,
-        borderRadius: BorderRadius.circular(12), clipBehavior: Clip.antiAlias,
-        child: MotionInkWell(
-          onTap: () => _open(context, record),
-          child: Padding(padding: const EdgeInsets.fromLTRB(8, 12, 8, 12), child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: 68, child: Center(child: _DirectoryArt(name: record.name))),
-              const SizedBox(height: 10),
-              Text(record.name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, height: 1.25, fontWeight: FontWeight.w700, color: colors.onSurface)),
-              if (record.issuedBy != null) ...[
-                const SizedBox(height: 3),
-                Text(record.issuedBy!, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 9, height: 1.25, color: colors.onSurfaceVariant)),
-              ],
-            ],
-          )),
-        ),
-      )),
-    );
-  }
-
-  Widget _idCard(BuildContext context, GovernmentIdDetails record, int index) {
-    final colors = Theme.of(context).colorScheme;
-    final dark = colors.brightness == Brightness.dark;
-    final tint = _pastels[index % _pastels.length];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: dark ? colors.surfaceContainer : Colors.white,
-        elevation: dark ? 0 : 1,
-        shadowColor: const Color(0x140C2545),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.45))),
-        clipBehavior: Clip.antiAlias,
-        child: MotionInkWell(
-          onTap: () => _open(context, record),
-          child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [
-            Container(
-              width: 72, height: 104,
-              decoration: BoxDecoration(
-                color: dark ? tint.withValues(alpha: 0.12) : tint.withValues(alpha: 0.32),
-                borderRadius: BorderRadius.circular(10),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: colors.onSurfaceVariant,
               ),
-              alignment: Alignment.center,
-              child: _DirectoryArt(name: record.name),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(record.name, style: TextStyle(fontSize: 15, height: 1.3,
-                fontWeight: FontWeight.w800, color: colors.onSurface)),
-              if (record.description != null) ...[
-                const SizedBox(height: 4),
-                Text(record.description!, maxLines: 3, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, height: 1.4, color: colors.onSurfaceVariant)),
-              ],
-              if (record.issuedBy != null) ...[
-                const SizedBox(height: 8),
-                Text(record.issuedBy!, style: TextStyle(fontSize: 10, height: 1.3,
-                  fontWeight: FontWeight.w500, color: colors.onSurfaceVariant)),
-              ],
-            ])),
-            const SizedBox(width: 4),
-            Icon(Icons.chevron_right_rounded, size: 20, color: colors.onSurfaceVariant),
-          ])),
+            ],
+          ),
         ),
       ),
     );
   }
 
+  String _shortName(GovernmentIdDetails record) {
+    final name = record.name.toLowerCase();
+    if (name.contains('national id')) return 'National ID';
+    if (name.contains('passport')) return 'Passport';
+    if (name.contains('nbi')) return 'NBI Clearance';
+    if (name.contains('birth certificate')) return 'Birth Certificate';
+    return record.name;
+  }
 
-}
+  Widget _commonCard(GovernmentIdDetails record) => Padding(
+    padding: const EdgeInsets.only(right: 7),
+    child: SizedBox(
+      width: 82,
+      child: Tooltip(
+        message: record.name,
+        child: _surface(
+          tint: _accent(record.recordType == 'document'),
+          onTap: () => _open(record),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 9),
+            child: Column(
+              children: [
+                Icon(
+                  _icon(record),
+                  color: _accent(record.recordType == 'document'),
+                  size: 22,
+                ),
+                const SizedBox(height: 7),
+                SizedBox(
+                  height: MediaQuery.textScalerOf(context).scale(11) * 2.5,
+                  child: Center(
+                    child: Semantics(
+                      label: record.name,
+                      excludeSemantics: true,
+                      child: Text(
+                        _shortName(record),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 
-// Decorative illustrations only; names never determine requirements or API IDs.
-class _DirectoryArt extends StatelessWidget {
-  const _DirectoryArt({required this.name});
-  final String name;
+  void _browse(List<GovernmentIdDetails> records, bool documents) {
+    final title = documents ? 'Documents & Certifications' : 'Government IDs';
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text(title)),
+          body: IdsScreen(
+            documents: documents,
+            initialFilter: documents ? 'Documents' : 'IDs',
+            loadIds: () async => records
+                .where(
+                  (r) =>
+                      r.recordType ==
+                      (documents ? 'document' : 'government_id'),
+                )
+                .toList(),
+            loadDetail: widget.loadDetail,
+            loadRecordDetail: (type, id) => _detailFor(
+              records.firstWhere((r) => r.recordType == type && r.id == id),
+            ),
+            loadInventory: widget.loadInventory,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _category(List<GovernmentIdDetails> records, bool documents) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 7),
+        child: _surface(
+          tint: _accent(documents),
+          onTap: () => _browse(records, documents),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              children: [
+                _iconTile(
+                  documents ? Icons.folder_outlined : Icons.badge_outlined,
+                  documents,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        documents
+                            ? 'Documents & Certifications'
+                            : 'Government IDs',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        documents
+                            ? 'Certificates, clearances & civil records'
+                            : 'Identity, travel & driving',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.3,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 
   @override
-  Widget build(BuildContext context) {
-    final passport = name.toLowerCase().contains('passport');
-    return ExcludeSemantics(child: Transform.rotate(
-      angle: passport ? 0.07 : -0.06,
-      child: Container(
-        width: passport ? 42 : 58, height: passport ? 58 : 40,
-        decoration: BoxDecoration(
-          color: passport ? const Color(0xFF82363E) : const Color(0xFFF8FBFF),
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: passport ? const Color(0xFF632731) : const Color(0xFFB7C8E4)),
-          boxShadow: const [BoxShadow(color: Color(0x200C2545), blurRadius: 5, offset: Offset(1, 3))],
+  Widget build(
+    BuildContext context,
+  ) => FutureBuilder<List<GovernmentIdDetails>>(
+    future: _catalog,
+    builder: (context, snapshot) {
+      final records = snapshot.data ?? [];
+      final query = _search.trim().toLowerCase();
+      final browsing =
+          query.isNotEmpty ||
+          _filter != 'All' ||
+          widget.initialFilter != null ||
+          widget.documents;
+      final visible = records.where((record) {
+        if (widget.documents && record.recordType != 'document') return false;
+        if (_filter == 'IDs' && record.recordType != 'government_id') {
+          return false;
+        }
+        if (_filter == 'Documents' && record.recordType != 'document') {
+          return false;
+        }
+        if (_filter == 'Ready Now' && _readiness(record)?.ready != true) {
+          return false;
+        }
+        return [
+          record.name,
+          record.issuedBy ?? '',
+          record.description ?? '',
+        ].any((text) => text.toLowerCase().contains(query));
+      }).toList();
+      final suggestions = records.where((r) => _readiness(r) != null).toList()
+        ..sort((a, b) {
+          final score = _readiness(b)!.completion
+              .compareTo(_readiness(a)!.completion);
+          return score == 0 ? a.name.compareTo(b.name) : score;
+        });
+      // Small editorial selection, always resolved against currently supported API records.
+      final common = <GovernmentIdDetails>[];
+      for (final term in [
+        'national id',
+        'passport',
+        'nbi',
+        'birth certificate',
+      ]) {
+        final matches = records.where(
+          (r) => _supported(r) && r.name.toLowerCase().contains(term),
+        );
+        if (matches.isNotEmpty && !common.contains(matches.first)) {
+          common.add(matches.first);
+        }
+      }
+      final colors = Theme.of(context).colorScheme;
+      return ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+            children: [
+              Text(
+                widget.documents
+                    ? 'Documents & Certifications'
+                    : 'ID Directory',
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                onChanged: (value) => setState(() => _search = value),
+                decoration: InputDecoration(
+                  hintText: 'Search IDs, documents, or agencies',
+                  hintStyle: const TextStyle(fontSize: 12),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    size: 19,
+                    color: _accent(false),
+                  ),
+                  filled: true,
+                  fillColor: colors.brightness == Brightness.dark
+                      ? colors.surfaceContainer
+                      : _accent(false).withValues(alpha: .045),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: colors.outlineVariant.withValues(alpha: .35),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: _accent(true), width: 1.2),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: colors.outlineVariant),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final filter in [
+                      'All',
+                      'IDs',
+                      'Documents',
+                      'Ready Now',
+                    ])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 5),
+                        child: ChoiceChip(
+                          label: Text(
+                            filter,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: _filter == filter
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                          selected: _filter == filter,
+                          showCheckmark: false,
+                          padding: const EdgeInsets.symmetric(horizontal: 1),
+                          labelPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                          ),
+                          selectedColor: AppTheme.accentGold,
+                          backgroundColor: colors.surface,
+                          labelStyle: TextStyle(
+                            color: _filter == filter
+                                ? AppTheme.navy
+                                : colors.onSurfaceVariant,
+                          ),
+                          side: BorderSide(
+                            color: _filter == filter
+                                ? _accent(true).withValues(alpha: .25)
+                                : colors.outlineVariant.withValues(alpha: .45),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (_) {
+                            _refreshInventory();
+                            setState(() => _filter = filter);
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (snapshot.connectionState != ConnectionState.done) ...[
+                const SizedBox(height: 24),
+                const LinearProgressIndicator(minHeight: 2),
+                const Text('Loading directory…'),
+              ] else if (snapshot.hasError) ...[
+                const SizedBox(height: 24),
+                const Text('Could not load the ID directory.'),
+                TextButton(
+                  onPressed: () {
+                    final request = _load();
+                    setState(() {
+                      _catalog = request;
+                    });
+                    if (_inventory != null) unawaited(_loadCandidateDetails());
+                    _refreshInventory();
+                  },
+                  child: const Text('Retry'),
+                ),
+              ] else if (browsing) ...[
+                _heading(
+                  query.isNotEmpty
+                      ? 'Search results'
+                      : widget.documents
+                      ? 'Documents & Certifications'
+                      : _filter,
+                ),
+                if (_filter == 'Ready Now' && visible.isNotEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      'Based on saved inventory and the structured checklist. Confirm details in the guide.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                if (visible.isEmpty) const Text('No matching entries.'),
+                for (final record in visible)
+                  _row(record, suggestion: _filter == 'Ready Now'),
+              ] else ...[
+                if (suggestions.isNotEmpty) ...[
+                  _heading(
+                    'Suggested for You',
+                    'Based on your profile and readiness.',
+                  ),
+                  for (final record in suggestions.take(3))
+                    _row(record, suggestion: true),
+                ],
+                _heading('Commonly Needed'),
+                if (common.isEmpty)
+                  const Text(
+                    'No commonly needed guides are available yet.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final record in common) _commonCard(record),
+                    ],
+                  ),
+                ),
+                _heading('Browse by Category'),
+                _category(records, false),
+                _category(records, true),
+              ],
+            ],
+          ),
         ),
-        child: passport
-            ? const Icon(Icons.public_rounded, color: Color(0xFFDDBA76), size: 25)
-            : const Padding(padding: EdgeInsets.all(5), child: Row(children: [
-                Icon(Icons.person_rounded, color: Color(0xFF527BAE), size: 22),
-                SizedBox(width: 3),
-                Expanded(child: Icon(Icons.notes_rounded, color: Color(0xFF8EACD1), size: 18)),
-              ])),
-      ),
-    ));
-  }
+      );
+    },
+  );
 }

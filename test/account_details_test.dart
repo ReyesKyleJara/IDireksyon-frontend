@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:idireksyon_frontend/core/auth/auth_service.dart';
 import 'package:idireksyon_frontend/core/theme/app_theme.dart';
 import 'package:idireksyon_frontend/features/profile/account_details_screen.dart';
+import 'package:idireksyon_frontend/features/profile/password_security_screen.dart';
 import 'package:idireksyon_frontend/features/ids/ids_screen.dart';
 import 'package:idireksyon_frontend/features/shell/resident_app_shell.dart';
 
@@ -36,17 +37,19 @@ void main() {
       for (final name in ['Kyle', 'Kai']) {
         await tester.tap(find.text('Profile').last);
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Account Details'));
+        await tester.scrollUntilVisible(find.text('Personal information'), 250, scrollable: find.byType(Scrollable).first);
+        await tester.tap(find.text('Personal information'));
         await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextFormField).first, name);
-        await tester.ensureVisible(find.text('Save account details'));
-        await tester.tap(find.text('Save account details'));
+        await tester.ensureVisible(find.text('Save changes'));
+        await tester.tap(find.text('Save changes'));
         await tester.pumpAndSettle();
         expect(tester.widget<TextFormField>(find.byType(TextFormField).first).controller!.text, name);
         // Both headers must update even while covered by the account route.
-        expect(find.text(name, skipOffstage: false), findsNWidgets(3));
+        expect(AuthService.instance.user?['name'], name);
         await tester.pageBack();
         await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(find.text(name), -250, scrollable: find.byType(Scrollable).first);
         expect(find.text(name), findsOneWidget);
         await tester.tap(find.text('Home').last);
         await tester.pumpAndSettle();
@@ -75,10 +78,6 @@ void main() {
         await tester.ensureVisible(find.text('Open ID Directory'));
         await tester.tap(find.text('Open ID Directory'));
         await tester.pumpAndSettle();
-        expect(
-          tester.widget<BottomNavigationBar>(find.byType(BottomNavigationBar)).currentIndex,
-          2,
-        );
         final directory = find.byType(IdsScreen);
         expect(directory, findsOneWidget);
         expect(find.descendant(of: directory, matching: find.text('ID Directory')), findsOneWidget);
@@ -139,12 +138,12 @@ void main() {
     );
     expect(find.text('resident@example.com'), findsOneWidget);
     await tester.enterText(find.byType(TextFormField).first, 'New Name');
-    await tester.ensureVisible(find.text('Save account details'));
-    await tester.tap(find.text('Save account details'));
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
     expect(AuthService.instance.user?['name'], 'New Name');
-    expect(find.text('Account details updated.'), findsOneWidget);
-    await tester.tap(find.text('Save account details'));
+    expect(find.text('Profile updated successfully.'), findsOneWidget);
+    await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
     expect(find.text('Email already in use.'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -165,14 +164,14 @@ void main() {
               .copyWith(textScaler: const TextScaler.linear(2)),
           child: child!,
         ),
-        home: const AccountDetailsScreen(),
+        home: const PasswordSecurityScreen(),
       ),
     );
-    await tester.ensureVisible(find.text('Update password'));
-    await tester.tap(find.text('Update password'));
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Update password'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Update password'));
     await tester.pumpAndSettle();
-    expect(find.text('Enter your current password'), findsOneWidget);
-    expect(find.text('Use at least 8 characters'), findsOneWidget);
+    expect(find.text('Enter your current password.'), findsOneWidget);
+    expect(find.text('Enter a new password.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

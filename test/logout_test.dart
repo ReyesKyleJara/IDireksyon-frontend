@@ -35,9 +35,14 @@ void main() {
           home: const ResidentAppShell(initialIndex: 3),
         ),
       );
-      await tester.ensureVisible(find.text('Log out'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Log out'), 300, scrollable: find.byType(Scrollable).first);
       await tester.tap(find.text('Log out'));
       await tester.pumpAndSettle();
+      expect(find.text('Log out of IDireksyon?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Log out'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
       expect(calls, 1);
       expect(AuthService.instance.token, isNull);
       expect(AuthService.instance.user, isNull);

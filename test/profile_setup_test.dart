@@ -13,14 +13,51 @@ import 'package:idireksyon_frontend/features/profile/profile_complete_screen.dar
 
 void main() {
   late List<http.Request> requests;
+  var failSave = false;
   setUp(() {
     requests = [];
-    AuthService.instance = AuthService(
-      client: MockClient((request) async {
-        requests.add(request);
-        return http.Response('{"user":{"id":1},"token":"test"}', 200);
-      }),
-    )..token = 'test';
+    failSave = false;
+    AuthService.instance =
+        AuthService(
+            client: MockClient((request) async {
+              requests.add(request);
+              if (request.url.path.endsWith('/inventory')) {
+                return http.Response(
+                  jsonEncode({
+                    'data': {
+                      'government_ids': [
+                        {'id': 1, 'name': 'PhilSys ID', 'owned': false},
+                        {'id': 2, 'name': 'Driver’s License', 'owned': false},
+                      ],
+                      'documents': [
+                        {'id': 1, 'name': 'Birth Certificate', 'owned': false},
+                        {'id': 2, 'name': 'NBI Clearance', 'owned': false},
+                      ],
+                    },
+                  }),
+                  200,
+                  headers: {'content-type': 'application/json; charset=utf-8'},
+                );
+              }
+              if (request.url.path.endsWith('/barangays')) {
+                return http.Response(
+                  '{"data":[{"id":1,"name":"Poblacion"}]}',
+                  200,
+                );
+              }
+              if (failSave && request.url.path.endsWith('/profile-setup')) {
+                return http.Response('{}', 500);
+              }
+              return http.Response('{"user":{"id":1},"token":"test"}', 200);
+            }),
+          )
+          ..token = 'test'
+          ..user = {
+            'id': 1,
+            'name': 'Juan',
+            'date_of_birth': '2000-01-01',
+            'barangay_id': 1,
+          };
   });
 
   Widget app(Widget home) => MaterialApp(
@@ -47,24 +84,52 @@ void main() {
     'IDs then documents preserve selection on back and save to account',
     (tester) async {
       await tester.pumpWidget(app(const ProfileSetupScreen()));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Next'),
+        findsOneWidget,
+        reason: tester
+            .widgetList<Text>(find.byType(Text))
+            .map((text) => text.data)
+            .join('|'),
+      );
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('PhilSys ID'));
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Birth Certificate'));
-      await tester.tap(find.byTooltip('Back to IDs'));
+      await tester.tap(find.byTooltip('Previous step'));
       await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.check), findsOneWidget);
+      expect(find.text('1 selected'), findsOneWidget);
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.check), findsOneWidget);
-      await tester.tap(find.text('Let’s start your ID Journey'));
+      expect(find.text('1 selected'), findsOneWidget);
+      await tester.tap(find.text('Finish Setup'));
       await finishSetup(tester);
       expect(find.text('Resident home'), findsOneWidget);
-      expect(requests.single.headers['Authorization'], 'Bearer test');
-      expect(jsonDecode(requests.single.body), {
-        'ids': ['PhilSys ID'],
-        'documents': ['Birth Certificate'],
-      });
+      expect(
+        requests
+            .where((r) => r.url.path.endsWith('/profile-setup'))
+            .single
+            .headers['Authorization'],
+        'Bearer test',
+      );
+      expect(
+        jsonDecode(
+          requests
+              .where((r) => r.url.path.endsWith('/profile-setup'))
+              .single
+              .body,
+        ),
+        {
+          'name': 'Juan',
+          'date_of_birth': '2000-01-01',
+          'barangay_id': 1,
+          'government_id_ids': [1],
+          'document_ids': [1],
+        },
+      );
     },
   );
 
@@ -72,13 +137,30 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(app(const ProfileSetupScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('PhilSys ID'));
     await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
     expect(find.text('Birth Certificate'), findsOneWidget);
     await tester.tap(find.text('Skip'));
     await finishSetup(tester);
-    expect(jsonDecode(requests.single.body), {'ids': [], 'documents': []});
+    expect(
+      jsonDecode(
+        requests
+            .where((r) => r.url.path.endsWith('/profile-setup'))
+            .single
+            .body,
+      ),
+      {
+        'name': 'Juan',
+        'date_of_birth': '2000-01-01',
+        'barangay_id': 1,
+        'government_id_ids': [],
+        'document_ids': [],
+      },
+    );
     expect(find.text('Resident home'), findsOneWidget);
   });
 
@@ -99,20 +181,21 @@ void main() {
   testWidgets('save failure keeps selections and permits retry', (
     tester,
   ) async {
-    AuthService.instance = AuthService(
-      client: MockClient((_) async => http.Response('{}', 500)),
-    )..token = 'test';
+    failSave = true;
     await tester.pumpWidget(app(const ProfileSetupScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Birth Certificate'));
-    await tester.tap(find.text('Let’s start your ID Journey'));
+    await tester.tap(find.text('Finish Setup'));
     await tester.pumpAndSettle();
     expect(
       find.text('The server is unavailable. Please try again.'),
       findsOneWidget,
     );
-    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(find.text('1 selected'), findsOneWidget);
     expect(
       tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
       isNotNull,
@@ -136,6 +219,10 @@ void main() {
         home: const ProfileSetupScreen(),
       ),
     );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Next'));
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Driver’s License'));
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();

@@ -1,49 +1,292 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import 'id_details_screen.dart';
 import '../../models/government_id.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/auth/auth_service.dart';
+import '../../services/application_preparation.dart';
 import '../../services/requirement_readiness.dart';
 
-Color _accent(BuildContext context) => Theme.of(context).brightness == Brightness.dark
-    ? const Color(0xFFA8CCFA) : const Color(0xFF174B85);
+Color _accent(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? const Color(0xFFA8CCFA)
+    : AppTheme.primaryBlue;
 
 class RequirementsTab extends StatefulWidget {
   final GovernmentIdDetails governmentId;
   final Future<Map<String, dynamic>> Function()? loadInventory;
-  const RequirementsTab({super.key, required this.governmentId, this.loadInventory});
+  final Future<Map<String, dynamic>> Function()? loadPreparation;
+  final Future<Map<String, dynamic>> Function(int itemId, bool prepared)?
+  savePreparation;
+  const RequirementsTab({
+    super.key,
+    required this.governmentId,
+    this.loadInventory,
+    this.loadPreparation,
+    this.savePreparation,
+  });
   @override
   State<RequirementsTab> createState() => _RequirementsTabState();
 }
 
+/// Assistance remains explanatory content, outside the saved application checklist.
+class AssistanceRequirements extends StatelessWidget {
+  final GovernmentIdDetails record;
+  const AssistanceRequirements({super.key, required this.record});
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (final set in record.requirementSets)
+        for (final group in set.groups)
+          _RequirementSection(group: group, checklist: false),
+    ],
+  );
+}
+
 class _RequirementsTabState extends State<RequirementsTab> {
-  int? selectedSetId;
-  RequirementReadiness? inventory;
-  bool inventoryError = false;
-  bool loadingInventory = false;
+  late final AuthService _auth = AuthService.instance;
+  RequirementReadiness? _inventory;
+  ApplicationPreparation? _preparation;
+  bool _loading = false,
+      _saving = false,
+      _loadError = false,
+      _inventoryError = false;
+  int _generation = 0, _revision = -1, _inventoryRevision = -1;
+  String? _session;
 
   @override
   void initState() {
     super.initState();
-    _loadInventory();
+    _session = _auth.token;
+    _revision = _auth.preparationRevision;
+    _inventoryRevision = _auth.inventoryRevision;
+    _auth.addListener(_authChanged);
+    unawaited(_load());
   }
 
-  Future<void> _loadInventory() async {
-    if (widget.loadInventory == null && AuthService.instance.token == null) return;
-    setState(() { loadingInventory = true; inventoryError = false; inventory = null; });
-    try {
-      final data = await (widget.loadInventory?.call() ?? AuthService.instance.getInventory());
-      final parsed = RequirementReadiness.fromInventory(data);
-      if (mounted) setState(() { inventory = parsed; });
-    } catch (_) {
-      if (mounted) setState(() { inventoryError = true; });
-    } finally {
-      if (mounted) setState(() { loadingInventory = false; });
+  void _authChanged() {
+    if (_session == _auth.token &&
+        _revision == _auth.preparationRevision &&
+        _inventoryRevision == _auth.inventoryRevision) {
+      return;
+    }
+    final changedSession = _session != _auth.token;
+    _session = _auth.token;
+    _revision = _auth.preparationRevision;
+    _inventoryRevision = _auth.inventoryRevision;
+    if (!_saving || changedSession) {
+      unawaited(_load());
     }
   }
 
   @override
   void didUpdateWidget(covariant RequirementsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.governmentId.id != widget.governmentId.id) selectedSetId = null;
+    if (oldWidget.governmentId.id != widget.governmentId.id ||
+        oldWidget.governmentId.recordType != widget.governmentId.recordType) {
+      unawaited(_load());
+    }
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _auth.removeListener(_authChanged);
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final generation = ++_generation;
+    final record = widget.governmentId;
+    final canLoad = widget.loadPreparation != null || _auth.token != null;
+    setState(() {
+      _preparation = null;
+      _inventory = null;
+      _loading = canLoad;
+      _saving = false;
+      _loadError = false;
+      _inventoryError = false;
+    });
+    await Future.wait([
+      if (canLoad)
+        (() async {
+          try {
+            final data =
+                await (widget.loadPreparation?.call() ??
+                    _auth.getRequirementPreparation(
+                      record.recordType,
+                      record.id,
+                    ));
+            final parsed = ApplicationPreparation.fromJson(data);
+            if (mounted && generation == _generation) {
+              setState(() => _preparation = parsed);
+            }
+          } catch (_) {
+            if (mounted && generation == _generation) {
+              setState(() => _loadError = true);
+            }
+          }
+        })(),
+      if (widget.loadInventory != null || _auth.token != null)
+        (() async {
+          try {
+            final data =
+                await (widget.loadInventory?.call() ?? _auth.getInventory());
+            final parsed = RequirementReadiness.fromInventory(data);
+            if (mounted && generation == _generation) {
+              setState(() => _inventory = parsed);
+            }
+          } catch (_) {
+            if (mounted && generation == _generation) {
+              setState(() => _inventoryError = true);
+            }
+          }
+        })(),
+    ]);
+    if (mounted && generation == _generation) setState(() => _loading = false);
+  }
+
+  Future<void> _toggle(RequirementItem item) async {
+    final before = _preparation;
+    if (_saving || before == null || item.id == null) return;
+    final generation = _generation;
+    final prepared = before.owns(item);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        constraints: const BoxConstraints(maxWidth: 420),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+        titleTextStyle: const TextStyle(
+          fontFamily: 'Google Sans',
+          fontSize: 20,
+          height: 1.25,
+          fontWeight: FontWeight.w800,
+          color: AppTheme.navy,
+        ),
+        contentTextStyle: const TextStyle(
+          fontFamily: 'Google Sans',
+          fontSize: 14,
+          height: 1.5,
+          color: Color(0xFF42556C),
+        ),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        title: Text(
+          prepared ? 'Remove from checklist?' : 'Confirm requirement',
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              prepared
+                  ? 'This requirement will no longer count toward your readiness for this application.'
+                  : 'Are you sure you already have this requirement and want to mark it as prepared for this application?',
+            ),
+            if (prepared && _inventory?.owns(item) == true) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'This requirement is already added to your Own IDs/Documents. Unchecking it only removes it from this application’s checklist.',
+                style: TextStyle(
+                  fontFamily: 'Google Sans',
+                  fontSize: 12,
+                  height: 1.4,
+                  color: AppTheme.primaryBlue,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              prepared ? 'Your saved Inventory will not be changed.' : 'This only updates your checklist for this application. It will not change your saved Inventory.',
+              style: const TextStyle(
+                fontFamily: 'Google Sans',
+                fontSize: 12,
+                height: 1.4,
+                color: Color(0xFF607089),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF42556C),
+              textStyle: const TextStyle(
+                fontFamily: 'Google Sans',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primaryBlue,
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(
+                fontFamily: 'Google Sans',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              prepared ? 'Remove from checklist' : 'Yes, mark as prepared',
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted || generation != _generation) return;
+    final record = widget.governmentId;
+    setState(() {
+      _preparation = before.withItem(item.id!, !prepared);
+      _saving = true;
+    });
+    try {
+      final data =
+          await (widget.savePreparation?.call(item.id!, !prepared) ??
+              _auth.saveRequirementPreparation(
+                record.recordType,
+                record.id,
+                item.id!,
+                !prepared,
+              ));
+      final saved = ApplicationPreparation.fromJson(data);
+      if (saved.owns(item) != !prepared) {
+        throw const FormatException('Unsaved selection');
+      }
+      if (mounted && generation == _generation) {
+        setState(() => _preparation = saved);
+      }
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() => _preparation = before);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not save your checklist. Your previous selection was restored. Please try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted && generation == _generation) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -52,69 +295,103 @@ class _RequirementsTabState extends State<RequirementsTab> {
     final sets = record.requirementSets;
     final colors = Theme.of(context).colorScheme;
     if (sets.isEmpty) {
-      return ListView(padding: const EdgeInsets.all(24), children: [
-        Text(record.requirements ?? 'Requirements are not available yet.',
-          style: TextStyle(fontSize: 15, height: 1.65, color: colors.onSurface)),
-      ]);
+      return ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Text(record.requirements ?? 'Requirements are not available yet.'),
+        ],
+      );
     }
-    final selected = sets.where((set) => set.id == selectedSetId).firstOrNull ?? sets.first;
+    final selected = sets.first;
+    final preparation = _preparation;
+    final canSave =
+        preparation != null &&
+        !_saving &&
+        (widget.savePreparation != null || _auth.token != null);
     return ListView(
-      key: ValueKey(record.id),
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+      key: ValueKey((record.recordType, record.id)),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
       children: [
-        LayoutBuilder(builder: (context, constraints) {
-          final label = Text('Applying for', style: TextStyle(
-            fontSize: 12, color: colors.onSurfaceVariant));
-          final selector = sets.length > 1
-              ? DropdownButtonFormField<int>(
-                  initialValue: selected.id,
-                  isExpanded: true,
-                  isDense: false,
-                  itemHeight: null,
-                  iconSize: 18,
-                  style: TextStyle(fontSize: 12, height: 1.4, color: colors.onSurface),
-                  decoration: const InputDecoration(
-                    isDense: true, filled: false,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
-                    border: InputBorder.none, enabledBorder: InputBorder.none,
-                    focusedBorder: UnderlineInputBorder(),
-                  ),
-                  items: sets.map((set) => DropdownMenuItem(
-                    value: set.id,
-                    child: Text(set.label, maxLines: 3, overflow: TextOverflow.ellipsis),
-                  )).toList(),
-                  onChanged: (value) => setState(() { selectedSetId = value; }),
-                )
-              : Text(selected.label, style: TextStyle(
-                  fontSize: 12, height: 1.4, color: colors.onSurface));
-          final stack = constraints.maxWidth < 320 ||
-              MediaQuery.textScalerOf(context).scale(12) > 16;
-          if (stack) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [label, const SizedBox(height: 4), selector],
-            );
-          }
-          return Row(children: [
-            label, const SizedBox(width: 10), Expanded(child: selector),
-          ]);
-        }),
-        const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text('Prepare each requirement below. Where choices are offered, only the stated number is needed.',
-            style: TextStyle(fontSize: 13, height: 1.5, color: colors.onSurfaceVariant)),
+        Text(
+          'Choose the requirements you have prepared for this application.',
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            color: colors.onSurfaceVariant,
+          ),
         ),
-        if (loadingInventory) const Text('Loading inventory readiness…'),
-        if (inventoryError) TextButton(onPressed: _loadInventory,
-          child: const Text('Could not load inventory readiness. Retry')),
-        if (inventory != null) const Text(
-          'Based on linked inventory items. Custom requirements need review. Check document conditions, validity and copies separately.'),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'Loading saved checklist…',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+        if (_loadError)
+          TextButton(
+            onPressed: _load,
+            child: const Text('Could not load your checklist. Retry'),
+          ),
+        if (_inventoryError)
+          TextButton(
+            onPressed: _load,
+            child: const Text('Could not load Inventory availability. Retry'),
+          ),
+        if (_auth.token == null && widget.loadPreparation == null)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'Sign in to save your checklist.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+        if (preparation != null && selected.groups.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              _saving
+                  ? 'Saving…'
+                  : '${preparationSummary(selected, preparation).complete} of ${preparationSummary(selected, preparation).total} required groups prepared',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _accent(context),
+              ),
+            ),
+          ),
         if (selected.groups.isEmpty)
-          const Padding(padding: EdgeInsets.only(top: 24),
-            child: Text('Requirements for this application are not available yet.')),
+          const Padding(
+            padding: EdgeInsets.only(top: 16),
+            child: Text(
+              'Requirements for this application are not available yet.',
+            ),
+          ),
         for (final group in selected.groups)
-          _RequirementSection(key: ValueKey((selected.id, group.id)), group: group, inventory: inventory),
+          _RequirementSection(
+            key: ValueKey((selected.id, group.id)),
+            group: group,
+            preparation: preparation,
+            inventory: _inventory,
+            onToggle: canSave ? _toggle : null,
+          ),
+        Container(
+          key: const ValueKey('readiness-explanation'),
+          margin: const EdgeInsets.only(top: 12),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _accent(context).withValues(alpha: .04),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            'Items in Own IDs/Documents start checked unless you saved an unchecked choice. Checklist changes do not change Inventory. Conditional and issuing-office checks still apply.',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.35,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -123,159 +400,329 @@ class _RequirementsTabState extends State<RequirementsTab> {
 class _RequirementSection extends StatelessWidget {
   final RequirementGroup group;
   final RequirementReadiness? inventory;
-  const _RequirementSection({super.key, required this.group, this.inventory});
+  final ApplicationPreparation? preparation;
+  final Future<void> Function(RequirementItem)? onToggle;
+  final bool checklist;
+  const _RequirementSection({
+    super.key,
+    required this.group,
+    this.inventory,
+    this.preparation,
+    this.onToggle,
+    this.checklist = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final hasAlternatives = group.ways.length > 1;
+    final progress = preparation?.group(group) ?? 0;
+    final best = group.ways.fold<RequirementWay?>(
+      null,
+      (best, way) =>
+          best == null ||
+              (preparation?.way(way) ?? 0) > (preparation?.way(best) ?? 0)
+          ? way
+          : best,
+    );
+    final met = preparation != null && progress == 1;
+    final count = best == null ? 0 : (progress * best.requiredCount).round();
+    final status = met
+        ? 'Requirement met'
+        : count > 0
+        ? '$count of ${best!.requiredCount} prepared'
+        : 'Not yet complete';
+    final single =
+        group.ways.length == 1 &&
+        group.ways.single.items.length == 1 &&
+        group.displayName == group.ways.single.items.single.name;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(border: Border(
-        bottom: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.55)))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(Icons.description_outlined, size: 18, color: _accent(context)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(group.displayName, style: TextStyle(
-            fontSize: 16, height: 1.4, fontWeight: FontWeight.w600, color: colors.onSurface))),
-        ]),
-        Padding(
-          padding: const EdgeInsets.only(left: 26),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (inventory != null)
-              Text('${(inventory!.group(group) * 100).round()}% inventory readiness'),
-            if (group.conditionType != 'always')
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(group.condition == null
-                    ? 'Conditional requirement — check when this applies.'
-                    : 'Only if: ${group.condition}',
-                  style: TextStyle(fontSize: 13, height: 1.5, color: colors.onSurfaceVariant)),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: colors.brightness == Brightness.dark
+            ? colors.surfaceContainer
+            : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!single)
+            Text(
+              group.displayName,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.3,
+                fontWeight: FontWeight.w700,
+                color: _accent(context),
               ),
-            if (hasAlternatives)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text('Meet one of these alternatives, not all of them.',
-                  style: TextStyle(fontSize: 13, height: 1.5, color: colors.onSurfaceVariant)),
+            ),
+          if (checklist)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 3),
+              child: Text(
+                status,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.3,
+                  color: met
+                      ? const Color(0xFF2E7D32)
+                      : colors.onSurfaceVariant,
+                ),
               ),
-            for (var index = 0; index < group.ways.length; index++) ...[
-              if (index > 0)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Text('OR', style: TextStyle(fontSize: 12,
-                    fontWeight: FontWeight.w700, color: _accent(context))),
+            ),
+          if (group.conditionType != 'always')
+            Text(
+              group.condition == null
+                  ? 'Check when this condition applies.'
+                  : 'Only if: ${group.condition}',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          if (group.ways.length > 1)
+            Text(
+              'Meet one of these alternatives, not all of them.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          for (var i = 0; i < group.ways.length; i++) ...[
+            if (i > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(
+                  children: [
+                    Expanded(child: Divider(color: colors.outlineVariant)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        'OR',
+                        style: TextStyle(fontSize: 10, color: _accent(context)),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: colors.outlineVariant)),
+                  ],
                 ),
-              if (hasAlternatives)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text('Option ${index + 1}', style: TextStyle(fontSize: 13,
-                    fontWeight: FontWeight.w600, color: colors.onSurface)),
+              ),
+            if (group.ways.length > 1)
+              Text(
+                'Option ${i + 1}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
-              if (inventory != null)
-                Text('${(inventory!.way(group.ways[index]) * 100).round()}% complete'),
-              _WayView(key: ValueKey((group.ways[index].id, index)),
-                way: group.ways[index], heading: group.displayName,
-                alternative: hasAlternatives),
-            ],
-          ]),
-        ),
-      ]),
+              ),
+            _WayView(
+              key: ValueKey((group.ways[i].id, i)),
+              way: group.ways[i],
+              alternative: group.ways.length > 1,
+              inventory: inventory,
+              preparation: preparation,
+              onToggle: onToggle,
+              checklist: checklist,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
 class _WayView extends StatelessWidget {
   final RequirementWay way;
-  final String heading;
-  final bool alternative;
-  const _WayView({super.key, required this.way, required this.heading, required this.alternative});
+  final bool alternative, checklist;
+  final RequirementReadiness? inventory;
+  final ApplicationPreparation? preparation;
+  final Future<void> Function(RequirementItem)? onToggle;
+  const _WayView({
+    super.key,
+    required this.way,
+    required this.alternative,
+    required this.checklist,
+    this.inventory,
+    this.preparation,
+    this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final isChoice = way.items.length > 1 && way.requiredCount < way.items.length;
-    final collapseItems = isChoice || way.items.length > 3;
+    final choice = way.items.length > 1 && way.requiredCount < way.items.length;
     final items = [
       for (final item in way.items)
-        _ItemView(item: item,
-          showName: alternative || way.items.length != 1 || item.name != heading,
-          bullet: way.items.length > 1),
+        _ItemView(
+          item: item,
+          inventory: inventory,
+          preparation: preparation,
+          checklist: checklist,
+          onToggle: onToggle,
+        ),
     ];
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (way.items.length != 1 || alternative)
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(way.instruction, style: TextStyle(fontSize: 13, height: 1.5,
-            fontWeight: FontWeight.w600, color: _accent(context))),
-        ),
-      if (way.qualification != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(way.qualification!, style: TextStyle(
-            fontSize: 13, height: 1.5, color: colors.onSurfaceVariant)),
-        ),
-      if (collapseItems)
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Material(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(6),
-            clipBehavior: Clip.antiAlias,
-            child: ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-              childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-              shape: const Border(),
-              collapsedShape: const Border(),
-              iconColor: _accent(context),
-              collapsedIconColor: _accent(context),
-              title: Text(
-                isChoice ? 'View ${way.items.length} accepted items'
-                    : 'View all ${way.items.length} required items',
-                style: TextStyle(fontSize: 13, height: 1.4,
-                  fontWeight: FontWeight.w500, color: _accent(context)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (way.items.length != 1 || alternative)
+          Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Text(
+              way.instruction,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+                color: _accent(context),
               ),
-              children: items,
             ),
           ),
-        )
-      else
-        ...items,
-    ]);
+        if (way.qualification != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Text(
+              way.qualification!,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+        if (choice || way.items.length > 3)
+          ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+            childrenPadding: const EdgeInsets.only(bottom: 4),
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            shape: const Border(),
+            collapsedShape: const Border(),
+            iconColor: _accent(context),
+            collapsedIconColor: _accent(context),
+            title: Text(
+              choice
+                  ? 'View ${way.items.length} accepted items'
+                  : 'View all ${way.items.length} required items',
+              style: TextStyle(fontSize: 12, color: _accent(context)),
+            ),
+            children: items,
+          )
+        else
+          ...items,
+      ],
+    );
   }
 }
 
 class _ItemView extends StatelessWidget {
   final RequirementItem item;
-  final bool showName, bullet;
-  const _ItemView({required this.item, required this.showName, required this.bullet});
+  final RequirementReadiness? inventory;
+  final ApplicationPreparation? preparation;
+  final bool checklist;
+  final Future<void> Function(RequirementItem)? onToggle;
+  const _ItemView({
+    required this.item,
+    this.inventory,
+    this.preparation,
+    required this.checklist,
+    this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final detailsStyle = TextStyle(fontSize: 13, height: 1.5, color: colors.onSurfaceVariant);
-    if (!showName && item.quantity == null && item.submission == null && item.instructions == null) {
-      return const SizedBox.shrink();
-    }
+    final owned = inventory?.owns(item) == true;
+    final checked = preparation?.owns(item) == true;
+    final style = TextStyle(
+      fontSize: 12,
+      height: 1.35,
+      color: colors.onSurfaceVariant,
+    );
+    final linked =
+        (item.type == 'document' && item.documentId != null) ||
+        (item.type == 'government_id' && item.governmentIdId != null);
     return Padding(
-      padding: const EdgeInsets.only(top: 5),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (bullet) ...[
-          Padding(padding: const EdgeInsets.only(top: 8),
-            child: Icon(Icons.circle, size: 4, color: colors.onSurfaceVariant)),
-          const SizedBox(width: 8),
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (checklist)
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: Checkbox(
+                key: ValueKey('prepare-item-${item.id}'),
+                value: checked,
+                activeColor: _accent(context),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                semanticLabel:
+                    '${checked ? 'Unprepare' : 'Prepare'} ${item.name}',
+                onChanged: onToggle == null || item.id == null
+                    ? null
+                    : (_) => onToggle!(item),
+              ),
+            ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Text(
+                    item.name,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.3,
+                      fontWeight: FontWeight.w500,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ),
+                if (owned && !checked)
+                  const Text(
+                    'Added to Own IDs/Documents',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF2E7D32),
+                      height: 1.3,
+                    ),
+                  ),
+                if (item.quantity != null)
+                  Text('Quantity: ${item.quantity}', style: style),
+                if (item.submission != null)
+                  Text(item.submission!, style: style),
+                if (item.instructions != null)
+                  Text(item.instructions!, style: style),
+                if (linked)
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      textStyle: const TextStyle(fontSize: 11),
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => IdDetailsScreen(
+                          idName: item.name,
+                          recordType: item.type,
+                          governmentId: item.type == 'document'
+                              ? item.documentId
+                              : item.governmentIdId,
+                        ),
+                      ),
+                    ),
+                    child: Text('View ${item.name}'),
+                  ),
+              ],
+            ),
+          ),
         ],
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showName) Text(item.name, style: TextStyle(fontSize: 14, height: 1.5,
-            fontWeight: FontWeight.w500, color: colors.onSurface)),
-          if (item.quantity != null) Text('Quantity: ${item.quantity}', style: detailsStyle),
-          if (item.submission != null) Text(item.submission!, style: detailsStyle),
-          if (item.instructions != null) Text(item.instructions!, style: detailsStyle),
-        ])),
-      ]),
+      ),
     );
   }
 }

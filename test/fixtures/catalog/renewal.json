@@ -1,0 +1,163 @@
+{
+    "id": 1,
+    "name": "NBI Clearance — fixture",
+    "description": null,
+    "purpose": null,
+    "level": null,
+    "category": null,
+    "eligibility": null,
+    "validity": null,
+    "validity_type": null,
+    "processing_time": null,
+    "guidance_mode": "guided",
+    "application_availability": "available",
+    "acquisition_type": "general_public",
+    "target_group": null,
+    "include_in_smart_sequencing": true,
+    "requirements": null,
+    "fee": null,
+    "record_type": "document",
+    "research_metadata": {
+        "sources": [
+            {
+                "title": "Fixture official reference",
+                "url": "https://example.gov.ph/reference",
+                "checked_on": "2026-10-29",
+                "scope": "Fixture channel"
+            }
+        ],
+        "hidden_sections": [],
+        "status": "reviewed",
+        "validity_note": "Check the receiving agency recency rule."
+    },
+    "request_paths": [
+        {
+            "id": 1,
+            "application_type": "renewal",
+            "application_type_custom": null,
+            "applicant_type": "all",
+            "applicant_type_custom": null,
+            "label": "Online renewal appointment",
+            "channel": "online",
+            "provider": "Official issuer",
+            "portal_url": "https://example.gov.ph/request",
+            "fulfillment": [
+                "pickup"
+            ],
+            "appointment": "required",
+            "applicability": null,
+            "processing": "20 minutes after complete submission",
+            "requirement_sets": [
+                {
+                    "id": 1,
+                    "application_type": "renewal",
+                    "application_type_label": "Renewal",
+                    "applicant_type": "all",
+                    "applicant_type_label": "All Applicants",
+                    "display_label": "All Applicants • Renewal",
+                    "min_age": null,
+                    "max_age": null,
+                    "groups": [
+                        {
+                            "id": 1,
+                            "title": null,
+                            "rule": "all",
+                            "condition_type": "representative",
+                            "condition_label": "Representative / guardian is applying",
+                            "ways": [
+                                {
+                                    "id": 1,
+                                    "required_count": 1,
+                                    "qualification_type": "none",
+                                    "qualification_scope": "every",
+                                    "qualification_custom": null,
+                                    "qualification_label": null,
+                                    "items": [
+                                        {
+                                            "id": 1,
+                                            "type": "custom",
+                                            "government_id_id": null,
+                                            "document_id": null,
+                                            "name": "Proof of authority",
+                                            "quantity": null,
+                                            "submission_format": "original",
+                                            "submission_label": "Original",
+                                            "copies": null,
+                                            "instructions": null
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "fees": [],
+            "offices": [],
+            "guide": [
+                {
+                    "id": 1,
+                    "title": "Retrieve the record through the official channel",
+                    "short_description": null,
+                    "type": "general",
+                    "blocks": []
+                }
+            ],
+            "troubleshooting": [
+                {
+                    "title": "No record found",
+                    "body": "Contact the issuer before submitting another request.",
+                    "url": "https://example.gov.ph/help"
+                }
+            ]
+        }
+    ],
+    "resident_notice": null,
+    "issued_by": null,
+    "requirement_sets": [
+        {
+            "id": 1,
+            "application_type": "renewal",
+            "application_type_label": "Renewal",
+            "applicant_type": "all",
+            "applicant_type_label": "All Applicants",
+            "display_label": "All Applicants • Renewal",
+            "min_age": null,
+            "max_age": null,
+            "groups": [
+                {
+                    "id": 1,
+                    "title": null,
+                    "rule": "all",
+                    "condition_type": "representative",
+                    "condition_label": "Representative / guardian is applying",
+                    "ways": [
+                        {
+                            "id": 1,
+                            "required_count": 1,
+                            "qualification_type": "none",
+                            "qualification_scope": "every",
+                            "qualification_custom": null,
+                            "qualification_label": null,
+                            "items": [
+                                {
+                                    "id": 1,
+                                    "type": "custom",
+                                    "government_id_id": null,
+                                    "document_id": null,
+                                    "name": "Proof of authority",
+                                    "quantity": null,
+                                    "submission_format": "original",
+                                    "submission_label": "Original",
+                                    "copies": null,
+                                    "instructions": null
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "fees": []
+}

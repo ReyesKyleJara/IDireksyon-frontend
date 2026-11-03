@@ -160,12 +160,13 @@ class RoadmapPlanView extends StatelessWidget {
                       }}${row['condition'] == null ? '' : '\nApplies when: ${row['condition']}'}',
                     ),
                   ),
-                if (plan.steps[i].type == 'government_id')
+                if (['government_id', 'document'].contains(plan.steps[i].type))
                   TextButton(
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => IdDetailsScreen(
                           governmentId: plan.steps[i].id,
+                          recordType: plan.steps[i].type,
                           idName: plan.steps[i].name,
                         ),
                       ),

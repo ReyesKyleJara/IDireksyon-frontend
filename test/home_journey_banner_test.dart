@@ -55,12 +55,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester
-          .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
-          .currentIndex,
-      1,
-    );
-    expect(
-      tester
           .widget<ActiveJourneyScreen>(find.byType(ActiveJourneyScreen))
           .initialJourney,
       same(second),

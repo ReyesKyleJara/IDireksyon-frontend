@@ -8,6 +8,31 @@ List<T> _rows<T>(dynamic value, T Function(Map<String, dynamic>) parse) =>
     : <T>[];
 
 class GovernmentIdDetails {
+  final Map<String, dynamic> raw;
+  String get recordType =>
+      raw['record_type'] == 'document' ? 'document' : 'government_id';
+  List<Map<String, dynamic>> get requestPaths =>
+      (raw['request_paths'] as List? ?? [])
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+
+  /// Offices linked directly to this record, never selected from a request path.
+  List<Map<String, dynamic>> get offices => (raw['offices'] as List? ?? [])
+      .whereType<Map>()
+      .map((row) => Map<String, dynamic>.from(row))
+      .toList();
+  Map<String, dynamic> get research => raw['research_metadata'] is Map
+      ? Map<String, dynamic>.from(raw['research_metadata'])
+      : {};
+  GovernmentIdDetails forPath(Map<String, dynamic> path) =>
+      GovernmentIdDetails.fromJson({
+        ...raw,
+        'requirement_sets': path['requirement_sets'] ?? [],
+        'requirements': null,
+        'fees': path['fees'] ?? [],
+        'fee': null,
+      });
   final int id;
   final bool includeInSmartSequencing;
   final String applicationAvailability;
@@ -19,12 +44,15 @@ class GovernmentIdDetails {
   final List<RequirementSet> requirementSets;
   final List<CatalogFee> fees;
   final String? legacyFee;
+  final String? processingTime, processingTimeNote;
 
   GovernmentIdDetails.fromJson(Map<String, dynamic> json)
-    : id = _integer(json['id']) ?? (throw const FormatException('Missing ID')),
+    : raw = Map<String, dynamic>.unmodifiable(json),
+      id = _integer(json['id']) ?? (throw const FormatException('Missing ID')),
       name = _text(json['name']) ?? 'Government ID',
       includeInSmartSequencing = json['include_in_smart_sequencing'] != false,
-      applicationAvailability = _text(json['application_availability']) ?? 'available',
+      applicationAvailability =
+          _text(json['application_availability']) ?? 'available',
       guidanceMode = _text(json['guidance_mode']) ?? 'guided',
       level = _text(json['level']),
       category = _text(json['category']),
@@ -34,6 +62,8 @@ class GovernmentIdDetails {
       issuedBy = _text(json['issued_by']),
       description = _text(json['description']),
       purpose = _text(json['purpose']),
+      processingTime = _text(json['processing_time']),
+      processingTimeNote = _text(json['processing_time_note']),
       validity = json['validity_type'] == 'not_applicable'
           ? null
           : _text(json['validity']),

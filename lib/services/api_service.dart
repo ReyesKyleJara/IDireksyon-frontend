@@ -37,6 +37,18 @@ class ApiService {
     return GovernmentIdDetails.fromJson(data);
   }
 
+  static Future<List<GovernmentIdDetails>> getDocuments({http.Client? client}) async {
+    final data = await _get('documents', client: client);
+    if (data is! List) throw const FormatException('Invalid document directory');
+    return data.map((row) => GovernmentIdDetails.fromJson({...Map<String, dynamic>.from(row), 'record_type': 'document'})).toList();
+  }
+
+  static Future<GovernmentIdDetails> getDocument(int id, {http.Client? client}) async {
+    final data = await _get('documents/$id', client: client);
+    if (data is! Map<String, dynamic>) throw const FormatException('Invalid document detail');
+    return GovernmentIdDetails.fromJson({...data, 'record_type': 'document'});
+  }
+
   static Future<Map<String, dynamic>> checkHealth() async {
     final response = await http.get(
       Uri.parse('$baseUrl/health'),
