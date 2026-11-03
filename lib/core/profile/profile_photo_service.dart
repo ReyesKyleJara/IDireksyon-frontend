@@ -21,9 +21,9 @@ class ProfilePhotoService extends ChangeNotifier {
 
   bool get hasPhoto => _photoBytes != null;
 
-  String get _storageKey {
-    final user = AuthService.instance.user;
+  String get _storageKey => _keyFor(AuthService.instance.user);
 
+  static String _keyFor(Map<String, dynamic>? user) {
     final identity = user?['id'] ?? user?['email'] ?? user?['phone'] ?? 'guest';
 
     return 'profile_photo_$identity';
@@ -92,6 +92,21 @@ class ProfilePhotoService extends ChangeNotifier {
     _loadedForKey = _storageKey;
 
     notifyListeners();
+  }
+
+  // Removes a photo saved for an account that is no longer signed in,
+  // such as one that was just deleted.
+  Future<void> forget(Map<String, dynamic>? user) async {
+    final key = _keyFor(user);
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.remove(key);
+
+    if (_loadedForKey == key) {
+      _photoBytes = null;
+      _loadedForKey = null;
+      notifyListeners();
+    }
   }
 }
 

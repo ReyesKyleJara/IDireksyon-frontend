@@ -153,6 +153,25 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  // Deletion failures must leave the resident signed in.
+  Future<void> deleteAccount({required String password}) async {
+    final session = token;
+    if (session == null) throw const AuthException('Please sign in again.');
+    final result = await _post('account/delete', {'password': password});
+    if (result['message'] != 'Account deleted.') {
+      throw const AuthException(
+        'The server returned an unexpected deletion response.',
+      );
+    }
+    if (token != session) {
+      throw const AuthException(
+        'Your session changed. Please reload before continuing.',
+      );
+    }
+    token = null;
+    user = null;
+  }
+
   Future<String> sendPasswordResetEmail(String email) async {
     final data = await _post('forgot-password', {'email': email.trim()});
     final message = data['message'];
