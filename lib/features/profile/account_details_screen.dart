@@ -36,6 +36,13 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         '',
   );
 
+  int? _selectedBarangayId = int.tryParse(
+    '${AuthService.instance.user?['barangay_id']}',
+  );
+  List<Map<String, dynamic>> _barangays = [];
+  bool _loadingBarangays = true;
+  bool _barangayError = false;
+
   bool _saving = false;
   bool _changingPhoto = false;
 
@@ -46,6 +53,27 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     super.initState();
     _photoService.addListener(_onPhotoChanged);
     _photoService.load();
+    _loadBarangays();
+  }
+
+  Future<void> _loadBarangays() async {
+    setState(() {
+      _loadingBarangays = true;
+      _barangayError = false;
+    });
+    try {
+      final rows = await AuthService.instance.getBarangays();
+      if (!mounted) return;
+      setState(() {
+        _barangays = rows
+            .where((row) => row['id'] is int && row['name'] is String)
+            .toList();
+      });
+    } catch (_) {
+      if (mounted) setState(() => _barangayError = true);
+    } finally {
+      if (mounted) setState(() => _loadingBarangays = false);
+    }
   }
 
   @override
@@ -142,6 +170,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         name: _name.text.trim(),
         contact: _contact.text.trim(),
         usePhone: _usePhone,
+        barangayId: _barangays.any((row) => row['id'] == _selectedBarangayId)
+            ? _selectedBarangayId
+            : null,
       );
 
       if (!mounted) return;
@@ -287,6 +318,102 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                     ),
 
                     const SizedBox(height: 36),
+
+                    Text(
+                      'Barangay',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (_loadingBarangays)
+                      const Text(
+                        'Loading barangays…',
+                        style: TextStyle(fontSize: 13),
+                      )
+                    else if (_barangayError)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AuthService.instance.user?['barangay_name']
+                                    as String? ??
+                                'Barangay details unavailable',
+                            style: TextStyle(fontSize: 13, color: muted),
+                          ),
+                          TextButton(
+                            onPressed: _busy ? null : _loadBarangays,
+                            child: const Text(
+                              'Could not load barangays. Retry',
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      DropdownButtonFormField<int>(
+                        key: ValueKey('barangay-$_selectedBarangayId'),
+                        initialValue:
+                            _barangays.any(
+                              (row) => row['id'] == _selectedBarangayId,
+                            )
+                            ? _selectedBarangayId
+                            : null,
+                        isExpanded: true,
+                        menuMaxHeight: 320,
+                        dropdownColor: colors.surface,
+                        itemHeight: null,
+                        selectedItemBuilder: (_) => [
+                          for (final row in _barangays)
+                            Text(
+                              row['name'] as String,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                        ],
+                        decoration: InputDecoration(
+                          hintText: 'Select your barangay',
+                          filled: true,
+                          fillColor: colors.surface,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 17,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: colors.outlineVariant,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: _navy,
+                              width: 1.5,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        items: [
+                          for (final row in _barangays)
+                            DropdownMenuItem(
+                              value: row['id'] as int,
+                              child: Text(
+                                row['name'] as String,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                        ],
+                        onChanged: _busy
+                            ? null
+                            : (value) =>
+                                  setState(() => _selectedBarangayId = value),
+                      ),
+                    const SizedBox(height: 28),
 
                     // SAVE BUTTON
                     FilledButton(

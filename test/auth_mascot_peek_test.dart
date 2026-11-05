@@ -11,31 +11,23 @@ void main() {
   final mascot = find.byKey(const ValueKey('auth-random-peek'));
   final bubble = find.byKey(const ValueKey('auth-feature-bubble'));
 
-  testWidgets('Welcome shows a large peek without covering either action', (
+  testWidgets('Welcome keeps both actions usable without a floating mascot', (
     tester,
   ) async {
     await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(mascot, findsOneWidget);
-    expect(bubble, findsOneWidget);
-    expect(tester.getSize(mascot).width, inInclusiveRange(132, 264));
-    final viewport =
-        Offset.zero & (tester.view.physicalSize / tester.view.devicePixelRatio);
-    final visible = tester.getRect(mascot).intersect(viewport);
+    expect(find.byType(AuthMascotPeek), findsNothing);
+    expect(mascot, findsNothing);
+    expect(bubble, findsNothing);
     for (final label in ['Log In', 'Sign Up']) {
       expect(find.text(label).hitTestable(), findsOneWidget);
-      expect(visible.overlaps(tester.getRect(find.text(label))), isFalse);
-      expect(
-        tester.getRect(bubble).overlaps(tester.getRect(find.text(label))),
-        isFalse,
-      );
     }
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('Mobile Welcome has room for both mascot and tip', (
+  testWidgets('Mobile Welcome displays its content without a mascot or tip', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -45,54 +37,46 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(mascot, findsOneWidget);
-    expect(bubble, findsOneWidget);
+    expect(find.byType(AuthMascotPeek), findsNothing);
+    expect(mascot, findsNothing);
+    expect(bubble, findsNothing);
     for (final label in ['Log In', 'Sign Up', 'Welcome!']) {
-      expect(
-        tester.getRect(bubble).overlaps(tester.getRect(find.text(label))),
-        isFalse,
-      );
+      expect(find.text(label).hitTestable(), findsOneWidget);
     }
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
   for (final phone in [false, true]) {
-    testWidgets('Random peeks leave small signup forms usable: phone=$phone', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(320, 640);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: phone ? const PhoneSignupScreen() : const EmailSignupScreen(),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-      expect(find.byType(AuthMascotPeek), findsOneWidget);
-      expect(mascot, findsOneWidget);
-      expect(bubble, findsOneWidget);
-      for (final field in tester.widgetList<TextFormField>(
-        find.byType(TextFormField),
-      )) {
-        final bounds = tester.getRect(find.byWidget(field));
-        expect(tester.getRect(mascot).overlaps(bounds), isFalse);
-        expect(tester.getRect(bubble).overlaps(bounds), isFalse);
-      }
-      expect(find.byType(TextFormField), findsNWidgets(3));
-      await tester.enterText(
-        find.byType(TextFormField).first,
-        phone ? '09091234567' : 'resident@example.com',
-      );
-      await tester.pump(const Duration(milliseconds: 600));
-      final submit = find.widgetWithText(FilledButton, 'Create Account');
-      await tester.ensureVisible(submit);
-      expect(submit.hitTestable(), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
+    testWidgets(
+      'Small signup forms remain usable without floating DIRO: phone=$phone',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: phone ? const PhoneSignupScreen() : const EmailSignupScreen(),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.byType(AuthMascotPeek), findsNothing);
+        expect(mascot, findsNothing);
+        expect(bubble, findsNothing);
+        expect(find.byType(TextFormField), findsNWidgets(3));
+        await tester.enterText(
+          find.byType(TextFormField).first,
+          phone ? '09091234567' : 'resident@example.com',
+        );
+        await tester.pump(const Duration(milliseconds: 600));
+        final submit = find.widgetWithText(FilledButton, 'Create Account');
+        await tester.ensureVisible(submit);
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
   }
 
   testWidgets('New turns change pose and location while avoiding content', (

@@ -271,6 +271,20 @@ Future<void> _confirmLogout() async {
                                   color: muted,
                                 ),
                               ),
+                              const SizedBox(height: 6),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.location_on_outlined, size: 16, color: muted),
+                                  const SizedBox(width: 4),
+                                  Expanded(child: Text(
+                                    user?['barangay_name'] as String? ??
+                                      (user?['barangay_id'] == null ? 'Barangay not set' : 'Barangay details unavailable'),
+                                    key: const ValueKey('profile-barangay'),
+                                    style: TextStyle(fontSize: 12, color: muted, height: 1.35),
+                                  )),
+                                ],
+                              ),
                             ],
                           ),
                         ),

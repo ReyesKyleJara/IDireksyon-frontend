@@ -4,18 +4,20 @@ import 'active_journey_screen.dart';
 import 'id_journey.dart';
 import 'roadmap_plan_panel.dart';
 import '../../models/roadmap_plan.dart';
-import '../ids/id_details_screen.dart';
+import 'suggested_journey_view.dart';
 
 class SuggestedRoadmapScreen extends StatefulWidget {
   const SuggestedRoadmapScreen({
     super.key,
     this.targetIds = const ['Passport ID'],
     this.targetCatalogIds = const [],
+    this.targetDocumentIds = const [],
     this.ownedItems = const [],
     this.existingJourneys = const [],
   });
   final List<String> targetIds;
   final List<int> targetCatalogIds;
+  final List<int> targetDocumentIds;
   final List<String> ownedItems;
   final List<IdJourney> existingJourneys;
 
@@ -31,17 +33,11 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
   List<int> get targetCatalogIds => widget.targetCatalogIds;
   List<String> get ownedItems => widget.ownedItems;
   List<IdJourney> get existingJourneys => widget.existingJourneys;
-  List<_RoadmapStep> get _steps => [
-    for (var index = 0; index < targetIds.length; index++)
-      _RoadmapStep(
-        title: targetIds[index],
-        governmentId: index < targetCatalogIds.length
-            ? targetCatalogIds[index]
-            : null,
-        subtitle: 'Review the requirements and application guide for this ID.',
-        icon: Icons.badge_outlined,
-      ),
-  ];
+  String get _goalTitle => targetIds
+      .map((name) => name == 'Passport ID' ? 'Philippine Passport' : name)
+      .join(' + ');
+  bool get _passport =>
+      targetIds.length == 1 && _goalTitle.toLowerCase().contains('passport');
 
   static const primaryBlue = Color(0xFF12499A);
 
@@ -57,7 +53,7 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_rounded, color: colors.onSurface),
+          icon: Icon(Icons.arrow_back_rounded, color: colors.primary),
         ),
       ),
       body: SafeArea(
@@ -72,12 +68,14 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
-                    color: colors.onSurface,
+                    color: colors.primary,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Review the next steps for your ${targetIds.join(' + ')} journey.',
+                  _passport
+                      ? 'Here’s the recommended sequence for your Passport journey.'
+                      : 'Here’s the recommended sequence for your journey.',
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.35,
@@ -85,44 +83,55 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _TargetCard(colors: colors, title: targetIds.join(' + ')),
-                const SizedBox(height: 8),
-                if (targetCatalogIds.isNotEmpty)
+                if (targetCatalogIds.isNotEmpty ||
+                    widget.targetDocumentIds.isNotEmpty)
                   RoadmapPlanPanel(
                     targetIds: targetCatalogIds,
-                    onPlan: (plan) { if (mounted) setState(() => _plan = plan); },
+                    targetDocumentIds: widget.targetDocumentIds,
+                    guidedPresentation: true,
+                    onPlan: (plan) {
+                      if (mounted) setState(() => _plan = plan);
+                    },
                   )
-                else SizedBox(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 8),
-                    itemCount: _steps.length,
-                    itemBuilder: (context, index) => _StepRow(
-                      step: _steps[index],
-                      number: index + 1,
-                      isLast: index == _steps.length - 1,
-                      colors: colors,
-                    ),
+                else ...[
+                  RoadmapGoalCard(
+                    title: _goalTitle,
+                    stepCount: targetIds.length,
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  for (var i = 0; i < targetIds.length; i++)
+                    SuggestedJourneyStep(
+                      number: i + 1,
+                      name: targetIds[i] == 'Passport ID'
+                          ? 'Philippine Passport'
+                          : targetIds[i],
+                      isGoal: true,
+                      isLast: i == targetIds.length - 1,
+                    ),
+                ],
                 const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
                   constraints: const BoxConstraints(minHeight: 48),
                   child: ElevatedButton(
-                    onPressed: targetCatalogIds.isNotEmpty && (_plan == null || _plan!.blocked) ? null : () => Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => JourneyLoadingScreen(
-                          journey: IdJourney(
-                            targetIds: targetIds,
-                            targetCatalogIds: targetCatalogIds,
-                            ownedItems: ownedItems,
+                    onPressed:
+                        (targetCatalogIds.isNotEmpty ||
+                                widget.targetDocumentIds.isNotEmpty) &&
+                            (_plan == null || _plan!.blocked)
+                        ? null
+                        : () => Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => JourneyLoadingScreen(
+                                journey: IdJourney(
+                                  targetIds: targetIds,
+                                  targetCatalogIds: targetCatalogIds,
+                                  targetDocumentIds: widget.targetDocumentIds,
+                                  ownedItems: ownedItems,
+                                ),
+                                existingJourneys: existingJourneys,
+                              ),
+                            ),
                           ),
-                          existingJourneys: existingJourneys,
-                        ),
-                      ),
-                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryBlue,
                       foregroundColor: Colors.white,
@@ -149,242 +158,6 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
   }
 }
 
-class _TargetCard extends StatelessWidget {
-  const _TargetCard({required this.colors, required this.title});
-  final String title;
-
-  final ColorScheme colors;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 103),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colors.brightness == Brightness.dark
-            ? colors.surfaceContainer
-            : Colors.white,
-        border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.menu_book_rounded,
-              color: SuggestedRoadmapScreen.primaryBlue,
-              size: 43,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _TargetMetric(
-              label: 'Target ID',
-              value: title,
-              colors: colors,
-            ),
-          ),
-          VerticalDivider(color: colors.outlineVariant, width: 1),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _TargetMetric(
-              label: 'Overall Readiness',
-              value: '0%',
-              colors: colors,
-              showBar: true,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TargetMetric extends StatelessWidget {
-  const _TargetMetric({
-    required this.label,
-    required this.value,
-    required this.colors,
-    this.showBar = false,
-  });
-
-  final String label;
-  final String value;
-  final ColorScheme colors;
-  final bool showBar;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(label, style: TextStyle(fontSize: 11, color: colors.onSurface)),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: SuggestedRoadmapScreen.primaryBlue,
-          ),
-        ),
-        if (showBar) ...[
-          const SizedBox(height: 5),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: const LinearProgressIndicator(
-              value: 0,
-              minHeight: 7,
-              backgroundColor: Color(0xFFE4E8EF),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                SuggestedRoadmapScreen.primaryBlue,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _StepRow extends StatelessWidget {
-  const _StepRow({
-    required this.step,
-    required this.number,
-    required this.isLast,
-    required this.colors,
-  });
-  final _RoadmapStep step;
-  final int number;
-  final bool isLast;
-  final ColorScheme colors;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = colors.brightness == Brightness.dark
-        ? Colors.blue.shade200
-        : SuggestedRoadmapScreen.primaryBlue;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 36,
-            child: Column(
-              children: [
-                Container(
-                  width: 26,
-                  height: 26,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: SuggestedRoadmapScreen.primaryBlue,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '$number',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (!isLast)
-                  Expanded(
-                    child: Container(width: 2, color: colors.outlineVariant),
-                  ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colors.brightness == Brightness.dark
-                    ? colors.surfaceContainer
-                    : Colors.white,
-                border: Border.all(color: colors.outlineVariant),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(step.icon, size: 28, color: accent),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              step.title,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: colors.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              step.subtitle,
-                              style: TextStyle(
-                                fontSize: 13,
-                                height: 1.4,
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => IdDetailsScreen(
-                          idName: step.title,
-                          governmentId: step.governmentId,
-                        ),
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: accent,
-                      minimumSize: const Size.fromHeight(48),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Preview Guide',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class PsaBirthCertificateGuideScreen extends StatelessWidget {
   const PsaBirthCertificateGuideScreen({super.key});
 
@@ -402,7 +175,7 @@ class PsaBirthCertificateGuideScreen extends StatelessWidget {
         scrolledUnderElevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_rounded, color: colors.onSurface),
+          icon: Icon(Icons.arrow_back_rounded, color: colors.primary),
         ),
       ),
       body: SafeArea(
@@ -702,18 +475,4 @@ class _ChecklistItem extends StatelessWidget {
       ),
     );
   }
-}
-
-class _RoadmapStep {
-  const _RoadmapStep({
-    this.governmentId,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  final int? governmentId;
-  final String title;
-  final String subtitle;
-  final IconData icon;
 }

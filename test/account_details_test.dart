@@ -18,6 +18,9 @@ void main() {
     var accountRequests = 0;
     var directoryRequests = 0;
     AuthService.instance = AuthService(client: MockClient((request) async {
+      if (request.url.path.endsWith('/barangays')) {
+        return http.Response('{"data":[]}', 200);
+      }
       accountRequests++;
       expect(request.url.path, '/api/auth/account');
       return http.Response(jsonEncode({'user': {
@@ -113,6 +116,9 @@ void main() {
     AuthService.instance =
         AuthService(
             client: MockClient((request) async {
+              if (request.url.path.endsWith('/barangays')) {
+                return http.Response('{"data":[]}', 200);
+              }
               expect(request.headers['Authorization'], 'Bearer test');
               requests++;
               if (requests == 2) {

@@ -10,10 +10,12 @@ class ConfirmDocumentsScreen extends StatefulWidget {
     super.key,
     this.targetIds = const ['Passport ID'],
     this.targetCatalogIds = const [],
+    this.targetDocumentIds = const [],
     this.existingJourneys = const [],
   });
   final List<String> targetIds;
   final List<int> targetCatalogIds;
+  final List<int> targetDocumentIds;
   final List<IdJourney> existingJourneys;
   static const primaryBlue = Color(0xFF12499A);
   @override
@@ -88,12 +90,12 @@ class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Confirm your current\ndocuments',
+              'Confirm your current documents',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             const Text(
-              'These are your saved Inventory items. Ownership can only be changed in Manage Inventory.',
+              'Review your saved IDs and documents before we build your roadmap.',
             ),
             const SizedBox(height: 17),
             if (_loading) const Text('Loading saved Inventory…'),
@@ -114,16 +116,39 @@ class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
                   ),
                 ),
                 for (final item in _owned.where((item) => item.type == type))
-                  Card(
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
                     child: ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 2,
+                      ),
                       key: ValueKey((item.type, item.id)),
                       leading: Icon(
                         type == 'government_id'
                             ? Icons.badge_outlined
                             : Icons.description_outlined,
                       ),
-                      title: Text(item.name),
-                      trailing: const Icon(Icons.check_circle_outline),
+                      title: Text(
+                        item.name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Icons.check_circle_outline,
+                        color: ConfirmDocumentsScreen.primaryBlue,
+                        size: 22,
+                      ),
                     ),
                   ),
                 if (!_owned.any((item) => item.type == type))
@@ -151,15 +176,27 @@ class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
                         builder: (_) => SuggestedRoadmapScreen(
                           targetIds: widget.targetIds,
                           targetCatalogIds: widget.targetCatalogIds,
+                          targetDocumentIds: widget.targetDocumentIds,
                           ownedItems: _owned.map((item) => item.name).toList(),
                           existingJourneys: widget.existingJourneys,
                         ),
                       ),
                     ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ConfirmDocumentsScreen.primaryBlue,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
               child: const Text('Save & Continue'),
             ),
+            const SizedBox(height: 8),
             const Text(
-              'Continue uses saved Inventory without changing ownership.',
+              'Update your saved items in Manage Inventory.',
+              style: TextStyle(fontSize: 12),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

@@ -170,7 +170,10 @@ void main() {
       expect(find.textContaining('Needs manual confirmation'), findsOneWidget);
       expect(find.textContaining('Applies when: If required'), findsOneWidget);
       expect(find.textContaining('Already in Inventory'), findsOneWidget);
-      expect(find.text('Preview Guide'), findsNWidgets(3)); // Document dependencies now open their own detail.
+      expect(
+        find.text('Preview Guide'),
+        findsNWidgets(3),
+      ); // Document dependencies now open their own detail.
     },
   );
 
@@ -209,7 +212,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Unavailable B'), findsOneWidget);
-      expect(find.textContaining('Prerequisite path blocked.'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Please check the requirements with the issuing office',
+        ),
+        findsOneWidget,
+      );
       expect(
         tester
             .widget<ElevatedButton>(
@@ -218,10 +226,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      expect(
-        find.text('0%'),
-        findsOneWidget,
-      ); // Overall placeholder is unchanged.
+      expect(find.text('0%'), findsNothing);
     },
   );
 

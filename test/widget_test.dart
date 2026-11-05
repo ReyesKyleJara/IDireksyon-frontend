@@ -6,7 +6,7 @@ import 'package:idireksyon_frontend/core/auth/auth_service.dart';
 import 'fixtures/roadmap_auth.dart';
 
 void main() {
-  testWidgets('Preview Guide opens the selected catalog target', (
+  testWidgets('View Guide opens the selected catalog target', (
     WidgetTester tester,
   ) async {
     final previous = AuthService.instance;
@@ -17,8 +17,8 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Preview Guide').first);
-    await tester.tap(find.text('Preview Guide').first);
+    await tester.ensureVisible(find.text('View Guide').first);
+    await tester.tap(find.text('View Guide').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(IdDetailsScreen), findsOneWidget);

@@ -1,6 +1,9 @@
 import 'fixtures/roadmap_auth.dart';
+
 import 'package:idireksyon_frontend/core/auth/auth_service.dart';
+
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:flutter/material.dart';
@@ -12,58 +15,79 @@ import 'package:idireksyon_frontend/features/shell/resident_app_shell.dart';
 
 void main() {
   late AuthService previousAuth;
-  setUp(() { previousAuth = AuthService.instance; AuthService.instance = journeyAuth(); });
-  tearDown(() { AuthService.instance.dispose(); AuthService.instance = previousAuth; });
+  setUp(() {
+    previousAuth = AuthService.instance;
+    AuthService.instance = journeyAuth();
+  });
+  tearDown(() {
+    AuthService.instance.dispose();
+    AuthService.instance = previousAuth;
+  });
   testWidgets('minimize, add a different journey, and reopen the original', (
     tester,
   ) async {
-    await http.runWithClient(() async {
-    final original = IdJourney();
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: ResidentAppShell(initialIndex: 1, journeys: [original]),
+    await http.runWithClient(
+      () async {
+        final original = IdJourney();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: ResidentAppShell(initialIndex: 1, journeys: [original]),
+          ),
+        );
+        await tester.tap(find.text('Minimize progress'));
+        await tester.pumpAndSettle();
+        expect(find.text('Your next steps'), findsNothing);
+        expect(find.text('0%'), findsOneWidget);
+        await tester.tap(find.text('Add another ID journey'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('PhilSys National ID'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Continue'));
+        await tester.tap(find.text('Continue'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Save & Continue'));
+        await tester.tap(find.text('Save & Continue'));
+        await tester.pumpAndSettle();
+        expect(find.text('Passport ID'), findsNothing);
+        await tester.ensureVisible(find.text('Confirm Suggested Journey'));
+        await tester.tap(find.text('Confirm Suggested Journey'));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        final active = tester.widget<ActiveJourneyScreen>(
+          find.byType(ActiveJourneyScreen),
+        );
+        expect(active.journeys.length, 2);
+        expect(identical(active.journeys.first, original), isTrue);
+        expect(original.minimized, isTrue);
+        expect(active.journeys.last.targetIds, ['PhilSys National ID']);
+        expect(active.journeys.last.targetCatalogIds, [56]);
+        expect(active.journeys.last.ownedItems, isEmpty);
+        await tester.tap(find.text('Expand progress'));
+        await tester.pumpAndSettle();
+        expect(original.minimized, isFalse);
+        await tester.tap(find.text('Home').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Roadmap').last);
+        await tester.pumpAndSettle();
+        expect(original.minimized, isFalse);
+        expect(tester.takeException(), isNull);
+      },
+      () => MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'data': request.url.path.endsWith('/documents')
+                ? []
+                : [
+                    {'id': 56, 'name': 'PhilSys National ID'},
+                    {'id': 55, 'name': 'Philippine Passport'},
+                  ],
+          }),
+          200,
+        ),
       ),
     );
-    await tester.tap(find.text('Minimize progress'));
-    await tester.pumpAndSettle();
-    expect(find.text('Your next steps'), findsNothing);
-    expect(find.text('0%'), findsOneWidget);
-    await tester.tap(find.text('Add another ID journey'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('PhilSys National ID'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Next'));
-    await tester.tap(find.text('Next'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Save & Continue'));
-    await tester.tap(find.text('Save & Continue'));
-    await tester.pumpAndSettle();
-    expect(find.text('Passport ID'), findsNothing);
-    await tester.ensureVisible(find.text('Confirm Suggested Journey'));
-    await tester.tap(find.text('Confirm Suggested Journey'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pumpAndSettle();
-    final active = tester.widget<ActiveJourneyScreen>(
-      find.byType(ActiveJourneyScreen),
-    );
-    expect(active.journeys.length, 2);
-    expect(identical(active.journeys.first, original), isTrue);
-    expect(original.minimized, isTrue);
-    expect(active.journeys.last.targetIds, ['PhilSys National ID']);
-    expect(active.journeys.last.targetCatalogIds, [56]);
-    expect(active.journeys.last.ownedItems, isEmpty);
-    await tester.tap(find.text('Expand progress'));
-    await tester.pumpAndSettle();
-    expect(original.minimized, isFalse);
-    await tester.tap(find.text('Home').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Roadmap').last);
-    await tester.pumpAndSettle();
-    expect(original.minimized, isFalse);
-    expect(tester.takeException(), isNull);
-    }, () => MockClient((request) async => http.Response(jsonEncode({'data': [{'id': 56, 'name': 'PhilSys National ID'}, {'id': 55, 'name': 'Philippine Passport'}]}), 200)));
   });
 
   testWidgets('canceling another journey preserves the original card', (

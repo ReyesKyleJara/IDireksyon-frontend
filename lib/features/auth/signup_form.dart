@@ -1,4 +1,3 @@
-import 'auth_mascot_peek.dart';
 import '../../core/widgets/app_motion.dart';
 
 import 'package:flutter/material.dart';
@@ -483,7 +482,6 @@ class _SignupFormState
         backgroundColor:
             AppTheme.pageBackground,
         body: SafeArea(
-          child: AuthMascotPeek(
           child: LayoutBuilder(
             builder:
                 (
@@ -1121,7 +1119,6 @@ class _SignupFormState
                 ),
               );
             },
-          ),
           ),
         ),
       ),

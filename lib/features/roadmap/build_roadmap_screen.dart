@@ -1,7 +1,6 @@
-import '../../core/widgets/app_motion.dart';
-
 import 'package:flutter/material.dart';
 
+import '../ids/ids_screen.dart';
 import 'confirm_documents_screen.dart';
 import 'id_journey.dart';
 import '../../models/government_id.dart';
@@ -15,7 +14,6 @@ class BuildRoadmapScreen extends StatefulWidget {
   });
   final List<IdJourney> existingJourneys;
   final Future<List<GovernmentIdDetails>> Function()? loadIds;
-
   static const primaryBlue = Color(0xFF12499A);
 
   @override
@@ -23,8 +21,9 @@ class BuildRoadmapScreen extends StatefulWidget {
 }
 
 class _BuildRoadmapScreenState extends State<BuildRoadmapScreen> {
-  final Set<int> _selectedIds = {};
+  (String, int)? _selected;
   late Future<List<GovernmentIdDetails>> _catalog;
+  String _search = '';
 
   @override
   void initState() {
@@ -33,291 +32,288 @@ class _BuildRoadmapScreenState extends State<BuildRoadmapScreen> {
   }
 
   Future<List<GovernmentIdDetails>> _loadCandidates() async {
-    final records =
-        await (widget.loadIds?.call() ?? ApiService.getGovernmentIds());
-    // Only acquisition targets are filtered; the shared catalog stays complete.
-    return records.where((record) => record.includeInSmartSequencing && record.guidanceMode == 'guided' &&
-        (record.applicationAvailability == 'available' ||
-         record.applicationAvailability == 'limited_conditional')).toList();
-  }
-
-  void _toggleId(int id) {
-    setState(() {
-      if (!_selectedIds.add(id)) _selectedIds.remove(id);
-    });
+    final records = widget.loadIds != null
+        ? await widget.loadIds!()
+        : (await Future.wait([
+            ApiService.getGovernmentIds(),
+            ApiService.getDocuments(),
+          ])).expand((rows) => rows).toList();
+    return records
+        .where(
+          (record) =>
+              record.includeInSmartSequencing &&
+              record.guidanceMode == 'guided' &&
+              [
+                'available',
+                'limited_conditional',
+              ].contains(record.applicationAvailability),
+        )
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        scrolledUnderElevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_rounded, color: colors.onSurface),
+          icon: const Icon(Icons.arrow_back_rounded),
         ),
       ),
-      body: FutureBuilder<List<GovernmentIdDetails>>(
-        future: _catalog,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
+      body: SafeArea(
+        child: FutureBuilder<List<GovernmentIdDetails>>(
+          future: _catalog,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Unable to load roadmap candidates.'),
+                    TextButton(
+                      onPressed: () => setState(() {
+                        _catalog = _loadCandidates();
+                      }),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            final records = snapshot.data ?? [];
+            final visible = records
+                .where((record) => record.name.toLowerCase().contains(_search))
+                .toList();
+            final selected = records
+                .where((record) => _selected == (record.recordType, record.id))
+                .toList();
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Unable to load roadmap candidates.'),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      _catalog = _loadCandidates();
-                    }),
-                    child: const Text('Retry'),
+                  const Text(
+                    'Build My Roadmap',
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Choose the government ID or document you want to acquire.',
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    onChanged: (value) =>
+                        setState(() => _search = value.trim().toLowerCase()),
+                    decoration: InputDecoration(
+                      hintText: 'Search government ID or document...',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: true,
+                      fillColor: colors.primary.withValues(alpha: 0.06),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (visible.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        records.isEmpty
+                            ? 'No acquisition targets are currently available for roadmap planning.'
+                            : 'No matching IDs or documents.',
+                      ),
+                    ),
+                  for (final record in visible)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _TargetRow(
+                        record: record,
+                        selected: _selected == (record.recordType, record.id),
+                        onTap: () => setState(() {
+                          _selected = (record.recordType, record.id);
+                        }),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colors.primary.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: colors.primary.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.manage_search_rounded,
+                          color: colors.primary,
+                          size: 30,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Not sure what to apply for?',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Browse available government IDs and guides',
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton(
+                                onPressed: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => Scaffold(
+                                      appBar: AppBar(
+                                        title: const Text('ID Directory'),
+                                      ),
+                                      body: const IdsScreen(),
+                                    ),
+                                  ),
+                                ),
+                                child: const Text('Open ID Directory'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: selected.isEmpty
+                        ? null
+                        : () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ConfirmDocumentsScreen(
+                                targetIds: selected
+                                    .map((record) => record.name)
+                                    .toList(),
+                                targetCatalogIds: selected
+                                    .where(
+                                      (record) =>
+                                          record.recordType == 'government_id',
+                                    )
+                                    .map((record) => record.id)
+                                    .toList(),
+                                targetDocumentIds: selected
+                                    .where(
+                                      (record) =>
+                                          record.recordType == 'document',
+                                    )
+                                    .map((record) => record.id)
+                                    .toList(),
+                                existingJourneys: widget.existingJourneys,
+                              ),
+                            ),
+                          ),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: BuildRoadmapScreen.primaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Continue'),
                   ),
                 ],
               ),
             );
-          }
-          final records = snapshot.data ?? [];
-          if (records.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'No acquisition targets are currently available for roadmap planning.',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-          final ids = records
-              .map(
-                (record) =>
-                    _RoadmapId(record.id, record.name, Icons.badge_outlined),
-              )
-              .toList();
-          return SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'What IDs do you want to\nacquire?',
-                      style: TextStyle(
-                        fontSize: 24,
-                        height: 1.25,
-                        fontWeight: FontWeight.w800,
-                        color: colors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Select one or more IDs you want to include in\nthis journey.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.35,
-                        color: colors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: BuildRoadmapScreen.primaryBlue.withValues(
-                          alpha: 0.08,
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        '${_selectedIds.length} ID${_selectedIds.length == 1 ? '' : 's'} selected',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: BuildRoadmapScreen.primaryBlue,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 17),
-                    SizedBox(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: ids.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final id = ids[index];
-                          return _IdOptionCard(
-                            id: id,
-                            selected: _selectedIds.contains(id.id),
-                            onTap: () => _toggleId(id.id),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      constraints: const BoxConstraints(minHeight: 48),
-                      child: ElevatedButton(
-                        onPressed: _selectedIds.isEmpty
-                            ? null
-                            : () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ConfirmDocumentsScreen(
-                                      targetIds: records
-                                          .where(
-                                            (record) => _selectedIds.contains(
-                                              record.id,
-                                            ),
-                                          )
-                                          .map((record) => record.name)
-                                          .toList(),
-                                      targetCatalogIds: records
-                                          .where(
-                                            (record) => _selectedIds.contains(
-                                              record.id,
-                                            ),
-                                          )
-                                          .map((record) => record.id)
-                                          .toList(),
-                                      existingJourneys: widget.existingJourneys,
-                                    ),
-                                  ),
-                                );
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: BuildRoadmapScreen.primaryBlue,
-                          disabledBackgroundColor:
-                              colors.surfaceContainerHighest,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Next',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+          },
+        ),
       ),
     );
   }
 }
 
-class _IdOptionCard extends StatelessWidget {
-  const _IdOptionCard({
-    required this.id,
+class _TargetRow extends StatelessWidget {
+  const _TargetRow({
+    required this.record,
     required this.selected,
     required this.onTap,
   });
-
-  final _RoadmapId id;
+  final GovernmentIdDetails record;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-
-    return Material(
-      color: colors.brightness == Brightness.dark
-          ? colors.surfaceContainer
-          : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: MotionInkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: AnimatedContainer(
-          duration: AppMotion.duration(context),
-          curve: AppMotion.curve,
-          constraints: const BoxConstraints(minHeight: 60),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected
-                  ? BuildRoadmapScreen.primaryBlue.withValues(alpha: 0.35)
-                  : colors.outlineVariant,
-              width: selected ? 1.4 : 1,
-            ),
-            borderRadius: BorderRadius.circular(20),
+    final document = record.recordType == 'document';
+    return Semantics(
+      selected: selected,
+      checked: selected,
+      inMutuallyExclusiveGroup: true,
+      child: Material(
+        color: selected
+            ? colors.primary.withValues(alpha: 0.06)
+            : colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: selected ? colors.primary : colors.outlineVariant,
           ),
-          child: Row(
-            children: [
-              Icon(
-                id.icon,
-                size: 25,
-                color: selected
-                    ? BuildRoadmapScreen.primaryBlue
-                    : colors.onSurfaceVariant,
-              ),
-              const SizedBox(width: 17),
-              Expanded(
-                child: Text(
-                  id.title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: colors.onSurface,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  document ? Icons.description_outlined : Icons.badge_outlined,
+                  color: colors.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        record.name,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        document ? 'Document' : 'Government ID',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              AnimatedContainer(
-                duration: AppMotion.duration(context, AppMotion.quick),
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? BuildRoadmapScreen.primaryBlue
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selected
-                        ? BuildRoadmapScreen.primaryBlue
-                        : colors.onSurfaceVariant,
-                    width: selected ? 1 : 1.2,
-                  ),
+                const SizedBox(width: 8),
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: selected ? colors.primary : colors.onSurfaceVariant,
+                  size: 22,
                 ),
-                child: selected
-                    ? const Icon(Icons.check, size: 13, color: Colors.white)
-                    : null,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-}
-
-class _RoadmapId {
-  const _RoadmapId(this.id, this.title, this.icon);
-
-  final int id;
-
-  final String title;
-  final IconData icon;
 }

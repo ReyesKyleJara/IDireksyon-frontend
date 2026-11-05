@@ -1,14 +1,20 @@
 class RoadmapPlan {
   RoadmapPlan.fromJson(Map<String, dynamic> json)
     : targetIds = List<int>.from(json['target_government_id_ids'] as List),
+      targetDocumentIds = List<int>.from(
+        json['target_document_ids'] as List? ?? const [],
+      ),
       steps = (json['steps'] as List)
           .map(
             (row) => RoadmapPlanStep.fromJson(Map<String, dynamic>.from(row)),
           )
           .toList() {
     if (steps.isEmpty ||
-        steps.map((step) => (step.type, step.id)).toSet().length !=
-            steps.length ||
+        steps.map((step) => step.identity).toSet().length != steps.length ||
+        targetDocumentIds.any(
+          (id) =>
+              !steps.any((step) => step.type == 'document' && step.id == id),
+        ) ||
         targetIds.any(
           (id) => !steps.any(
             (step) => step.type == 'government_id' && step.id == id,
@@ -19,6 +25,7 @@ class RoadmapPlan {
   }
 
   final List<int> targetIds;
+  final List<int> targetDocumentIds;
   final List<RoadmapPlanStep> steps;
   bool get blocked => steps.any((step) => step.blocked);
 }
@@ -28,6 +35,12 @@ class RoadmapPlanStep {
     : type = json['type'] as String,
       id = json['id'] as int,
       name = json['name'] as String,
+      resolutionKey = json['resolution_key'] as String?,
+      resolutionKind = json['kind'] as String?,
+      message = json['message'] as String?,
+      suggestions = (json['suggestions'] as List? ?? const [])
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList(),
       guidanceMode = json['guidance_mode'] as String? ?? 'guided',
       blocked = json['blocked'] as bool,
       selected = json['selected'] as bool,
@@ -38,8 +51,27 @@ class RoadmapPlanStep {
       readiness = Map<String, dynamic>.from(
         json['prerequisite_readiness'] as Map,
       ) {
-    if (!['government_id', 'document'].contains(type) ||
+    if (![
+          'government_id',
+          'document',
+          'unresolved_requirement',
+        ].contains(type) ||
         id <= 0 ||
+        (isUnresolved &&
+            (resolutionKey == null ||
+                !['path', 'requirement'].contains(resolutionKind) ||
+                message == null ||
+                suggestions.any(
+                  (option) =>
+                      option['name'] is! String ||
+                      (resolutionKind == 'path'
+                          ? option['set_id'] is! int
+                          : ![
+                                  'government_id',
+                                  'document',
+                                ].contains(option['type']) ||
+                                option['id'] is! int),
+                ))) ||
         prerequisites.any(
           (row) => !['satisfied', 'missing', 'manual'].contains(row['status']),
         ) ||
@@ -52,6 +84,10 @@ class RoadmapPlanStep {
   }
 
   final String type, name, guidanceMode;
+  final String? resolutionKey, resolutionKind, message;
+  final List<Map<String, dynamic>> suggestions;
+  bool get isUnresolved => type == 'unresolved_requirement';
+  String get identity => isUnresolved ? resolutionKey! : '$type:$id';
   bool get isInformational => guidanceMode == 'informational_only';
   final int id;
   final bool blocked, selected;

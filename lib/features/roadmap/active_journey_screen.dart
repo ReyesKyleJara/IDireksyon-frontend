@@ -243,77 +243,82 @@ class _JourneyCard extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 14),
-            if (journey.targetCatalogIds.isNotEmpty)
-              RoadmapPlanPanel(targetIds: journey.targetCatalogIds)
-            else for (var i = 0; i < steps.length; i++) ...[
-              Material(
-                color: i == 0
-                    ? (dark
-                          ? colors.surfaceContainerHigh
-                          : const Color(0xFFEFF5FD))
-                    : (dark ? colors.surfaceContainer : Colors.white),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(
-                    color: i == 0 ? accent : colors.outlineVariant,
+            if (journey.targetCatalogIds.isNotEmpty ||
+                journey.targetDocumentIds.isNotEmpty)
+              RoadmapPlanPanel(
+                targetIds: journey.targetCatalogIds,
+                targetDocumentIds: journey.targetDocumentIds,
+              )
+            else
+              for (var i = 0; i < steps.length; i++) ...[
+                Material(
+                  color: i == 0
+                      ? (dark
+                            ? colors.surfaceContainerHigh
+                            : const Color(0xFFEFF5FD))
+                      : (dark ? colors.surfaceContainer : Colors.white),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(
+                      color: i == 0 ? accent : colors.outlineVariant,
+                    ),
                   ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: MotionInkWell(
-                  onTap: () => Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (_) => steps[i].page)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(steps[i].icon, size: 24, color: accent),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'STEP ${i + 1}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: accent,
+                  clipBehavior: Clip.antiAlias,
+                  child: MotionInkWell(
+                    onTap: () => Navigator.of(context)
+                        .push(MaterialPageRoute(builder: (_) => steps[i].page)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(steps[i].icon, size: 24, color: accent),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'STEP ${i + 1}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: accent,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                steps[i].title,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
+                                const SizedBox(height: 5),
+                                Text(
+                                  steps[i].title,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                steps[i].detail,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.4,
-                                  color: colors.onSurfaceVariant,
+                                const SizedBox(height: 5),
+                                Text(
+                                  steps[i].detail,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.4,
+                                    color: colors.onSurfaceVariant,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 20,
-                          color: accent,
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 20,
+                            color: accent,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (i < steps.length - 1) const SizedBox(height: 12),
-            ],
+                if (i < steps.length - 1) const SizedBox(height: 12),
+              ],
           ],
         ],
       ),

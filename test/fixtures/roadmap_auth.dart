@@ -60,12 +60,20 @@ AuthService journeyAuth({
     final targets = List<int>.from(
       jsonDecode(request.body)['target_government_id_ids'],
     );
+    final documents = List<int>.from(
+      jsonDecode(request.body)['target_document_ids'] ?? [],
+    );
     return http.Response(
       jsonEncode({
-        'data': planData(
-          targets,
-          targets.map((id) => planStep(id, names[id] ?? 'Target $id')).toList(),
-        ),
+        'data': {
+          ...planData(targets, [
+            ...targets.map((id) => planStep(id, names[id] ?? 'Target $id')),
+            ...documents.map(
+              (id) => planStep(id, 'Document $id', type: 'document'),
+            ),
+          ]),
+          'target_document_ids': documents,
+        },
       }),
       200,
     );

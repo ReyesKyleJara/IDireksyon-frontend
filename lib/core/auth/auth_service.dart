@@ -181,16 +181,25 @@ class AuthService extends ChangeNotifier {
     return message;
   }
 
-  Future<RoadmapPlan> roadmapPlan(List<int> targets) async {
+  Future<RoadmapPlan> roadmapPlan(
+    List<int> targets, {
+    List<int> documentTargets = const [],
+    Map<String, dynamic>? resolution,
+  }) async {
     if (token == null) throw const AuthException('Please sign in again.');
     final response = await _post('roadmap-plan', {
       'target_government_id_ids': targets,
+      if (documentTargets.isNotEmpty) 'target_document_ids': documentTargets,
+      'resolution': ?resolution,
     });
     try {
       final plan = RoadmapPlan.fromJson(
         Map<String, dynamic>.from(response['data'] as Map),
       );
-      if (!listEquals(plan.targetIds, targets)) throw const FormatException();
+      if (!listEquals(plan.targetIds, targets) ||
+          !listEquals(plan.targetDocumentIds, documentTargets)) {
+        throw const FormatException();
+      }
       return plan;
     } catch (_) {
       throw const AuthException(
@@ -359,6 +368,7 @@ class AuthService extends ChangeNotifier {
     required String name,
     required String contact,
     required bool usePhone,
+    int? barangayId,
   }) async {
     if (token == null) {
       throw const AuthException('Please sign in again.');
@@ -366,6 +376,7 @@ class AuthService extends ChangeNotifier {
 
     final data = await _post('account', {
       'name': name.trim(),
+      'barangay_id': ?barangayId,
       usePhone ? 'phone' : 'email': contact.trim(),
     });
 

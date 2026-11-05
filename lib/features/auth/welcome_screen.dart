@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/theme/app_theme.dart';
-import 'auth_mascot_peek.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -16,8 +15,7 @@ class WelcomeScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppTheme.pageBackground,
         body: SafeArea(
-          child: AuthMascotPeek(
-            child: LayoutBuilder(
+          child: LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
                   keyboardDismissBehavior:
@@ -143,7 +141,6 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 );
               },
-            ),
           ),
         ),
       ),

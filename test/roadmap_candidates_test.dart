@@ -1,5 +1,7 @@
 import 'fixtures/roadmap_auth.dart';
 
+import 'package:idireksyon_frontend/features/roadmap/roadmap_screen.dart';
+
 import 'package:idireksyon_frontend/core/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,6 +41,124 @@ void main() {
     AuthService.instance.dispose();
     AuthService.instance = previousAuth;
   });
+  testWidgets('landing keeps the compact empty state and existing Directory', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: RoadmapScreen())),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('My ID Journey'), findsOneWidget);
+    expect(find.text('No active roadmap yet'), findsOneWidget);
+    expect(find.text('Build My Roadmap'), findsOneWidget);
+    await tester.ensureVisible(find.text('Open ID Directory'));
+    await tester.tap(find.text('Open ID Directory'));
+    await tester.pumpAndSettle();
+    expect(find.byType(IdsScreen), findsOneWidget);
+  });
+
+  testWidgets('single selection replaces the previous government ID', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BuildRoadmapScreen(
+          loadIds: () async => [
+            catalog(55, 'Passport'),
+            catalog(56, 'National ID'),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'Continue'),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.text('Passport'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('National ID'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
+    await tester.ensureVisible(find.text('Continue'));
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    final confirmation = tester.widget<ConfirmDocumentsScreen>(
+      find.byType(ConfirmDocumentsScreen),
+    );
+    expect(confirmation.targetCatalogIds, [56]);
+    expect(confirmation.targetIds, ['National ID']);
+  });
+
+  testWidgets('search and typed document selection reach the real roadmap', (
+    tester,
+  ) async {
+    final records = [
+      catalog(55, 'Philippine Passport'),
+      GovernmentIdDetails.fromJson({
+        'id': 55,
+        'name': 'PSA Birth Certificate',
+        'record_type': 'document',
+        'guidance_mode': 'guided',
+      }),
+      GovernmentIdDetails.fromJson({
+        'id': 99,
+        'name': 'Hidden document',
+        'record_type': 'document',
+        'guidance_mode': 'informational_only',
+      }),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(home: BuildRoadmapScreen(loadIds: () async => records)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Build My Roadmap'), findsOneWidget);
+    expect(
+      find.text('Only items with a guided acquisition are shown.'),
+      findsNothing,
+    );
+    expect(find.text('Hidden document'), findsNothing);
+    await tester.tap(find.text('Philippine Passport'));
+    await tester.enterText(find.byType(TextField), 'birth');
+    await tester.pumpAndSettle();
+    expect(find.text('Philippine Passport'), findsNothing);
+    expect(find.text('PSA Birth Certificate'), findsOneWidget);
+    await tester.tap(find.text('PSA Birth Certificate'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Continue'));
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    final confirmation = tester.widget<ConfirmDocumentsScreen>(
+      find.byType(ConfirmDocumentsScreen),
+    );
+    expect(confirmation.targetCatalogIds, isEmpty);
+    expect(confirmation.targetDocumentIds, [55]);
+    expect(confirmation.targetIds, ['PSA Birth Certificate']);
+    await tester.ensureVisible(find.text('Save & Continue'));
+    await tester.tap(find.text('Save & Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unable to load your roadmap.'), findsNothing);
+    expect(find.text('Document 55'), findsNWidgets(2));
+  });
+
+  testWidgets(
+    'helper opens the existing Directory even without eligible targets',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(home: BuildRoadmapScreen(loadIds: () async => [])),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Open ID Directory'));
+      await tester.tap(find.text('Open ID Directory'));
+      await tester.pumpAndSettle();
+      expect(find.byType(IdsScreen), findsOneWidget);
+    },
+  );
+
   testWidgets(
     'allowed candidates retain other metadata and real IDs reach the suggested journey',
     (tester) async {
@@ -56,13 +176,15 @@ void main() {
       expect(find.text('Excluded'), findsNothing);
       expect(
         tester
-            .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Next'))
+            .widget<ElevatedButton>(
+              find.widgetWithText(ElevatedButton, 'Continue'),
+            )
             .onPressed,
         isNull,
       );
       await tester.tap(find.text('Allowed'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Next'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       final confirmation = tester.widget<ConfirmDocumentsScreen>(
         find.byType(ConfirmDocumentsScreen),
@@ -78,8 +200,8 @@ void main() {
       expect(suggested.targetCatalogIds, [55]);
       expect(find.text('Birth Certificate'), findsNothing);
       expect(find.text('PhilSys National ID Registration'), findsNothing);
-      await tester.ensureVisible(find.text('Preview Guide'));
-      await tester.tap(find.text('Preview Guide'));
+      await tester.ensureVisible(find.text('View Guide'));
+      await tester.tap(find.text('View Guide'));
       await tester.pumpAndSettle();
       expect(
         tester
@@ -276,7 +398,14 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Next'), findsNothing);
+      expect(
+        tester
+            .widget<ElevatedButton>(
+              find.widgetWithText(ElevatedButton, 'Continue'),
+            )
+            .onPressed,
+        isNull,
+      );
       expect(find.textContaining('No acquisition targets'), findsOneWidget);
       await tester.pumpWidget(
         MaterialApp(
