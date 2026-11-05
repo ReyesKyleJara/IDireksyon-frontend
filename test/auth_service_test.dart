@@ -92,4 +92,50 @@ void main() {
       ),
     );
   });
+  test('successful send retains backend cooldown per normalized email', () async {
+    var requests = 0;
+    final auth = AuthService(client: MockClient((_) async {
+      requests++;
+      return http.Response('{"challenge_id":"challenge","resend_after":42}', 200);
+    }));
+    addTearDown(auth.dispose);
+    await auth.sendSignupEmailCode(' TEST@example.com ');
+    expect(auth.signupResendSeconds('test@example.com'), 42);
+    await expectLater(auth.sendSignupEmailCode('test@example.com'), throwsA(
+      isA<AuthException>().having((e) => e.retryAfterSeconds, 'seconds', 42)
+        .having((e) => e.message, 'message', 'A code was already requested. You can resend in 42s.'),
+    ));
+    expect(requests, 1);
+    await auth.sendSignupEmailCode('other@example.com');
+    expect(requests, 2);
+  });
+
+  test('send reads 429 body timing and falls back to Retry-After', () async {
+    for (final body in ['{"remaining_seconds":42}', 'not JSON']) {
+      final auth = AuthService(client: MockClient((_) async => http.Response(
+        body, 429, headers: {'retry-after': '37'},
+      )));
+      final seconds = body.startsWith('{') ? 42 : 37;
+      await expectLater(auth.sendSignupEmailCode('test@example.com'), throwsA(
+        isA<AuthException>().having((e) => e.retryAfterSeconds, 'seconds', seconds),
+      ));
+      expect(auth.signupResendSeconds('test@example.com'), seconds);
+      auth.dispose();
+    }
+  });
+
+  test('failed delivery does not create a local resend cooldown', () async {
+    var requests = 0;
+    final auth = AuthService(client: MockClient((_) async {
+      requests++;
+      return requests == 1 ? http.Response('{}', 503)
+          : http.Response('{"challenge_id":"challenge","resend_after":60}', 200);
+    }));
+    addTearDown(auth.dispose);
+    await expectLater(auth.sendSignupEmailCode('test@example.com'), throwsA(isA<AuthException>()));
+    expect(auth.signupResendSeconds('test@example.com'), 0);
+    expect(await auth.sendSignupEmailCode('test@example.com'), 'challenge');
+    expect(requests, 2);
+  });
+
 }

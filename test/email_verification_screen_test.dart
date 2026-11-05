@@ -17,6 +17,9 @@ void main() {
       client: MockClient((request) async {
         paths.add(request.url.path);
         final body = jsonDecode(request.body) as Map<String, dynamic>;
+        if (request.url.path.endsWith('email-verification/send')) {
+          return http.Response('{"challenge_id":"challenge","resend_after":60}', 200);
+        }
         if (request.url.path.endsWith('email-verification/verify')) {
           expect(body, {'challenge_id': 'challenge', 'code': '123456'});
           return http.Response('{"email_verification_token":"proof"}', 200);
@@ -31,6 +34,8 @@ void main() {
       AuthService.instance = original;
       auth.dispose();
     });
+    await auth.sendSignupEmailCode('test@example.com');
+    paths.clear();
     await tester.pumpWidget(
       MaterialApp(
         routes: {
@@ -158,4 +163,28 @@ void main() {
       expect(find.text('Profile setup'), findsOneWidget);
     },
   );
+  testWidgets('backend 429 starts the remaining resend countdown', (tester) async {
+    final original = AuthService.instance;
+    var requests = 0;
+    final auth = AuthService(client: MockClient((_) async {
+      requests++;
+      return http.Response(
+        '{"message":"A code was already requested. You can resend in 42s.","remaining_seconds":42}',
+        429, headers: {'retry-after': '42'},
+      );
+    }));
+    AuthService.instance = auth;
+    addTearDown(() { AuthService.instance = original; auth.dispose(); });
+    await tester.pumpWidget(MaterialApp(home: EmailVerificationScreen(
+      email: 'test@example.com', challengeId: 'challenge', onVerified: (_) async {},
+    )));
+    await tester.tap(find.text('Resend code'));
+    await tester.pump();
+    expect(find.text('A code was already requested. You can resend in 42s.'), findsOneWidget);
+    expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'Resend code in 42s')).onPressed, isNull);
+    await tester.tap(find.text('Resend code in 42s'));
+    expect(requests, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
 }

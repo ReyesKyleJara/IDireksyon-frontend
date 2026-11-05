@@ -23,7 +23,7 @@ void main() {
     requests.clear();
     AuthService.instance = AuthService(client: MockClient((request) async {
       requests.add(request);
-      if (request.url.path.endsWith('/email-verification/send')) return http.Response('{"challenge_id":"test-challenge"}',200);
+      if (request.url.path.endsWith('/email-verification/send')) return http.Response('{"challenge_id":"test-challenge","resend_after":42}',200);
       return http.Response('{"user":{"id":1},"token":"test-token"}',201);
     }));
   });
@@ -75,6 +75,15 @@ void main() {
         expect(find.byType(EmailVerificationScreen),findsOneWidget);
         expect(AuthService.instance.token,isNull);
         expect(requests.single.url.path, '/api/auth/email-verification/send');
+        expect(find.text('Resend code in 42s'), findsOneWidget);
+        await tester.pageBack();
+        await settleSignup(tester);
+        await tester.ensureVisible(submit);
+        await tester.tap(submit);
+        await settleSignup(tester);
+        expect(requests.length, 1);
+        expect(find.textContaining('A code was already requested.'), findsOneWidget);
+
       }
       expect(tester.takeException(),isNull);
       await tester.pumpWidget(const SizedBox.shrink());
