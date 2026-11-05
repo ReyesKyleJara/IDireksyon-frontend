@@ -114,7 +114,7 @@ class _JourneyBannerState extends State<JourneyBanner> {
           12 +
           _textHeight(context, _detail, _detailStyle, width) +
           16 +
-          _textHeight(context, 'Overall readiness: 100%', _detailStyle, width) +
+          _textHeight(context, 'Overall progress: 100%', _detailStyle, width) +
           10 +
           8 +
           20 +
@@ -161,18 +161,18 @@ class _JourneyBannerState extends State<JourneyBanner> {
                       const Text(_detail, style: _detailStyle),
                       const SizedBox(height: 16),
                       Text(
-                        'Overall readiness: ${journey.readinessLabel}',
+                        'Overall progress: ${journey.completionLabel}',
                         style: _detailStyle,
                       ),
                       const SizedBox(height: 10),
                       MotionProgress(
-                        value: journey.readiness,
+                        value: journey.completionProgress,
                         minHeight: 8,
                         borderRadius: BorderRadius.circular(8),
                         backgroundColor: Colors.white.withValues(alpha: .2),
                         color: const Color(0xFFFFD576),
-                        semanticsLabel: '${journey.title} overall readiness',
-                        semanticsValue: journey.readinessLabel,
+                        semanticsLabel: '${journey.title} journey progress',
+                        semanticsValue: journey.completionLabel,
                       ),
                       const Spacer(),
                       const SizedBox(height: 20),

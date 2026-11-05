@@ -86,6 +86,9 @@ void main() {
             200,
           );
         }
+        if (request.url.path.endsWith('/journeys') && request.method == 'POST') {
+          return http.Response(jsonEncode({'data': {'id': 1, 'plan': planData([55], steps), 'completed_step_identities': []}}), 201);
+        }
         expectSync(request.url.path, '/api/auth/roadmap-plan');
         expectSync(request.method, 'POST');
         expectSync(jsonDecode(request.body), {

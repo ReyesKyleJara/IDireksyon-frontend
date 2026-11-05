@@ -19,6 +19,8 @@ void main() {
       AuthService.instance =
           AuthService(
               client: MockClient((request) async {
+                if (request.url.path.endsWith('/journeys') && request.method == 'GET') return http.Response('{"data":[]}', 200);
+                if (request.url.path.endsWith('/inventory') && request.method == 'GET') return http.Response('{"data":{"government_ids":[],"documents":[]}}', 200);
                 calls++;
                 expect(request.url.path, '/api/auth/logout');
                 expect(request.headers['Authorization'], 'Bearer test-token');

@@ -445,6 +445,99 @@ class AuthService extends ChangeNotifier {
     });
   }
 
+  Future<List<Map<String, dynamic>>> getJourneys() async {
+    final response = await _journeyRequest('GET', 'journeys');
+    final data = response['data'];
+    if (data is! List) {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+    if (data.any((item) => item is! Map)) {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+    return data.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> saveJourney(
+    List<int> targets,
+    List<int> documents,
+  ) async {
+    final response = await _journeyRequest('POST', 'journeys', {
+      'target_government_id_ids': targets,
+      'target_document_ids': documents,
+    });
+    if (response['data'] is! Map) {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+    return Map<String, dynamic>.from(response['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> completeJourneyStep(
+    int journeyId,
+    String identity,
+  ) async {
+    final response = await _journeyRequest(
+      'PUT',
+      'journeys/$journeyId/completion',
+      {'step_identity': identity},
+    );
+    if (response['data'] is! Map) {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+    return Map<String, dynamic>.from(response['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> _journeyRequest(
+    String method,
+    String path, [
+    Map<String, dynamic>? payload,
+  ]) async {
+    final session = token;
+    if (session == null) throw const AuthException('Please sign in again.');
+    try {
+      final request = http.Request(
+        method,
+        Uri.parse('${baseUrl.replaceAll(RegExp(r'/$'), '')}/auth/$path'),
+      );
+      request.headers.addAll({
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $session',
+      });
+      if (payload != null) request.body = jsonEncode(payload);
+      final response = await _client
+          .send(request)
+          .then(http.Response.fromStream)
+          .timeout(const Duration(seconds: 20));
+      if (token != session) {
+        throw const AuthException(
+          'Your session changed. Please reload before continuing.',
+        );
+      }
+      if (response.statusCode >= 500) {
+        throw const AuthException(
+          'Unable to save or load your journey. Please try again.',
+        );
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) throw const FormatException();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AuthException(
+          decoded['message']?.toString() ??
+              'Unable to update your journey. Please try again.',
+        );
+      }
+      return decoded;
+    } on TimeoutException {
+      throw const AuthException('The connection timed out. Please try again.');
+    } on http.ClientException {
+      throw const AuthException(
+        'Cannot connect to the server. Please try again.',
+      );
+    } on FormatException {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+  }
+
   Future<Map<String, dynamic>> getInventory() async {
     if (token == null) {
       throw const AuthException('Please sign in again.');

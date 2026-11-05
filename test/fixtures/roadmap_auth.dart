@@ -46,36 +46,44 @@ AuthService journeyAuth({
     55: 'Philippine Passport',
     56: 'PhilSys National ID',
   },
-}) => AuthService(
-  baseUrl: 'http://localhost:8000/api',
-  client: MockClient((request) async {
-    if (request.url.path.endsWith('/inventory')) {
-      return http.Response(
-        jsonEncode({
-          'data': {'government_ids': [], 'documents': []},
-        }),
-        200,
-      );
-    }
-    final targets = List<int>.from(
-      jsonDecode(request.body)['target_government_id_ids'],
-    );
-    final documents = List<int>.from(
-      jsonDecode(request.body)['target_document_ids'] ?? [],
-    );
-    return http.Response(
-      jsonEncode({
-        'data': {
-          ...planData(targets, [
-            ...targets.map((id) => planStep(id, names[id] ?? 'Target $id')),
-            ...documents.map(
-              (id) => planStep(id, 'Document $id', type: 'document'),
-            ),
-          ]),
-          'target_document_ids': documents,
-        },
-      }),
-      200,
-    );
-  }),
-)..token = 'resident-test-token';
+}) {
+  final saved = <Map<String, dynamic>>[];
+  return AuthService(
+    baseUrl: 'http://localhost:8000/api',
+    client: MockClient((request) async {
+      if (request.url.path.endsWith('/inventory')) {
+        return http.Response(
+          jsonEncode({
+            'data': {'government_ids': [], 'documents': []},
+          }),
+          200,
+        );
+      }
+      if (request.url.path.endsWith('/journeys') && request.method == 'GET') {
+        return http.Response(jsonEncode({'data': saved}), 200);
+      }
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final targets = List<int>.from(body['target_government_id_ids']);
+      final documents = List<int>.from(body['target_document_ids'] ?? []);
+      final plan = {
+        ...planData(targets, [
+          ...targets.map((id) => planStep(id, names[id] ?? 'Target $id')),
+          ...documents.map(
+            (id) => planStep(id, 'Document $id', type: 'document'),
+          ),
+        ]),
+        'target_document_ids': documents,
+      };
+      if (request.url.path.endsWith('/journeys')) {
+        final data = {
+          'id': saved.length + 1,
+          'plan': plan,
+          'completed_step_identities': <String>[],
+        };
+        saved.add(data);
+        return http.Response(jsonEncode({'data': data}), 201);
+      }
+      return http.Response(jsonEncode({'data': plan}), 200);
+    }),
+  )..token = 'resident-test-token';
+}

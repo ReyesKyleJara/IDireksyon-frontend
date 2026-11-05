@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/app_motion.dart';
+import '../../core/auth/auth_service.dart';
 
 import '../home/home_screen.dart';
 import '../roadmap/roadmap_screen.dart';
@@ -25,42 +26,124 @@ class ResidentAppShell extends StatefulWidget {
   State<ResidentAppShell> createState() => _ResidentAppShellState();
 }
 
-class _ResidentAppShellState extends State<ResidentAppShell> {
+class _ResidentAppShellState extends State<ResidentAppShell>
+    with WidgetsBindingObserver {
   late int _currentIndex = widget.initialIndex;
 
   late final List<IdJourney> _journeys = widget.journeys.isNotEmpty
       ? List.of(widget.journeys)
       : widget.journeyConfirmed
-          ? [IdJourney()]
-          : [];
+      ? [IdJourney()]
+      : [];
 
-  late final List<Widget> _pages = [
+  late final AuthService _auth = AuthService.instance;
+  String? _session;
+  IdJourney? _selectedJourney;
+  bool _loading = false;
+  String? _loadError;
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _session = _auth.token;
+    _auth.addListener(_sessionChanged);
+    WidgetsBinding.instance.addObserver(this);
+    if (_journeys.isEmpty && _session != null) _restore();
+  }
+
+  @override
+  void dispose() {
+    _auth.removeListener(_sessionChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void _sessionChanged() {
+    if (_session == _auth.token) return;
+    _session = _auth.token;
+    _generation++;
+    setState(() {
+      _journeys.clear();
+      _selectedJourney = null;
+      _loadError = null;
+      _loading = false;
+    });
+    if (_session != null) _restore();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _session != null) _restore();
+  }
+
+  Future<void> _restore() async {
+    if (_auth.token == null) return;
+    final generation = ++_generation;
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final saved = (await _auth.getJourneys())
+          .map(IdJourney.fromJson)
+          .toList();
+      if (!mounted || generation != _generation) return;
+      final existing = {
+        for (final item in _journeys)
+          if (item.id != null) item.id!: item,
+      };
+      setState(() {
+        final legacy = _journeys.where((item) => item.id == null).toList();
+        _journeys
+          ..clear()
+          ..addAll(legacy)
+          ..addAll(
+            saved.map((item) {
+              final previous = existing[item.id];
+              if (previous == null) return item;
+              previous.applyCompletion(item);
+              return previous;
+            }),
+          );
+        _loading = false;
+      });
+    } on Object catch (error) {
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _loading = false;
+        _loadError = error is AuthException
+            ? error.message
+            : 'Unable to load saved journeys. Please try again.';
+      });
+      if (_journeys.isNotEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(_loadError!)));
+      }
+    }
+  }
+
+  List<Widget> get _pages => [
     HomeScreen(
       journeys: _journeys,
-      onOpenJourney: (journey) {
-        setState(() {
-          journey.minimized = false;
-
-          _pages[1] = ActiveJourneyScreen(
-            key: ObjectKey(journey),
-            journeys: _journeys,
-            initialJourney: journey,
-          );
-
-          _currentIndex = 1;
-        });
-      },
+      onOpenJourney: (journey) => setState(() {
+        journey.minimized = false;
+        _selectedJourney = journey;
+        _currentIndex = 1;
+      }),
     ),
     _journeys.isNotEmpty
         ? ActiveJourneyScreen(
+            key: ObjectKey(_selectedJourney ?? _session),
             journeys: _journeys,
+            initialJourney: _selectedJourney,
+            onJourneyChanged: () {
+              _generation++; // An older list response must not overwrite a saved completion.
+              setState(() => _loading = false);
+            },
           )
         : RoadmapScreen(
-            onOpenDirectory: () {
-              setState(() {
-                _currentIndex = 2;
-              });
-            },
+            onOpenDirectory: () => setState(() => _currentIndex = 2),
           ),
     const IdsScreen(),
     const ProfileScreen(),
@@ -74,21 +157,38 @@ class _ResidentAppShellState extends State<ResidentAppShell> {
     setState(() {
       _currentIndex = index;
     });
+    if (index == 1 && _session != null) _restore();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          for (var i = 0; i < _pages.length; i++)
-            MotionTab(
-              active: i == _currentIndex,
-              child: _pages[i],
+      body: _currentIndex == 1 && _loading && _journeys.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : _currentIndex == 1 && _loadError != null && _journeys.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_loadError!),
+                    TextButton(
+                      onPressed: _restore,
+                      child: const Text('Try again'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : IndexedStack(
+              key: ValueKey(_session),
+              index: _currentIndex,
+              children: [
+                for (final (i, page) in _pages.indexed)
+                  MotionTab(active: i == _currentIndex, child: page),
+              ],
             ),
-        ],
-      ),
       bottomNavigationBar: _ResidentBottomBar(
         currentIndex: _currentIndex,
         onTap: _changeTab,
@@ -98,10 +198,7 @@ class _ResidentAppShellState extends State<ResidentAppShell> {
 }
 
 class _ResidentBottomBar extends StatelessWidget {
-  const _ResidentBottomBar({
-    required this.currentIndex,
-    required this.onTap,
-  });
+  const _ResidentBottomBar({required this.currentIndex, required this.onTap});
 
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -137,28 +234,22 @@ class _ResidentBottomBar extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = colorScheme.brightness == Brightness.dark;
 
-    final barColor =
-        isDark ? const Color(0xFF111111) : Colors.white;
+    final barColor = isDark ? const Color(0xFF111111) : Colors.white;
 
     final inactiveColor = isDark
         ? Colors.white.withValues(alpha: 0.72)
         : const Color(0xFF454545);
 
-    final activeColor =
-        isDark ? const Color(0xFF8EBBFF) : primaryBlue;
+    final activeColor = isDark ? const Color(0xFF8EBBFF) : primaryBlue;
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: barColor,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(26),
-        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
-              alpha: isDark ? 0.16 : 0.06,
-            ),
+            color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.06),
             blurRadius: 12,
             offset: const Offset(0, -3),
           ),
@@ -173,12 +264,10 @@ class _ResidentBottomBar extends StatelessWidget {
               const indicatorWidth = 32.0;
               const indicatorHeight = 4.0;
 
-              final tabWidth =
-                  constraints.maxWidth / items.length;
+              final tabWidth = constraints.maxWidth / items.length;
 
               final indicatorLeft =
-                  tabWidth * currentIndex +
-                  (tabWidth - indicatorWidth) / 2;
+                  tabWidth * currentIndex + (tabWidth - indicatorWidth) / 2;
 
               return Stack(
                 clipBehavior: Clip.none,
@@ -186,12 +275,9 @@ class _ResidentBottomBar extends StatelessWidget {
                   // Navigation items.
                   Positioned.fill(
                     child: Row(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        for (var index = 0;
-                            index < items.length;
-                            index++)
+                        for (var index = 0; index < items.length; index++)
                           Expanded(
                             child: _BottomBarItem(
                               item: items[index],
@@ -217,15 +303,12 @@ class _ResidentBottomBar extends StatelessWidget {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: accentGold,
-                          borderRadius:
-                              const BorderRadius.vertical(
+                          borderRadius: const BorderRadius.vertical(
                             bottom: Radius.circular(6),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: accentGold.withValues(
-                                alpha: 0.18,
-                              ),
+                              color: accentGold.withValues(alpha: 0.18),
                               blurRadius: 5,
                               offset: const Offset(0, 1),
                             ),
@@ -283,15 +366,12 @@ class _BottomBarItem extends StatelessWidget {
                     switchOutCurve: Curves.easeInCubic,
                     transitionBuilder: (child, animation) {
                       final scaleAnimation =
-                          Tween<double>(
-                        begin: 0.92,
-                        end: 1.0,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOutCubic,
-                        ),
-                      );
+                          Tween<double>(begin: 0.92, end: 1.0).animate(
+                            CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOutCubic,
+                            ),
+                          );
 
                       return FadeTransition(
                         opacity: animation,
@@ -305,9 +385,7 @@ class _BottomBarItem extends StatelessWidget {
                       selected ? item.activeIcon : item.icon,
                       key: ValueKey(selected),
                       size: selected ? 25 : 24,
-                      color: selected
-                          ? activeColor
-                          : inactiveColor,
+                      color: selected ? activeColor : inactiveColor,
                     ),
                   ),
 
@@ -320,12 +398,8 @@ class _BottomBarItem extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10.5,
                       height: 1.1,
-                      fontWeight: selected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: selected
-                          ? activeColor
-                          : inactiveColor,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? activeColor : inactiveColor,
                     ),
                     child: Text(
                       item.label,

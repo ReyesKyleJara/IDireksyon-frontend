@@ -32,12 +32,12 @@ void main() {
       ),
     );
     expect(find.text('Get started'), findsNothing);
-    expect(find.text('Overall readiness: 25%'), findsOneWidget);
+    expect(find.text('Overall progress: 0%'), findsOneWidget);
     expect(find.text('Journey 1 of 2 · Swipe to browse'), findsOneWidget);
     await tester.drag(find.byType(PageView), const Offset(-600, 0));
     await tester.pumpAndSettle();
     expect(find.text('Journey 2 of 2 · Swipe to browse'), findsOneWidget);
-    expect(find.text('Overall readiness: 50%'), findsOneWidget);
+    expect(find.text('Overall progress: 0%'), findsOneWidget);
     expect(
       tester
           .widget<LinearProgressIndicator>(
@@ -49,7 +49,7 @@ void main() {
                 .first,
           )
           .value,
-      .5,
+      0,
     );
     await tester.tap(find.text('Continue journey').hitTestable());
     await tester.pumpAndSettle();
@@ -60,7 +60,10 @@ void main() {
       same(second),
     );
     expect(second.minimized, isFalse);
-    expect(find.text('50%'), findsOneWidget);
+    expect(
+      find.text('0%'),
+      findsNWidgets(2),
+    ); // Readiness is not journey completion.
     await tester.tap(find.text('Home').last);
     await tester.pumpAndSettle();
     expect(find.text('Journey 2 of 2 · Swipe to browse'), findsOneWidget);

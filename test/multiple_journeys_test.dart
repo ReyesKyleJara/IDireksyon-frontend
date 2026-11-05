@@ -23,72 +23,72 @@ void main() {
     AuthService.instance.dispose();
     AuthService.instance = previousAuth;
   });
-  testWidgets('minimize, add a different journey, and reopen the original', (
-    tester,
-  ) async {
-    await http.runWithClient(
-      () async {
-        final original = IdJourney();
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: ResidentAppShell(initialIndex: 1, journeys: [original]),
+  testWidgets(
+    'add a journey opens the new timeline and allows reopening the original',
+    (tester) async {
+      await http.runWithClient(
+        () async {
+          final original = IdJourney();
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: AppTheme.lightTheme,
+              home: ResidentAppShell(initialIndex: 1, journeys: [original]),
+            ),
+          );
+          expect(find.text('Current step'), findsOneWidget);
+          expect(find.text('0%'), findsOneWidget);
+          await tester.tap(find.text('Add another ID journey'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('PhilSys National ID'));
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('Continue'));
+          await tester.tap(find.text('Continue'));
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('Save & Continue'));
+          await tester.tap(find.text('Save & Continue'));
+          await tester.pumpAndSettle();
+          expect(find.text('Passport ID'), findsNothing);
+          await tester.ensureVisible(find.text('Confirm Suggested Journey'));
+          await tester.tap(find.text('Confirm Suggested Journey'));
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 3));
+          await tester.pumpAndSettle();
+          final active = tester.widget<ActiveJourneyScreen>(
+            find.byType(ActiveJourneyScreen),
+          );
+          expect(active.journeys.length, 2);
+          expect(identical(active.journeys.first, original), isTrue);
+          expect(original.minimized, isTrue);
+          expect(active.journeys.last.targetIds, ['PhilSys National ID']);
+          expect(active.journeys.last.targetCatalogIds, [56]);
+          expect(active.journeys.last.ownedItems, isEmpty);
+          await tester.ensureVisible(find.text(original.title).last);
+          await tester.tap(find.text(original.title).last);
+          await tester.pumpAndSettle();
+          expect(original.minimized, isFalse);
+          await tester.tap(find.text('Home').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Roadmap').last);
+          await tester.pumpAndSettle();
+          expect(original.minimized, isFalse);
+          expect(tester.takeException(), isNull);
+        },
+        () => MockClient(
+          (request) async => http.Response(
+            jsonEncode({
+              'data': request.url.path.endsWith('/documents')
+                  ? []
+                  : [
+                      {'id': 56, 'name': 'PhilSys National ID'},
+                      {'id': 55, 'name': 'Philippine Passport'},
+                    ],
+            }),
+            200,
           ),
-        );
-        await tester.tap(find.text('Minimize progress'));
-        await tester.pumpAndSettle();
-        expect(find.text('Your next steps'), findsNothing);
-        expect(find.text('0%'), findsOneWidget);
-        await tester.tap(find.text('Add another ID journey'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('PhilSys National ID'));
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Continue'));
-        await tester.tap(find.text('Continue'));
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Save & Continue'));
-        await tester.tap(find.text('Save & Continue'));
-        await tester.pumpAndSettle();
-        expect(find.text('Passport ID'), findsNothing);
-        await tester.ensureVisible(find.text('Confirm Suggested Journey'));
-        await tester.tap(find.text('Confirm Suggested Journey'));
-        await tester.pump();
-        await tester.pump(const Duration(seconds: 3));
-        await tester.pumpAndSettle();
-        final active = tester.widget<ActiveJourneyScreen>(
-          find.byType(ActiveJourneyScreen),
-        );
-        expect(active.journeys.length, 2);
-        expect(identical(active.journeys.first, original), isTrue);
-        expect(original.minimized, isTrue);
-        expect(active.journeys.last.targetIds, ['PhilSys National ID']);
-        expect(active.journeys.last.targetCatalogIds, [56]);
-        expect(active.journeys.last.ownedItems, isEmpty);
-        await tester.tap(find.text('Expand progress'));
-        await tester.pumpAndSettle();
-        expect(original.minimized, isFalse);
-        await tester.tap(find.text('Home').last);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Roadmap').last);
-        await tester.pumpAndSettle();
-        expect(original.minimized, isFalse);
-        expect(tester.takeException(), isNull);
-      },
-      () => MockClient(
-        (request) async => http.Response(
-          jsonEncode({
-            'data': request.url.path.endsWith('/documents')
-                ? []
-                : [
-                    {'id': 56, 'name': 'PhilSys National ID'},
-                    {'id': 55, 'name': 'Philippine Passport'},
-                  ],
-          }),
-          200,
         ),
-      ),
-    );
-  });
+      );
+    },
+  );
 
   testWidgets('canceling another journey preserves the original card', (
     tester,
@@ -104,7 +104,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.arrow_back_rounded));
     await tester.pumpAndSettle();
-    expect(find.text('Expand progress'), findsOneWidget);
+    expect(find.text('Current step'), findsOneWidget);
     expect(
       tester
           .widget<ActiveJourneyScreen>(find.byType(ActiveJourneyScreen))
@@ -113,7 +113,7 @@ void main() {
     );
   });
 
-  testWidgets('minimized cards fit narrow screens with large text', (
+  testWidgets('active timeline fits narrow screens with large text', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 740);
@@ -138,14 +138,7 @@ void main() {
         ),
       ),
     );
-    await tester.scrollUntilVisible(
-      find.text('Expand progress').hitTestable(),
-      200,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Expand progress'));
-    await tester.pumpAndSettle();
-    expect(find.text('Minimize progress'), findsOneWidget);
+    expect(find.text('Current step'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

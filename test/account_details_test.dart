@@ -18,6 +18,12 @@ void main() {
     var accountRequests = 0;
     var directoryRequests = 0;
     AuthService.instance = AuthService(client: MockClient((request) async {
+      if (request.url.path.endsWith('/journeys') && request.method == 'GET') {
+        return http.Response('{"data":[]}', 200);
+      }
+      if (request.url.path.endsWith('/inventory') && request.method == 'GET') {
+        return http.Response('{"data":{"government_ids":[],"documents":[]}}', 200);
+      }
       if (request.url.path.endsWith('/barangays')) {
         return http.Response('{"data":[]}', 200);
       }
@@ -62,6 +68,7 @@ void main() {
       expect(directoryRequests, 1);
       expect(tester.takeException(), isNull);
     }, () => MockClient((request) async {
+      if (request.url.path.endsWith('/documents')) return http.Response('{"data":[]}', 200);
       directoryRequests++;
       expect(request.url.path, '/api/government-ids');
       return http.Response('{"data":[]}', 200);
@@ -89,12 +96,15 @@ void main() {
           expect(find.text('Could not load the ID directory.'), findsOneWidget);
           expect(find.text('Retry'), findsOneWidget);
         } else {
+          await tester.enterText(find.descendant(of: directory, matching: find.byType(TextField)), 'Directory test credential');
+          await tester.pumpAndSettle();
           expect(find.text('Directory test credential'), findsWidgets);
           expect(find.text('Could not load the ID directory.'), findsNothing);
         }
         expect(requests, 1);
         expect(tester.takeException(), isNull);
       }, () => MockClient((request) async {
+        if (request.url.path.endsWith('/documents')) return http.Response('{"data":[]}', 200);
         requests++;
         expect(request.method, 'GET');
         expect(request.url.path, '/api/government-ids');
