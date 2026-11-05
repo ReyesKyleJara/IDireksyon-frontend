@@ -40,7 +40,7 @@ void main() {
     expect(find.byType(AuthMascotPeek), findsNothing);
     expect(mascot, findsNothing);
     expect(bubble, findsNothing);
-    for (final label in ['Log In', 'Sign Up', 'Welcome!']) {
+    for (final label in ['Log In', 'Sign Up', 'Welcome to IDireksyon!']) {
       expect(find.text(label).hitTestable(), findsOneWidget);
     }
     expect(tester.takeException(), isNull);

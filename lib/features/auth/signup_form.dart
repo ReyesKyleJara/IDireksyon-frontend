@@ -1,14 +1,13 @@
 import '../../core/widgets/app_motion.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'auth_shell.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/password_policy.dart';
 import '../profile/privacy_policy_screen.dart';
 import '../profile/terms_of_service_screen.dart';
 import 'email_verification_screen.dart';
-import '../../core/theme/app_theme.dart';
 
 class SignupForm extends StatefulWidget {
   const SignupForm({
@@ -273,13 +272,13 @@ class _SignupFormState
                 const TextStyle(
               fontSize: 13,
               fontWeight:
-                  FontWeight.w500,
+                  FontWeight.w600,
               color:
                   Color(0xFF20242B),
             ),
           ),
 
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
 
           TextFormField(
             controller: controller,
@@ -307,108 +306,27 @@ class _SignupFormState
               color:
                   Color(0xFF20242B),
             ),
-            decoration:
-                InputDecoration(
-              hintText: hint,
-              hintStyle:
-                  const TextStyle(
-                fontSize: 14,
-                color:
-                    Color(0xFF98A2B3),
-              ),
-              helperText: helper,
-              helperMaxLines: 3,
-              helperStyle:
-                  const TextStyle(
-                fontSize: 11,
-                color:
-                    Color(0xFF8E96A3),
-              ),
-
-              // Allow validation messages to wrap.
-              errorMaxLines: 2,
-
+            decoration: AuthShell.inputDecoration(
+              hint,
               suffixIcon: secret
                   ? IconButton(
-                      tooltip:
-                          showSecret
-                              ? 'Hide password'
-                              : 'Show password',
-                      onPressed:
-                          onToggleSecret,
+                      tooltip: showSecret ? 'Hide password' : 'Show password',
+                      onPressed: onToggleSecret,
                       icon: Icon(
                         showSecret
-                            ? Icons
-                                .visibility_off_outlined
-                            : Icons
-                                .visibility_outlined,
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                         size: 20,
-                        color:
-                            const Color(
-                          0xFF697386,
-                        ),
+                        color: const Color(0xFF697386),
                       ),
                     )
                   : null,
-              filled: true,
-              fillColor: Colors.white,
-              isDense: true,
-              contentPadding:
-                  const EdgeInsets
-                      .symmetric(
-                horizontal: 15,
-                vertical: 14,
-              ),
-              border:
-                  OutlineInputBorder(
-                borderRadius:
-                    BorderRadius
-                        .circular(12),
-              ),
-              enabledBorder:
-                  OutlineInputBorder(
-                borderRadius:
-                    BorderRadius
-                        .circular(12),
-                borderSide:
-                    const BorderSide(
-                  color:
-                      Color(0xFFDDE1E6),
-                ),
-              ),
-              focusedBorder:
-                  OutlineInputBorder(
-                borderRadius:
-                    BorderRadius
-                        .circular(12),
-                borderSide:
-                    const BorderSide(
-                  color: _blue,
-                  width: 1.5,
-                ),
-              ),
-              errorBorder:
-                  OutlineInputBorder(
-                borderRadius:
-                    BorderRadius
-                        .circular(12),
-                borderSide:
-                    const BorderSide(
-                  color:
-                      Color(0xFFB3261E),
-                ),
-              ),
-              focusedErrorBorder:
-                  OutlineInputBorder(
-                borderRadius:
-                    BorderRadius
-                        .circular(12),
-                borderSide:
-                    const BorderSide(
-                  color:
-                      Color(0xFFB3261E),
-                  width: 1.5,
-                ),
+            ).copyWith(
+              helperText: helper,
+              helperMaxLines: 3,
+              helperStyle: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFF8E96A3),
               ),
             ),
           ),
@@ -429,41 +347,32 @@ class _SignupFormState
         selected: selected,
         button: true,
         child: InkWell(
-          onTap: () =>
-              _switchMethod(phone),
-          borderRadius:
-              BorderRadius.circular(
-            10,
-          ),
-          child:
-              AnimatedContainer(
-            duration:
-                const Duration(
-              milliseconds: 150,
-            ),
-            height: 38,
-            alignment:
-                Alignment.center,
-            decoration:
-                BoxDecoration(
-              color: selected
-                  ? _blue
-                  : Colors.transparent,
-              borderRadius:
-                  BorderRadius
-                      .circular(10),
+          onTap: () => _switchMethod(phone),
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: selected
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x1F0B4295),
+                        blurRadius: 10,
+                        offset: Offset(0, 3),
+                      ),
+                    ]
+                  : null,
             ),
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    FontWeight.w600,
-                color: selected
-                    ? Colors.white
-                    : const Color(
-                        0xFF667085,
-                      ),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? _blue : const Color(0xFF667085),
               ),
             ),
           ),
@@ -476,186 +385,20 @@ class _SignupFormState
   Widget build(
     BuildContext context,
   ) {
-    return Theme(
-      data: AppTheme.lightTheme,
-      child: Scaffold(
-        backgroundColor:
-            AppTheme.pageBackground,
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder:
-                (
-              context,
-              constraints,
-            ) {
-              return SingleChildScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior
-                        .onDrag,
-                padding:
-                    const EdgeInsets
-                        .fromLTRB(
-                  20,
-                  18,
-                  20,
-                  24,
-                ),
-                child:
-                    ConstrainedBox(
-                  constraints:
-                      BoxConstraints(
-                    minHeight:
-                        (constraints
-                                    .maxHeight -
-                                42)
-                            .clamp(
-                      0.0,
-                      double.infinity,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment:
-                        MainAxisAlignment
-                            .spaceBetween,
-                    children: [
-                      Center(
-                        child:
-                            ConstrainedBox(
-                          constraints:
-                              const BoxConstraints(
-                            maxWidth:
-                                420,
-                          ),
-                          child:
-                              AutofillGroup(
-                            child: Form(
-                              key:
-                                  _formKey,
-                              child:
-                                  Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment
-                                        .stretch,
-                                children: [
-                                  SizedBox(
-                                    // Keep a clear stage for the mascot and tip.
-                                    // Release it while typing or using large text.
-                                    height: MediaQuery.viewInsetsOf(context).bottom == 0 &&
-                                        !MediaQuery.disableAnimationsOf(context) &&
-                                        MediaQuery.textScalerOf(context).scale(16) <= 22.4
-                                        ? 176 : 32,
-                                  ),
-
-                                  Center(
-                                    child:
-                                        SvgPicture
-                                            .asset(
-                                      'assets/onboarding pictures/Group 105.svg',
-                                      width:
-                                          76,
-                                      height:
-                                          52,
-                                      excludeFromSemantics:
-                                          true,
-                                    ),
-                                  ),
-
-                                  const SizedBox(
-                                    height: 8,
-                                  ),
-
-                                  const Text(
-                                    'IDireksyon',
-                                    textAlign:
-                                        TextAlign
-                                            .center,
-                                    style:
-                                        TextStyle(
-                                      fontFamily:
-                                          'Bricolage Grotesque',
-                                      fontSize:
-                                          31,
-                                      height:
-                                          1.2,
-                                      fontWeight:
-                                          FontWeight
-                                              .w800,
-                                      color:
-                                          Color(
-                                        0xFF0A426E,
-                                      ),
-                                    ),
-                                  ),
-
-                                  const SizedBox(
-                                    height:
-                                        22,
-                                  ),
-
-                                  const Text(
-                                    'Create Account',
-                                    textAlign:
-                                        TextAlign
-                                            .center,
-                                    style:
-                                        TextStyle(
-                                      fontFamily:
-                                          'Bricolage Grotesque',
-                                      fontSize:
-                                          24,
-                                      height:
-                                          1.25,
-                                      fontWeight:
-                                          FontWeight
-                                              .w700,
-                                      color:
-                                          Colors
-                                              .black,
-                                    ),
-                                  ),
-
-                                  const SizedBox(
-                                    height: 5,
-                                  ),
-
-                                  const Text(
-                                    'Create your account to get started.',
-                                    textAlign:
-                                        TextAlign
-                                            .center,
-                                    style:
-                                        TextStyle(
-                                      fontSize:
-                                          13,
-                                      color:
-                                          Color(
-                                        0xFF667085,
-                                      ),
-                                    ),
-                                  ),
-
-                                  const SizedBox(
-                                    height:
-                                        22,
-                                  ),
-
+    return AuthShell(
+      title: 'Create Account',
+      subtitle: 'Create your account to get started.',
+      child: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
                                   Container(
-                                    padding:
-                                        const EdgeInsets
-                                            .all(
-                                      3,
-                                    ),
-                                    decoration:
-                                        BoxDecoration(
-                                      color:
-                                          const Color(
-                                        0xFFEDEFF3,
-                                      ),
-                                      borderRadius:
-                                          BorderRadius
-                                              .circular(
-                                        12,
-                                      ),
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF4FA),
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
                                     child:
                                         Row(
@@ -997,34 +740,7 @@ class _SignupFormState
                                         _submitting
                                             ? null
                                             : _submit,
-                                    style:
-                                        FilledButton
-                                            .styleFrom(
-                                      backgroundColor:
-                                          _blue,
-                                      foregroundColor:
-                                          Colors
-                                              .white,
-                                      disabledBackgroundColor:
-                                          _blue
-                                              .withValues(
-                                        alpha:
-                                            0.55,
-                                      ),
-                                      minimumSize:
-                                          const Size
-                                              .fromHeight(
-                                        50,
-                                      ),
-                                      shape:
-                                          RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius
-                                                .circular(
-                                          12,
-                                        ),
-                                      ),
-                                    ),
+                                    style: AuthShell.primaryButton,
                                     child:
                                         _submitting
                                             ? const SizedBox(
@@ -1040,16 +756,7 @@ class _SignupFormState
                                                       Colors.white,
                                                 ),
                                               )
-                                            : const Text(
-                                                'Create Account',
-                                                style:
-                                                    TextStyle(
-                                                  fontSize:
-                                                      14,
-                                                  fontWeight:
-                                                      FontWeight.w700,
-                                                ),
-                                              ),
+                                            : const Text('Create Account'),
                                   ),
 
                                   const SizedBox(
@@ -1086,20 +793,7 @@ class _SignupFormState
                                             '/login',
                                           );
                                         },
-                                        style:
-                                            TextButton
-                                                .styleFrom(
-                                          foregroundColor:
-                                              const Color(
-                                            0xFFFFAB00,
-                                          ),
-                                          padding:
-                                              const EdgeInsets
-                                                  .symmetric(
-                                            horizontal:
-                                                4,
-                                          ),
-                                        ),
+                                        style: AuthShell.linkButton,
                                         child:
                                             const Text(
                                           'Log In',
@@ -1107,18 +801,7 @@ class _SignupFormState
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    ],
-                  ),
-                ),
-              );
-            },
+            ],
           ),
         ),
       ),

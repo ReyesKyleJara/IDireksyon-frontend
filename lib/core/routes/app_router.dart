@@ -28,7 +28,7 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const PhoneSignupScreen());
       case '/onboarding/requirements':
         return MaterialPageRoute(
-          builder: (_) => const OnboardingScreen.requirements(),
+          builder: (_) => const OnboardingScreen(initialPage: 1),
         );
       case '/home':
         return MaterialPageRoute(builder: (_) => const ResidentAppShell());
