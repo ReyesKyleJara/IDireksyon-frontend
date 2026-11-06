@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'active_journey_screen.dart';
+import '../../core/auth/auth_service.dart';
 import 'id_journey.dart';
 import 'roadmap_plan_panel.dart';
 import '../../models/roadmap_plan.dart';
@@ -29,6 +30,7 @@ class SuggestedRoadmapScreen extends StatefulWidget {
 
 class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
   RoadmapPlan? _plan;
+  bool _saving = false;
   List<String> get targetIds => widget.targetIds;
   List<int> get targetCatalogIds => widget.targetCatalogIds;
   List<String> get ownedItems => widget.ownedItems;
@@ -40,6 +42,47 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
       targetIds.length == 1 && _goalTitle.toLowerCase().contains('passport');
 
   static const primaryBlue = Color(0xFF12499A);
+
+  Future<void> _confirm() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final journey = IdJourney.fromJson(
+        await AuthService.instance.saveJourney(
+          targetCatalogIds,
+          widget.targetDocumentIds,
+        ),
+      );
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => JourneyLoadingScreen(
+            journey: journey,
+            existingJourneys: existingJourneys
+                .where((item) => item.id != journey.id)
+                .toList(),
+          ),
+        ),
+      );
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on FormatException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'The server returned unexpected journey data. Please try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,23 +158,12 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
                   constraints: const BoxConstraints(minHeight: 48),
                   child: ElevatedButton(
                     onPressed:
-                        (targetCatalogIds.isNotEmpty ||
-                                widget.targetDocumentIds.isNotEmpty) &&
-                            (_plan == null || _plan!.blocked)
+                        _saving ||
+                            ((targetCatalogIds.isNotEmpty ||
+                                    widget.targetDocumentIds.isNotEmpty) &&
+                                (_plan == null || _plan!.blocked))
                         ? null
-                        : () => Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) => JourneyLoadingScreen(
-                                journey: IdJourney(
-                                  targetIds: targetIds,
-                                  targetCatalogIds: targetCatalogIds,
-                                  targetDocumentIds: widget.targetDocumentIds,
-                                  ownedItems: ownedItems,
-                                ),
-                                existingJourneys: existingJourneys,
-                              ),
-                            ),
-                          ),
+                        : _confirm,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryBlue,
                       foregroundColor: Colors.white,

@@ -6,6 +6,7 @@ import '../../models/roadmap_plan.dart';
 import '../ids/id_details_screen.dart';
 import '../profile/manage_inventory_screen.dart';
 import 'suggested_journey_view.dart';
+import 'active_journey_view.dart';
 
 /// Fresh Inventory-backed plan, shared by suggested and active journeys.
 class RoadmapPlanPanel extends StatefulWidget {
@@ -15,10 +16,14 @@ class RoadmapPlanPanel extends StatefulWidget {
     this.targetDocumentIds = const [],
     this.onPlan,
     this.guidedPresentation = false,
+    this.activeJourneyTitle,
+    this.completedStepIdentities = const {},
   });
   final List<int> targetIds;
   final List<int> targetDocumentIds;
   final bool guidedPresentation;
+  final String? activeJourneyTitle;
+  final Set<String> completedStepIdentities;
   final ValueChanged<RoadmapPlan?>? onPlan;
   @override
   State<RoadmapPlanPanel> createState() => _RoadmapPlanPanelState();
@@ -88,7 +93,7 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
         _loading = false;
         _error = error is AuthException
             ? error.message
-            : widget.guidedPresentation
+            : (widget.guidedPresentation || widget.activeJourneyTitle != null)
             ? 'Unable to load your roadmap.'
             : 'Unable to load the prerequisite plan.';
       });
@@ -192,7 +197,7 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
     children: [
       if (_loading)
         Text(
-          widget.guidedPresentation
+          (widget.guidedPresentation || widget.activeJourneyTitle != null)
               ? 'Preparing your next steps…'
               : 'Checking saved Inventory and prerequisites…',
         ),
@@ -201,26 +206,34 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
         TextButton(
           onPressed: _reload,
           child: Text(
-            widget.guidedPresentation
+            (widget.guidedPresentation || widget.activeJourneyTitle != null)
                 ? 'Try again'
                 : 'Retry prerequisite check',
           ),
         ),
       ],
       if (_plan != null)
-        if (widget.guidedPresentation)
+        if (widget.activeJourneyTitle != null)
+          ActiveJourneyView(
+            title: widget.activeJourneyTitle!,
+            steps: _plan!.steps,
+            completedStepIdentities: widget.completedStepIdentities,
+            onResolve: _showOptions,
+          )
+        else if (widget.guidedPresentation)
           SuggestedJourneyView(plan: _plan!, onResolve: _showOptions)
         else
           RoadmapPlanView(plan: _plan!, onResolve: _showOptions),
-      TextButton(
-        onPressed: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ManageInventoryScreen()),
-          );
-          if (mounted) await _reload();
-        },
-        child: const Text('Manage Inventory'),
-      ),
+      if (widget.activeJourneyTitle == null)
+        TextButton(
+          onPressed: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ManageInventoryScreen()),
+            );
+            if (mounted) await _reload();
+          },
+          child: const Text('Manage Inventory'),
+        ),
     ],
   );
 }

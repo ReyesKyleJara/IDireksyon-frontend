@@ -9,9 +9,10 @@ import '../../models/roadmap_plan.dart';
 import '../../services/application_preparation.dart';
 
 class AuthException implements Exception {
-  const AuthException(this.message, {this.fieldErrors = const {}});
+  const AuthException(this.message, {this.fieldErrors = const {}, this.retryAfterSeconds});
 
   final String message;
+  final int? retryAfterSeconds;
   final Map<String, String> fieldErrors;
 
   String? field(String name) => fieldErrors[name];
@@ -223,15 +224,42 @@ class AuthService extends ChangeNotifier {
     'terms_accepted': accepted,
   });
 
+  final Map<String, DateTime> _signupResendAt = {};
+
+  int signupResendSeconds(String email) {
+    final deadline = _signupResendAt[email.trim().toLowerCase()];
+    if (deadline == null) return 0;
+    final seconds = (deadline.difference(DateTime.now()).inMilliseconds / 1000).ceil();
+    return seconds > 0 ? seconds : 0;
+  }
+
+  String _signupCooldownMessage(int seconds) =>
+      'A code was already requested. You can resend in ${seconds}s.';
+
   Future<String> sendSignupEmailCode(String email) async {
-    final data = await _post('email-verification/send', {
-      'email': email.trim(),
-    });
-    final id = data['challenge_id'];
-    if (id is! String) {
-      throw const AuthException('The server returned an unexpected response.');
+    final key = email.trim().toLowerCase();
+    final remaining = signupResendSeconds(key);
+    if (remaining > 0) {
+      throw AuthException(_signupCooldownMessage(remaining), retryAfterSeconds: remaining);
     }
-    return id;
+    try {
+      final data = await _post('email-verification/send', {
+        'email': key,
+      });
+      final id = data['challenge_id'];
+      if (id is! String) {
+        throw const AuthException('The server returned an unexpected response.');
+      }
+      final seconds = (data['resend_after'] as num?)?.toInt() ?? 60;
+      _signupResendAt[key] = DateTime.now().add(Duration(seconds: seconds));
+      return id;
+    } on AuthException catch (error) {
+      final seconds = error.retryAfterSeconds;
+      if (seconds != null) {
+        _signupResendAt[key] = DateTime.now().add(Duration(seconds: seconds));
+      }
+      rethrow;
+    }
   }
 
   Future<String> verifySignupEmailCode(String challengeId, String code) async {
@@ -313,8 +341,20 @@ class AuthService extends ChangeNotifier {
       }
 
       if (response.statusCode == 429) {
-        throw const AuthException(
-          'Too many attempts. Please wait a minute and try again.',
+        Map<String, dynamic>? cooldown;
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) cooldown = decoded;
+        } on FormatException {
+          // A proxy may return a non-JSON response; still honor Retry-After.
+        }
+        final seconds = int.tryParse('${cooldown?['remaining_seconds']}') ??
+            int.tryParse(response.headers['retry-after'] ?? '');
+        throw AuthException(
+          path == 'email-verification/send' && seconds != null
+              ? (cooldown?['message']?.toString() ?? _signupCooldownMessage(seconds))
+              : 'Too many attempts. Please wait a minute and try again.',
+          retryAfterSeconds: seconds,
         );
       }
 
@@ -403,6 +443,99 @@ class AuthService extends ChangeNotifier {
       'password': password,
       'password_confirmation': confirmation,
     });
+  }
+
+  Future<List<Map<String, dynamic>>> getJourneys() async {
+    final response = await _journeyRequest('GET', 'journeys');
+    final data = response['data'];
+    if (data is! List) {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+    if (data.any((item) => item is! Map)) {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+    return data.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> saveJourney(
+    List<int> targets,
+    List<int> documents,
+  ) async {
+    final response = await _journeyRequest('POST', 'journeys', {
+      'target_government_id_ids': targets,
+      'target_document_ids': documents,
+    });
+    if (response['data'] is! Map) {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+    return Map<String, dynamic>.from(response['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> completeJourneyStep(
+    int journeyId,
+    String identity,
+  ) async {
+    final response = await _journeyRequest(
+      'PUT',
+      'journeys/$journeyId/completion',
+      {'step_identity': identity},
+    );
+    if (response['data'] is! Map) {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+    return Map<String, dynamic>.from(response['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> _journeyRequest(
+    String method,
+    String path, [
+    Map<String, dynamic>? payload,
+  ]) async {
+    final session = token;
+    if (session == null) throw const AuthException('Please sign in again.');
+    try {
+      final request = http.Request(
+        method,
+        Uri.parse('${baseUrl.replaceAll(RegExp(r'/$'), '')}/auth/$path'),
+      );
+      request.headers.addAll({
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $session',
+      });
+      if (payload != null) request.body = jsonEncode(payload);
+      final response = await _client
+          .send(request)
+          .then(http.Response.fromStream)
+          .timeout(const Duration(seconds: 20));
+      if (token != session) {
+        throw const AuthException(
+          'Your session changed. Please reload before continuing.',
+        );
+      }
+      if (response.statusCode >= 500) {
+        throw const AuthException(
+          'Unable to save or load your journey. Please try again.',
+        );
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) throw const FormatException();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AuthException(
+          decoded['message']?.toString() ??
+              'Unable to update your journey. Please try again.',
+        );
+      }
+      return decoded;
+    } on TimeoutException {
+      throw const AuthException('The connection timed out. Please try again.');
+    } on http.ClientException {
+      throw const AuthException(
+        'Cannot connect to the server. Please try again.',
+      );
+    } on FormatException {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
   }
 
   Future<Map<String, dynamic>> getInventory() async {

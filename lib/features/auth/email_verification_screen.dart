@@ -28,20 +28,16 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   String? _proof;
   String? _error;
   bool _busy = false;
-  int _resendSeconds = 60;
+  int _resendSeconds = 0;
   late final Timer _timer;
-  late DateTime _resendAt;
 
   @override
   void initState() {
     super.initState();
     _challengeId = widget.challengeId;
-    _resendAt = DateTime.now().add(const Duration(seconds: 60));
+    _resendSeconds = AuthService.instance.signupResendSeconds(widget.email);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final remaining =
-          (_resendAt.difference(DateTime.now()).inMilliseconds / 1000)
-              .ceil()
-              .clamp(0, 60);
+      final remaining = AuthService.instance.signupResendSeconds(widget.email);
       if (mounted && remaining != _resendSeconds) {
         setState(() => _resendSeconds = remaining);
       }
@@ -101,11 +97,15 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         _challengeId = id;
         _proof = null;
         _code.clear();
-        _resendSeconds = 60;
-        _resendAt = DateTime.now().add(const Duration(seconds: 60));
+        _resendSeconds = AuthService.instance.signupResendSeconds(widget.email);
       });
     } on AuthException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (mounted) {
+        setState(() {
+          _error = error.message;
+          _resendSeconds = AuthService.instance.signupResendSeconds(widget.email);
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

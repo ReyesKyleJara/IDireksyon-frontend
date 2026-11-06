@@ -59,13 +59,17 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Roadmap').last);
         await tester.pumpAndSettle();
-        expect(find.text('Your next steps'), findsOneWidget);
+        expect(find.text('Current step'), findsOneWidget);
+        expect(find.text('Overall Progress'), findsOneWidget);
+        expect(find.text('0 of 1 completed'), findsOneWidget);
+        expect(find.text('Minimize progress'), findsNothing);
+        expect(find.text('Manage Inventory'), findsNothing);
         expect(find.text('Birth Certificate'), findsNothing);
-        await tester.ensureVisible(find.text('Preview Guide').last);
+        await tester.ensureVisible(find.text('Philippine Passport').last);
         await tester.pumpAndSettle();
         await tester.drag(find.byType(ListView).first, const Offset(0, -200));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Preview Guide').last);
+        await tester.tap(find.text('Philippine Passport').last);
         await tester.pumpAndSettle();
         expect(find.byType(IdDetailsScreen), findsOneWidget);
         expect(

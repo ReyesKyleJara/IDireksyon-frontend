@@ -18,6 +18,12 @@ void main() {
     var accountRequests = 0;
     var directoryRequests = 0;
     AuthService.instance = AuthService(client: MockClient((request) async {
+      if (request.url.path.endsWith('/journeys') && request.method == 'GET') {
+        return http.Response('{"data":[]}', 200);
+      }
+      if (request.url.path.endsWith('/inventory') && request.method == 'GET') {
+        return http.Response('{"data":{"government_ids":[],"documents":[]}}', 200);
+      }
       if (request.url.path.endsWith('/barangays')) {
         return http.Response('{"data":[]}', 200);
       }
@@ -71,6 +77,7 @@ void main() {
       expect(directoryRequests, startupDirectoryRequests);
       expect(tester.takeException(), isNull);
     }, () => MockClient((request) async {
+      if (request.url.path.endsWith('/documents')) return http.Response('{"data":[]}', 200);
       directoryRequests++;
       expect(request.url.path, anyOf('/api/government-ids', '/api/documents'));
       return http.Response('{"data":[]}', 200);
@@ -106,10 +113,11 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.text('Directory test credential'), findsWidgets);
         }
-        // One catalog load: government IDs plus documents.
-        expect(requests, 2);
+        // One catalog load; the mock answers documents without counting them.
+        expect(requests, 1);
         expect(tester.takeException(), isNull);
       }, () => MockClient((request) async {
+        if (request.url.path.endsWith('/documents')) return http.Response('{"data":[]}', 200);
         requests++;
         expect(request.method, 'GET');
         expect(request.url.path, anyOf('/api/government-ids', '/api/documents'));

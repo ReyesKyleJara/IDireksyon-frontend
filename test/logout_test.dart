@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -21,15 +19,8 @@ void main() {
       AuthService.instance =
           AuthService(
               client: MockClient((request) async {
-                // The directory loads saved Inventory for readiness.
-                if (request.url.path == '/api/auth/inventory') {
-                  return http.Response(
-                  jsonEncode({
-                    'data': {'government_ids': [], 'documents': []},
-                  }),
-                  200,
-                );
-                }
+                if (request.url.path.endsWith('/journeys') && request.method == 'GET') return http.Response('{"data":[]}', 200);
+                if (request.url.path.endsWith('/inventory') && request.method == 'GET') return http.Response('{"data":{"government_ids":[],"documents":[]}}', 200);
                 calls++;
                 expect(request.url.path, '/api/auth/logout');
                 expect(request.headers['Authorization'], 'Bearer test-token');
