@@ -26,9 +26,27 @@ RoadmapPlan samplePlan() => RoadmapPlan.fromJson(
         satisfied: 1,
         total: 1,
       ),
-      planStep(2, 'Supporting ID', selected: false),
-      planStep(3, 'Another document', type: 'document', selected: false),
-      planStep(4, 'Target ID'),
+      planStep(
+        2,
+        'Supporting ID',
+        selected: false,
+        prerequisites: [missingPrerequisite(1, type: 'document')],
+      ),
+      planStep(
+        3,
+        'Another document',
+        type: 'document',
+        selected: false,
+        prerequisites: [missingPrerequisite(2)],
+      ),
+      planStep(
+        4,
+        'Target ID',
+        prerequisites: [
+          missingPrerequisite(3, type: 'document'),
+          missingPrerequisite(1, type: 'document'),
+        ],
+      ),
     ],
   ),
 );

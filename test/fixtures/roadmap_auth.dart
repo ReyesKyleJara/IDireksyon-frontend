@@ -32,6 +32,12 @@ Map<String, dynamic> planStep(
   },
 };
 
+/// A prerequisite still to be obtained, which makes its step wait for this one.
+Map<String, dynamic> missingPrerequisite(
+  int id, {
+  String type = 'government_id',
+}) => {'type': type, 'id': id, 'name': '$type $id', 'status': 'missing'};
+
 Map<String, dynamic> planData(
   List<int> targets,
   List<Map<String, dynamic>> steps,

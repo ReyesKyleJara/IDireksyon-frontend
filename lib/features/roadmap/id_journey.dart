@@ -73,20 +73,13 @@ class IdJourney {
   }
 
   int get totalSteps =>
-      confirmedPlan?.steps
-          .where(
-            (step) =>
-                !step.isUnresolved && !step.isInformational && !step.blocked,
-          )
-          .length ??
+      confirmedPlan?.steps.where((step) => step.isActionable).length ??
       targetIds.length;
   int get completedSteps =>
       confirmedPlan?.steps
           .where(
             (step) =>
-                !step.isUnresolved &&
-                !step.isInformational &&
-                !step.blocked &&
+                step.isActionable &&
                 completedStepIdentities.contains(step.identity),
           )
           .length ??

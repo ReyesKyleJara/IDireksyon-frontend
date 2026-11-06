@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_motion.dart';
 import '../../models/roadmap_plan.dart';
 import '../ids/id_details_screen.dart';
+import 'roadmap_widgets.dart';
 
 /// Active progress is explicit completion, never Inventory or prerequisite readiness.
 class ActiveJourneyView extends StatelessWidget {
@@ -18,6 +19,7 @@ class ActiveJourneyView extends StatelessWidget {
     this.onResolve,
     this.onComplete,
     this.saving = false,
+    this.savingStep,
   });
 
   final String title;
@@ -30,143 +32,58 @@ class ActiveJourneyView extends StatelessWidget {
   final ValueChanged<RoadmapPlanStep>? onComplete;
   final bool saving;
 
+  /// The step being saved; other steps stay disabled but keep their label.
+  final String? savingStep;
+
+  List<RoadmapPlanStep> _waitingOn(RoadmapPlanStep step) =>
+      waitingOnSteps(step, steps, completedStepIdentities);
+
+  bool _isOpen(RoadmapPlanStep step) =>
+      step.isActionable &&
+      !completedStepIdentities.contains(step.identity) &&
+      _waitingOn(step).isEmpty;
+
+  String? _detail(int index, int current) {
+    if (steps.isEmpty) return index == current ? _currentDetail : null;
+    final step = steps[index];
+    if (step.isUnresolved) {
+      return 'Review this requirement before continuing with your journey.';
+    }
+    final waiting = _waitingOn(step);
+    if (waiting.isNotEmpty) {
+      return 'Complete ${waiting.map((item) => item.name).join(', ')} first.';
+    }
+    if (index == current) return _currentDetail;
+    return null;
+  }
+
+  static const _currentDetail =
+      'Prepare this step first so you can continue your journey.';
+
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final actionable = steps
-        .where(
-          (step) =>
-              !step.isUnresolved && !step.isInformational && !step.blocked,
-        )
-        .toList();
+    final actionable = steps.where((step) => step.isActionable).toList();
     final count = steps.isEmpty ? fallbackTitles.length : actionable.length;
     final rowCount = steps.isEmpty ? fallbackTitles.length : steps.length;
     final completed = actionable
         .where((step) => completedStepIdentities.contains(step.identity))
         .length;
     final progress = count == 0 ? 0.0 : completed / count;
-    final current = steps.isEmpty
-        ? 0
-        : steps.indexWhere(
-            (step) =>
-                !step.isUnresolved &&
-                !step.isInformational &&
-                !step.blocked &&
-                !completedStepIdentities.contains(step.identity),
-          );
+    final current = steps.isEmpty ? 0 : steps.indexWhere(_isOpen);
+    final goals = steps
+        .where((step) => step.selected && !step.isUnresolved)
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Material(
-          color: colors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(
-              color: expanded
-                  ? colors.primary.withValues(alpha: .35)
-                  : colors.outlineVariant,
-            ),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: MotionInkWell(
-            onTap: expanded ? null : onOpen,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: colors.primary.withValues(alpha: .08),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.badge_outlined,
-                          size: 26,
-                          color: colors.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Target ID',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              title,
-                              style: TextStyle(
-                                fontSize: 17,
-                                height: 1.25,
-                                fontWeight: FontWeight.w700,
-                                color: colors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (!expanded)
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: colors.primary,
-                          size: 20,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Overall Progress',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '${(progress * 100).round()}%',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: colors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    borderRadius: BorderRadius.circular(8),
-                    backgroundColor: colors.primary.withValues(alpha: .1),
-                    color: colors.primary,
-                    semanticsLabel: '$title journey progress',
-                    semanticsValue: '${(progress * 100).round()}%',
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '$completed of $count completed',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        _JourneySummary(
+          title: title,
+          goals: [for (final goal in goals) goal.name],
+          progress: progress,
+          completed: completed,
+          count: count,
+          expanded: expanded,
+          onOpen: onOpen,
         ),
         if (expanded) ...[
           const SizedBox(height: 20),
@@ -175,22 +92,26 @@ class ActiveJourneyView extends StatelessWidget {
               key: ValueKey(
                 'active-step-${steps.isEmpty ? 'legacy:$i' : steps[i].identity}',
               ),
-              number: i + 1,
+              // Owned items show a check, so they don't use up a step number.
+              number: steps.isEmpty
+                  ? i + 1
+                  : steps.take(i + 1).where((step) => !step.alreadyOwned).length,
               name: steps.isEmpty ? fallbackTitles[i] : steps[i].name,
+              processingTime: steps.isEmpty ? null : steps[i].processingTime,
+              owned: steps.isNotEmpty && steps[i].alreadyOwned,
               completed:
                   steps.isNotEmpty &&
                   completedStepIdentities.contains(steps[i].identity),
               current: i == current,
+              ready: steps.isNotEmpty && _isOpen(steps[i]),
               last: i == rowCount - 1,
               saving: saving,
-              onComplete: i == current && steps.isNotEmpty && onComplete != null
+              savingThis: steps.isNotEmpty && savingStep == steps[i].identity,
+              onComplete:
+                  steps.isNotEmpty && _isOpen(steps[i]) && onComplete != null
                   ? () => onComplete!(steps[i])
                   : null,
-              detail: steps.isNotEmpty && steps[i].isUnresolved
-                  ? 'Review this requirement before continuing with your journey.'
-                  : i == current
-                  ? 'Prepare this step first so you can continue your journey.'
-                  : null,
+              detail: _detail(i, current),
               onTap: steps.isEmpty
                   ? null
                   : steps[i].isUnresolved
@@ -211,6 +132,130 @@ class ActiveJourneyView extends StatelessWidget {
   }
 }
 
+/// Navy while open, like Home's journey banner; a plain card when collapsed.
+class _JourneySummary extends StatelessWidget {
+  const _JourneySummary({
+    required this.title,
+    required this.goals,
+    required this.progress,
+    required this.completed,
+    required this.count,
+    required this.expanded,
+    required this.onOpen,
+  });
+
+  final String title;
+  final List<String> goals;
+  final double progress;
+  final int completed, count;
+  final bool expanded;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final strong = expanded ? Colors.white : colors.onSurface;
+    final muted = expanded ? const Color(0xFFD5E7FA) : colors.onSurfaceVariant;
+    final percent = '${(progress * 100).round()}%';
+    final several = goals.length > 1;
+    final content = Padding(
+      padding: EdgeInsets.all(expanded ? 20 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      several ? '${goals.length} target IDs' : 'Target ID',
+                      style: TextStyle(fontSize: 11, color: muted),
+                    ),
+                    const SizedBox(height: 4),
+                    if (several)
+                      for (final goal in goals)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            goal,
+                            style: TextStyle(
+                              fontSize: 15,
+                              height: 1.3,
+                              fontWeight: FontWeight.w700,
+                              color: strong,
+                            ),
+                          ),
+                        )
+                    else
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 19,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                          color: strong,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (!expanded)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colors.onSurfaceVariant,
+                  size: 20,
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Overall Progress',
+                  style: TextStyle(fontSize: 12, color: muted),
+                ),
+              ),
+              Text(
+                percent,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: strong,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: progress,
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(8),
+            backgroundColor: expanded
+                ? Colors.white.withValues(alpha: .2)
+                : colors.primary.withValues(alpha: .1),
+            color: expanded ? AppTheme.accentGold : colors.primary,
+            semanticsLabel: '$title journey progress',
+            semanticsValue: percent,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '$completed of $count completed',
+            style: TextStyle(fontSize: 11, color: muted),
+          ),
+        ],
+      ),
+    );
+    if (expanded) return RoadmapGradientCard(child: content);
+    return RoadmapCard(
+      child: MotionInkWell(onTap: onOpen, child: content),
+    );
+  }
+}
+
 class _ActiveStep extends StatelessWidget {
   const _ActiveStep({
     super.key,
@@ -218,27 +263,43 @@ class _ActiveStep extends StatelessWidget {
     required this.name,
     required this.completed,
     required this.current,
+    required this.ready,
     required this.last,
+    this.owned = false,
+    this.processingTime,
     this.detail,
     this.onTap,
     this.onComplete,
     this.saving = false,
+    this.savingThis = false,
   });
   final int number;
   final String name;
-  final bool completed, current, last;
-  final String? detail;
+  final bool completed, current, ready, last, owned;
+  final String? processingTime, detail;
   final VoidCallback? onTap, onComplete;
-  final bool saving;
+  final bool saving, savingThis;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final nodeColor = completed
+    final dark = colors.brightness == Brightness.dark;
+    final active = (current || ready) && !completed;
+    final done = completed || owned;
+    final nodeColor = done
         ? AppTheme.completedGreen
-        : current
+        : active
         ? colors.primary
         : colors.outlineVariant;
+    final status = owned
+        ? 'Already in your Inventory'
+        : completed
+        ? 'Completed'
+        : current
+        ? 'Current step'
+        : ready
+        ? 'Ready to start'
+        : 'Upcoming';
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -255,7 +316,7 @@ class _ActiveStep extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: nodeColor,
                   ),
-                  child: completed
+                  child: done
                       ? const Icon(
                           Icons.check_rounded,
                           size: 18,
@@ -263,10 +324,11 @@ class _ActiveStep extends StatelessWidget {
                         )
                       : Text(
                           '$number',
+                          textScaler: TextScaler.noScaling,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: current
+                            color: active
                                 ? colors.onPrimary
                                 : colors.onSurfaceVariant,
                           ),
@@ -275,8 +337,9 @@ class _ActiveStep extends StatelessWidget {
                 if (!last)
                   Expanded(
                     child: Container(
-                      width: 1.5,
-                      color: colors.primary.withValues(alpha: .2),
+                      width: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      color: colors.outlineVariant.withValues(alpha: .6),
                     ),
                   ),
               ],
@@ -285,27 +348,25 @@ class _ActiveStep extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: 10),
               child: Material(
-                color: current && !completed
-                    ? Color.alphaBlend(
-                        colors.primary.withValues(alpha: .03),
-                        colors.surface,
-                      )
-                    : colors.surface,
+                color: dark ? colors.surfaceContainer : Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
+                    width: current && !completed ? 1.5 : 1,
                     color: current && !completed
                         ? colors.primary
-                        : colors.outlineVariant.withValues(alpha: .6),
+                        : dark
+                        ? colors.outlineVariant.withValues(alpha: .35)
+                        : const Color(0xFFE3ECF7),
                   ),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: MotionInkWell(
                   onTap: saving ? null : onTap,
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(14),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -316,32 +377,28 @@ class _ActiveStep extends StatelessWidget {
                               Text(
                                 name,
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 14.5,
                                   height: 1.3,
                                   fontWeight: FontWeight.w700,
-                                  color: current
-                                      ? colors.primary
-                                      : colors.onSurface,
+                                  color: colors.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                completed
-                                    ? 'Completed'
-                                    : current
-                                    ? 'Current step'
-                                    : 'Upcoming',
+                                status,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 11.5,
                                   fontWeight: FontWeight.w600,
-                                  color: completed
-                                      ? AppTheme.completedGreen
-                                      : current
+                                  color: done
+                                      ? (dark
+                                            ? const Color(0xFF81C784)
+                                            : AppTheme.completedGreen)
+                                      : active
                                       ? colors.primary
                                       : colors.onSurfaceVariant,
                                 ),
                               ),
-                              if (detail != null && !completed) ...[
+                              if (detail != null && !done) ...[
                                 const SizedBox(height: 6),
                                 Text(
                                   detail!,
@@ -352,19 +409,37 @@ class _ActiveStep extends StatelessWidget {
                                   ),
                                 ),
                               ],
+                              if (processingTime != null && !done) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Listed processing time: $processingTime',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.4,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
                               if (onComplete != null && !completed) ...[
-                                const SizedBox(height: 8),
-                                TextButton(
+                                const SizedBox(height: 10),
+                                OutlinedButton(
                                   onPressed: saving ? null : onComplete,
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: colors.primary,
                                     minimumSize: const Size(0, 40),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
                                   ),
                                   child: Text(
-                                    saving ? 'Saving…' : 'Mark as Completed',
-                                    style: const TextStyle(fontSize: 12),
+                                    savingThis ? 'Saving…' : 'Mark as Completed',
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ],

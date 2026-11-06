@@ -69,6 +69,7 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
         );
 
   bool _saving = false;
+  String? _savingStep;
   bool _confirming = false;
 
   Future<void> _complete(IdJourney journey, RoadmapPlanStep step) async {
@@ -101,7 +102,10 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
         AuthService.instance.token != session) {
       return;
     }
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _savingStep = step.identity;
+    });
     try {
       final saved = IdJourney.fromJson(
         await AuthService.instance.completeJourneyStep(
@@ -128,7 +132,12 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _savingStep = null;
+        });
+      }
     }
   }
 
@@ -171,6 +180,7 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
               expanded: journey == _openJourney,
               onOpen: () => _open(journey),
               saving: _saving,
+              savingStep: _savingStep,
               onComplete: journey.id == null
                   ? null
                   : (step) => _complete(journey, step),
