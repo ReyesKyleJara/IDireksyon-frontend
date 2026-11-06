@@ -50,6 +50,7 @@ class _ResidentAppShellState extends State<ResidentAppShell> {
           _currentIndex = 1;
         });
       },
+      onOpenDirectory: () => _changeTab(2),
     ),
     _journeys.isNotEmpty
         ? ActiveJourneyScreen(

@@ -223,10 +223,29 @@ void main() {
     await tester.ensureVisible(find.text('Next'));
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Driver’s License'));
+    // Options are built lazily, so scroll to them like a resident would.
+    Finder options() => find
+        .descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Driver’s License'),
+      150,
+      scrollable: options(),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Driver’s License').hitTestable(), findsOneWidget);
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('NBI Clearance'));
+    await tester.scrollUntilVisible(
+      find.text('NBI Clearance'),
+      150,
+      scrollable: options(),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('NBI Clearance').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

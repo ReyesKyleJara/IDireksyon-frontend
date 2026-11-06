@@ -146,11 +146,23 @@ void main() {
           child: child!,
         ),
         home: Scaffold(
-          body: Column(
-            children: [
-              if (overview) ApplicationPreparationCard(record: record),
-              Expanded(child: RequirementsTab(governmentId: record)),
-            ],
+          // In the app the card scrolls inside the Overview tab's list; here
+          // it scrolls within at most half the screen, above the checklist.
+          body: LayoutBuilder(
+            builder: (context, constraints) => Column(
+              children: [
+                if (overview)
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: constraints.maxHeight / 2,
+                    ),
+                    child: SingleChildScrollView(
+                      child: ApplicationPreparationCard(record: record),
+                    ),
+                  ),
+                Expanded(child: RequirementsTab(governmentId: record)),
+              ],
+            ),
           ),
         ),
       ),
