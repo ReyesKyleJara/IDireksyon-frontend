@@ -45,6 +45,9 @@ class RoadmapPlanStep {
         json['processing_time'] as String?,
       ),
       ownerKey = json['owner_key'] as String?,
+      remainingCount = json['remaining_count'] as int? ?? 1,
+      manualPreparation = json['manual_preparation'] == true,
+      resolutionReady = json['resolution_ready'] == true,
       resolutionKey = json['resolution_key'] as String?,
       resolutionKind = json['kind'] as String?,
       message = json['message'] as String?,
@@ -95,21 +98,32 @@ class RoadmapPlanStep {
   }
 
   final String type, name, guidanceMode;
-  final String? resolutionKey, resolutionKind, message, processingTime, ownerKey;
+  final String? resolutionKey,
+      resolutionKind,
+      message,
+      processingTime,
+      ownerKey;
   final List<Map<String, dynamic>> suggestions;
   bool get isUnresolved => type == 'unresolved_requirement';
   String get identity => isUnresolved ? resolutionKey! : '$type:$id';
   bool get isInformational => guidanceMode == 'informational_only';
   bool get isManualPreparation =>
-      isUnresolved && resolutionKind == 'requirement' && suggestions.isEmpty;
+      isUnresolved &&
+      resolutionKind == 'requirement' &&
+      manualPreparation &&
+      suggestions.isEmpty;
   bool get countsForProgress => isUnresolved || isActionable;
   bool get isActionable =>
       (!isUnresolved || isManualPreparation) &&
       !isInformational &&
       !blocked &&
       !alreadyOwned;
-  final int id;
-  final bool blocked, selected, alreadyOwned;
+  final int id, remainingCount;
+  final bool blocked,
+      selected,
+      alreadyOwned,
+      manualPreparation,
+      resolutionReady;
   final List<String> issues;
   final List<Map<String, dynamic>> prerequisites;
   final Map<String, dynamic> readiness;
@@ -128,7 +142,7 @@ List<RoadmapPlanStep> waitingOnSteps(
       (item) =>
           item.isUnresolved &&
           item.ownerKey == step.identity &&
-          !completed.contains(item.identity),
+          (!item.isManualPreparation || !completed.contains(item.identity)),
     ),
   );
   for (final row in step.prerequisites) {

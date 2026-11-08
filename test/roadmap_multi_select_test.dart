@@ -31,14 +31,10 @@ Map<String, dynamic> choice({
     {'type': 'document', 'id': 8, 'name': 'Other option', 'way_id': 1},
   ],
 }) => {
-  ...planStep(
-    9,
-    'Valid IDs',
-    type: 'unresolved_requirement',
-    selected: false,
-  ),
+  ...planStep(9, 'Valid IDs', type: 'unresolved_requirement', selected: false),
   'resolution_key': 'government_id:57:set:1:group:9',
   'kind': 'requirement',
+  'manual_preparation': suggestions.isEmpty,
   'owner_key': 'government_id:57',
   'message': 'You still need at least one accepted option.',
   'suggestions': suggestions,
@@ -49,21 +45,18 @@ void main() {
   setUp(() => previous = AuthService.instance);
   tearDown(() => AuthService.instance = previous);
 
-  Map<String, dynamic> threeGoals({List<Map<String, dynamic>> extra = const []}) =>
-      planData(
-        [56, 55, 57],
-        [
-          planStep(56, 'PhilSys National ID'),
-          planStep(55, 'Philippine Passport')
-            ..['processing_time'] = '10–12 working days',
-          ...extra,
-          planStep(
-            57,
-            'Postal ID',
-            prerequisites: [missingPrerequisite(56)],
-          ),
-        ],
-      );
+  Map<String, dynamic> threeGoals({
+    List<Map<String, dynamic>> extra = const [],
+  }) => planData(
+    [56, 55, 57],
+    [
+      planStep(56, 'PhilSys National ID'),
+      planStep(55, 'Philippine Passport')
+        ..['processing_time'] = '10–12 working days',
+      ...extra,
+      planStep(57, 'Postal ID', prerequisites: [missingPrerequisite(56)]),
+    ],
+  );
 
   void serve(Map<String, dynamic> plan) {
     AuthService.instance = AuthService(
@@ -287,10 +280,10 @@ void main() {
     await tester.ensureVisible(find.text('See Suggested Options'));
     await tester.tap(find.text('See Suggested Options'));
     await tester.pumpAndSettle();
-    expect(find.text('ALREADY IN THIS ROADMAP'), findsOneWidget);
+    expect(find.text('Already in your Roadmap'), findsOneWidget);
     expect(find.text('Use This Option'), findsOneWidget);
     expect(find.text('Add to Journey'), findsOneWidget);
-    expect(find.text('Listed processing time: 3 days'), findsOneWidget);
+    expect(find.text('3 days'), findsOneWidget);
     expect(find.textContaining('astest'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -523,26 +516,29 @@ void main() {
     );
   });
 
-  test('reference-only and satisfied prerequisites do not hold a step back', () {
-    final plan = RoadmapPlan.fromJson(
-      planData(
-        [2],
-        [
-          planStep(1, 'Other', selected: false),
-          planStep(
-            2,
-            'Goal',
-            prerequisites: [
-              {...missingPrerequisite(1), 'resolution': 'reference_only'},
-              {...missingPrerequisite(1), 'status': 'satisfied'},
-              {'type': 'custom', 'id': null, 'name': 'x', 'status': 'manual'},
-            ],
-          ),
-        ],
-      ),
-    );
-    expect(waitingOnSteps(plan.steps.last, plan.steps, const {}), isEmpty);
-  });
+  test(
+    'reference-only and satisfied prerequisites do not hold a step back',
+    () {
+      final plan = RoadmapPlan.fromJson(
+        planData(
+          [2],
+          [
+            planStep(1, 'Other', selected: false),
+            planStep(
+              2,
+              'Goal',
+              prerequisites: [
+                {...missingPrerequisite(1), 'resolution': 'reference_only'},
+                {...missingPrerequisite(1), 'status': 'satisfied'},
+                {'type': 'custom', 'id': null, 'name': 'x', 'status': 'manual'},
+              ],
+            ),
+          ],
+        ),
+      );
+      expect(waitingOnSteps(plan.steps.last, plan.steps, const {}), isEmpty);
+    },
+  );
 
   for (final (size, scale) in [
     (const Size(320, 640), 2.0),
@@ -560,8 +556,14 @@ void main() {
           planData(
             [1, 2, 3],
             [
-              planStep(1, 'Philippine Identification System (PhilSys National ID)'),
-              planStep(2, 'OWWA OFW eCard (Overseas Workers Welfare Administration eCard)'),
+              planStep(
+                1,
+                'Philippine Identification System (PhilSys National ID)',
+              ),
+              planStep(
+                2,
+                'OWWA OFW eCard (Overseas Workers Welfare Administration eCard)',
+              ),
               planStep(3, 'Non-Professional Driver’s License (NPDL)'),
             ],
           ),
@@ -600,8 +602,14 @@ void main() {
                     planData(
                       [1, 2],
                       [
-                        planStep(1, 'Philippine Identification System (PhilSys National ID)'),
-                        planStep(2, 'OWWA OFW eCard (Overseas Workers Welfare Administration eCard)'),
+                        planStep(
+                          1,
+                          'Philippine Identification System (PhilSys National ID)',
+                        ),
+                        planStep(
+                          2,
+                          'OWWA OFW eCard (Overseas Workers Welfare Administration eCard)',
+                        ),
                       ],
                     ),
                   ).steps,

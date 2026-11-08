@@ -23,7 +23,7 @@ class IdJourney {
   final List<String> ownedItems;
 
   /// Reviewed steps, retained independently of later Inventory readiness.
-  final RoadmapPlan? confirmedPlan;
+  RoadmapPlan? confirmedPlan;
 
   /// Explicit journey completion only. Confirmation and Inventory never add here.
   /// Restored from the account API; never inferred from Inventory.
@@ -69,6 +69,7 @@ class IdJourney {
     if (id == null || id != saved.id) {
       throw const FormatException('Journey identity changed');
     }
+    confirmedPlan = saved.confirmedPlan;
     _completedStepIdentities = Set.unmodifiable(saved.completedStepIdentities);
   }
 

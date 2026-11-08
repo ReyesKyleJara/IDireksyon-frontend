@@ -185,6 +185,7 @@ void main() {
       'kind': 'requirement',
       'message': 'Choose supporting proof.',
       'suggestions': [],
+      'manual_preparation': true,
     });
     await tester.pumpWidget(
       MaterialApp(

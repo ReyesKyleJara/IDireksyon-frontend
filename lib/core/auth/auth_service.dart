@@ -583,6 +583,21 @@ class AuthService extends ChangeNotifier {
     return Map<String, dynamic>.from(response['data'] as Map);
   }
 
+  Future<Map<String, dynamic>> resolveJourneyStep(
+    int journeyId,
+    Map<String, dynamic> resolution,
+  ) async {
+    final response = await _journeyRequest(
+      'PUT',
+      'journeys/$journeyId/resolution',
+      {'resolution': resolution},
+    );
+    if (response['data'] is! Map) {
+      throw const AuthException('The server returned unexpected journey data.');
+    }
+    return Map<String, dynamic>.from(response['data'] as Map);
+  }
+
   Future<Map<String, dynamic>> completeJourneyStep(
     int journeyId,
     String identity,

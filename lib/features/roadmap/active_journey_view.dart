@@ -100,7 +100,10 @@ class ActiveJourneyView extends StatelessWidget {
               // Owned items show a check, so they don't use up a step number.
               number: steps.isEmpty
                   ? i + 1
-                  : steps.take(i + 1).where((step) => !step.alreadyOwned).length,
+                  : steps
+                        .take(i + 1)
+                        .where((step) => !step.alreadyOwned)
+                        .length,
               name: steps.isEmpty ? fallbackTitles[i] : steps[i].name,
               processingTime: steps.isEmpty ? null : steps[i].processingTime,
               owned: steps.isNotEmpty && steps[i].alreadyOwned,
@@ -117,6 +120,17 @@ class ActiveJourneyView extends StatelessWidget {
                   ? () => onComplete!(steps[i])
                   : null,
               detail: _detail(i, current),
+              resolveLabel:
+                  steps.isNotEmpty && steps[i].resolutionKind == 'path'
+                  ? 'Choose Application Requirements'
+                  : 'See Suggested Options',
+              onResolve:
+                  steps.isNotEmpty &&
+                      steps[i].isUnresolved &&
+                      !steps[i].isManualPreparation &&
+                      onResolve != null
+                  ? () => onResolve!(steps[i])
+                  : null,
               onTap: steps.isEmpty
                   ? null
                   : steps[i].isUnresolved
@@ -276,6 +290,8 @@ class _ActiveStep extends StatelessWidget {
     this.detail,
     this.onTap,
     this.onComplete,
+    this.onResolve,
+    this.resolveLabel = 'See Suggested Options',
     this.saving = false,
     this.savingThis = false,
   });
@@ -283,7 +299,8 @@ class _ActiveStep extends StatelessWidget {
   final String name;
   final bool completed, current, ready, last, owned;
   final String? processingTime, detail;
-  final VoidCallback? onTap, onComplete;
+  final VoidCallback? onTap, onComplete, onResolve;
+  final String resolveLabel;
   final bool saving, savingThis;
 
   @override
@@ -426,6 +443,13 @@ class _ActiveStep extends StatelessWidget {
                                   ),
                                 ),
                               ],
+                              if (onResolve != null) ...[
+                                const SizedBox(height: 10),
+                                TextButton(
+                                  onPressed: saving ? null : onResolve,
+                                  child: Text(resolveLabel),
+                                ),
+                              ],
                               if (onComplete != null && !completed) ...[
                                 const SizedBox(height: 10),
                                 OutlinedButton(
@@ -441,7 +465,9 @@ class _ActiveStep extends StatelessWidget {
                                     ),
                                   ),
                                   child: Text(
-                                    savingThis ? 'Saving…' : 'Mark as Completed',
+                                    savingThis
+                                        ? 'Saving…'
+                                        : 'Mark as Completed',
                                     style: const TextStyle(
                                       fontSize: 12.5,
                                       fontWeight: FontWeight.w700,

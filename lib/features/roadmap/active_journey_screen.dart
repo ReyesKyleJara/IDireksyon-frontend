@@ -9,6 +9,7 @@ import '../shell/resident_app_shell.dart';
 import 'build_roadmap_screen.dart';
 import 'id_journey.dart';
 import 'roadmap_plan_panel.dart';
+import 'suggested_options_dialog.dart';
 
 class JourneyLoadingScreen extends StatelessWidget {
   const JourneyLoadingScreen({
@@ -141,6 +142,69 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
     }
   }
 
+  Future<void> _resolve(IdJourney journey, RoadmapPlanStep requested) async {
+    if (_saving || _confirming || journey.id == null) return;
+    _confirming = true;
+    final auth = AuthService.instance;
+    final session = auth.token;
+    try {
+      // Review the current account-owned choice, including legacy snapshots
+      // and choices that another device may already have resolved.
+      final rows = await auth.getJourneys();
+      final row = rows.where((item) => item['id'] == journey.id).firstOrNull;
+      if (row == null) {
+        throw const AuthException('Please reload your journeys.');
+      }
+      if (!mounted || auth.token != session) return;
+      setState(() => journey.applyCompletion(IdJourney.fromJson(row)));
+      final plan = journey.confirmedPlan;
+      final step = plan?.steps
+          .where((item) => item.identity == requested.identity)
+          .firstOrNull;
+      if (step == null || step.isManualPreparation || plan == null) return;
+      if (!mounted || auth.token != session) return;
+      final resolution = await showSuggestedRoadmapOptions(
+        context,
+        plan: plan,
+        step: step,
+      );
+      if (resolution == null || !mounted || auth.token != session) return;
+      setState(() {
+        _saving = true;
+        _savingStep = step.identity;
+      });
+      final saved = IdJourney.fromJson(
+        await auth.resolveJourneyStep(journey.id!, resolution),
+      );
+      if (!mounted || auth.token != session) return;
+      setState(() => journey.applyCompletion(saved));
+      widget.onJourneyChanged?.call();
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on FormatException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to read the updated journey. Please reload your journeys.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _confirming = false;
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _savingStep = null;
+        });
+      }
+    }
+  }
+
   void _open(IdJourney journey) => setState(() {
     _openJourney = journey;
     for (final item in _journeys) {
@@ -179,6 +243,9 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
               completedStepIdentities: journey.completedStepIdentities,
               expanded: journey == _openJourney,
               onOpen: () => _open(journey),
+              onResolve: journey.id == null
+                  ? null
+                  : (step) => _resolve(journey, step),
               saving: _saving,
               savingStep: _savingStep,
               onComplete: journey.id == null
