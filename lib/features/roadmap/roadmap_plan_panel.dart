@@ -7,6 +7,7 @@ import '../ids/id_details_screen.dart';
 import '../profile/manage_inventory_screen.dart';
 import 'suggested_journey_view.dart';
 import 'active_journey_view.dart';
+import 'roadmap_widgets.dart';
 
 /// Fresh Inventory-backed plan, shared by suggested and active journeys.
 class RoadmapPlanPanel extends StatefulWidget {
@@ -105,7 +106,9 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
     final option = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(path ? 'Choose Request Path' : 'Suggested Options'),
+        title: Text(
+          path ? 'Choose Application Requirements' : 'Suggested Options',
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: SingleChildScrollView(
@@ -118,27 +121,19 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
                     'No guided options are currently available. Review the requirement in the target’s guide or check with the issuing office.',
                   ),
                 for (final option in step.suggestions)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          option['name'] as String,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        if (option['needs_review'] == true)
-                          const Text(
-                            'Confirm that this applicant path applies to you.',
-                          ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, option),
-                          child: Text(
-                            path ? 'Use This Path' : 'Add to Journey',
-                          ),
-                        ),
-                      ],
+                  _OptionRow(
+                    name: option['name'] as String,
+                    processingTime: displayProcessingTime(
+                      option['processing_time'] as String?,
                     ),
+                    inJourney: option['in_journey'] == true,
+                    needsReview: option['needs_review'] == true,
+                    actionLabel: path
+                        ? 'Use This Checklist'
+                        : option['in_journey'] == true
+                        ? 'Use This Option'
+                        : 'Add to Journey',
+                    onSelect: () => Navigator.pop(context, option),
                   ),
               ],
             ),
@@ -153,15 +148,20 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
       ),
     );
     if (option == null || !mounted) return;
+    final planned = option['in_journey'] == true;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          path ? 'Use ${option['name']}?' : 'Add ${option['name']} to Journey?',
+          path || planned
+              ? 'Use ${option['name']}?'
+              : 'Add ${option['name']} to Journey?',
         ),
         content: Text(
           path
-              ? 'IDireksyon will use this requirement path and recalculate your roadmap.'
+              ? 'IDireksyon will use this application checklist and recalculate your roadmap.'
+              : planned
+              ? 'This is already in your roadmap. It will be scheduled before what needs it.'
               : 'IDireksyon will add this before your target and recalculate your roadmap.',
         ),
         actions: [
@@ -171,7 +171,13 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(path ? 'Use This Path' : 'Add to Journey'),
+            child: Text(
+              path
+                  ? 'Use This Checklist'
+                  : planned
+                  ? 'Use This Option'
+                  : 'Add to Journey',
+            ),
           ),
         ],
       ),
@@ -196,10 +202,14 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       if (_loading)
-        Text(
-          (widget.guidedPresentation || widget.activeJourneyTitle != null)
-              ? 'Preparing your next steps…'
-              : 'Checking saved Inventory and prerequisites…',
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            (widget.guidedPresentation || widget.activeJourneyTitle != null)
+                ? 'Preparing your next steps…'
+                : 'Checking saved Inventory and prerequisites…',
+            textAlign: TextAlign.center,
+          ),
         ),
       if (_error != null) ...[
         Text(_error!),
@@ -236,6 +246,89 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
         ),
     ],
   );
+}
+
+class _OptionRow extends StatelessWidget {
+  const _OptionRow({
+    required this.name,
+    required this.processingTime,
+    required this.inJourney,
+    required this.needsReview,
+    required this.actionLabel,
+    required this.onSelect,
+  });
+
+  final String name, actionLabel;
+  final String? processingTime;
+  final bool inJourney, needsReview;
+  final VoidCallback onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final muted = TextStyle(
+      fontSize: 12,
+      height: 1.35,
+      color: colors.onSurfaceVariant,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RoadmapCard(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (inJourney)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'ALREADY IN THIS ROADMAP',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .7,
+                      color: colors.primary,
+                    ),
+                  ),
+                ),
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 14,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (processingTime != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    'Listed processing time: $processingTime',
+                    style: muted,
+                  ),
+                ),
+              if (needsReview)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    'Confirm that this applicant path applies to you.',
+                    style: muted,
+                  ),
+                ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: onSelect,
+                  child: Text(actionLabel),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class RoadmapPlanView extends StatelessWidget {

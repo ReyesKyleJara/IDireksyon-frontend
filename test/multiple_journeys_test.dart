@@ -62,7 +62,17 @@ void main() {
           expect(active.journeys.last.targetIds, ['PhilSys National ID']);
           expect(active.journeys.last.targetCatalogIds, [56]);
           expect(active.journeys.last.ownedItems, isEmpty);
-          await tester.ensureVisible(find.text(original.title).last);
+          await tester.scrollUntilVisible(
+            find.text(original.title).last,
+            100,
+            scrollable: find
+                .descendant(
+                  of: find.byType(ActiveJourneyScreen),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
           await tester.tap(find.text(original.title).last);
           await tester.pumpAndSettle();
           expect(original.minimized, isFalse);

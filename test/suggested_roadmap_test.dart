@@ -259,7 +259,9 @@ void main() {
         'kind': 'requirement',
         'resolution_key': 'government_id:55:set:22:group:12',
         'message': 'You still need at least one accepted option.',
-        'suggestions': <Map<String, dynamic>>[],
+        'suggestions': [
+          {'type': 'document', 'id': 4, 'name': 'Accepted document', 'way_id': 8},
+        ],
       };
       final rows = [
         setup(28),

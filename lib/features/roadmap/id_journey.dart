@@ -73,27 +73,21 @@ class IdJourney {
   }
 
   int get totalSteps =>
-      confirmedPlan?.steps
-          .where(
-            (step) =>
-                !step.isUnresolved && !step.isInformational && !step.blocked,
-          )
-          .length ??
+      confirmedPlan?.steps.where((step) => step.countsForProgress).length ??
       targetIds.length;
   int get completedSteps =>
       confirmedPlan?.steps
           .where(
             (step) =>
-                !step.isUnresolved &&
-                !step.isInformational &&
-                !step.blocked &&
+                step.isActionable &&
                 completedStepIdentities.contains(step.identity),
           )
           .length ??
       0;
   double get completionProgress =>
       totalSteps == 0 ? 0 : completedSteps / totalSteps;
-  String get completionLabel => '${(completionProgress * 100).round()}%';
+  String get completionLabel =>
+      '${completedSteps < totalSteps ? (completionProgress * 100).round().clamp(0, 99) : (completionProgress * 100).round()}%';
 
   /// Readiness from 0 to 1; new journeys start with no completed steps.
   final double progress;

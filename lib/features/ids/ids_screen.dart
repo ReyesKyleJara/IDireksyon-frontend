@@ -9,6 +9,7 @@ import '../../models/government_id.dart';
 import '../../services/api_service.dart';
 import '../../services/requirement_readiness.dart';
 import '../../services/checklist_readiness_summary.dart';
+import '../../services/directory_suggestions.dart';
 import 'id_details_screen.dart';
 
 class IdsScreen extends StatefulWidget {
@@ -98,34 +99,8 @@ class _IdsScreenState extends State<IdsScreen> {
     }
   }
 
-  List<GovernmentIdDetails> _candidates(List<GovernmentIdDetails> records) {
-    final result = <GovernmentIdDetails>[];
-    // Editorial names locate real catalog records; numeric IDs come from APIs.
-    const choices = [
-      ('government_id', ['philsys national id', 'national id']),
-      ('government_id', ['philippine passport', 'passport']),
-      ('document', ['nbi clearance']),
-      ('document', ['national police clearance']),
-    ];
-    for (final (type, names) in choices) {
-      final record = records
-          .where(
-            (r) =>
-                r.recordType == type &&
-                names.contains(r.name.trim().toLowerCase()) &&
-                _supported(r) &&
-                r.guidanceMode == 'guided',
-          )
-          .firstOrNull;
-      if (record == null) continue;
-      final owned = type == 'document'
-          ? _inventory?.documents
-          : _inventory?.governmentIds;
-      if (owned?.contains(record.id) == true) continue;
-      result.add(record);
-    }
-    return result;
-  }
+  List<GovernmentIdDetails> _candidates(List<GovernmentIdDetails> records) =>
+      suggestionCandidates(records, _inventory);
 
   Future<GovernmentIdDetails> _detailFor(GovernmentIdDetails record) {
     final key = (record.recordType, record.id);
@@ -184,33 +159,14 @@ class _IdsScreenState extends State<IdsScreen> {
     super.dispose();
   }
 
-  bool _supported(GovernmentIdDetails record) =>
-      !record.isInformational &&
-      [
-        'available',
-        'limited_conditional',
-      ].contains(record.applicationAvailability);
+  bool _supported(GovernmentIdDetails record) => isSupportedRecord(record);
 
-  // Presentation summary of the same group/way inventory completion used in
-  // RequirementsTab. This never infers applicability or evaluates eligibility.
-  ({double completion, bool ready, String status, String message})? _readiness(
-    GovernmentIdDetails record,
-  ) {
-    final inventory = _inventory;
-    final detail = _candidateDetails[(record.recordType, record.id)];
-    if (inventory == null ||
-        detail == null ||
-        !_supported(record) ||
-        !_supported(detail) ||
-        detail.guidanceMode != 'guided') {
-      return null;
-    }
-    final owned = record.recordType == 'document'
-        ? inventory.documents
-        : inventory.governmentIds;
-    if (owned.contains(record.id)) return null;
-    return summarizeChecklistReadiness(record, detail, inventory);
-  }
+  ChecklistReadinessSummary? _readiness(GovernmentIdDetails record) =>
+      suggestionReadiness(
+        record,
+        _candidateDetails[(record.recordType, record.id)],
+        _inventory,
+      );
 
   void _open(GovernmentIdDetails record) async {
     await Navigator.of(context).push(
@@ -551,12 +507,7 @@ class _IdsScreenState extends State<IdsScreen> {
           record.description ?? '',
         ].any((text) => text.toLowerCase().contains(query));
       }).toList();
-      final suggestions = records.where((r) => _readiness(r) != null).toList()
-        ..sort((a, b) {
-          final score = _readiness(b)!.completion
-              .compareTo(_readiness(a)!.completion);
-          return score == 0 ? a.name.compareTo(b.name) : score;
-        });
+      final suggestions = rankedSuggestions(records, _readiness);
       // Small editorial selection, always resolved against currently supported API records.
       final common = <GovernmentIdDetails>[];
       for (final term in [

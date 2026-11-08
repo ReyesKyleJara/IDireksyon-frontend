@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/profile/profile_avatar.dart';
+import '../../core/theme/app_theme.dart';
 import '../ids/ids_screen.dart';
 import '../ids/id_details_screen.dart';
 import '../office_finder/office_finder_screen.dart';
@@ -18,10 +19,35 @@ class HomeScreen extends StatelessWidget {
     super.key,
     this.journeys = const [],
     this.onOpenJourney,
+    this.onOpenDirectory,
   });
 
   final List<IdJourney> journeys;
   final ValueChanged<IdJourney>? onOpenJourney;
+
+  /// Switches to the IDirectory tab. Without it (Home shown on its own), the
+  /// directory opens as its own page.
+  final VoidCallback? onOpenDirectory;
+
+  void _openDirectory(
+    BuildContext context,
+  ) {
+    if (onOpenDirectory != null) {
+      onOpenDirectory!();
+      return;
+    }
+    _open(
+      context,
+      Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'ID Directory',
+          ),
+        ),
+        body: const IdsScreen(),
+      ),
+    );
+  }
 
   static const primaryBlue =
       Color(0xFF174B85);
@@ -102,50 +128,7 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 14),
 
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .stretch,
-                children: [
-                  _action(
-                    context,
-                    Icons.folder_copy_rounded,
-                    primaryBlue,
-                    'Document\nInventory',
-                    const ManageInventoryScreen(),
-                  ),
-
-                  const SizedBox(
-                    width: 10,
-                  ),
-
-                  _action(
-                    context,
-                    Icons.location_on_rounded,
-                    const Color(
-                      0xFFC84648,
-                    ),
-                    'Office\nFinder',
-                    const OfficeFinderScreen(),
-                  ),
-
-                  const SizedBox(
-                    width: 10,
-                  ),
-
-                  _action(
-                    context,
-                    Icons.badge_rounded,
-                    const Color(
-                      0xFFAA7309,
-                    ),
-                    'ID\nDirectory',
-                    const IdsScreen(),
-                  ),
-                ],
-              ),
-            ),
+            _quickActions(context),
 
             const SizedBox(height: 28),
 
@@ -182,9 +165,8 @@ class HomeScreen extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: () =>
-                      _open(
+                      _openDirectory(
                     context,
-                    const IdsScreen(),
                   ),
                   child:
                       const Text('View all'),
@@ -498,13 +480,17 @@ class HomeScreen extends StatelessWidget {
                                 MainAxisSize
                                     .min,
                             children: [
-                              Text(
-                                'Get started',
-                                style:
-                                    TextStyle(
-                                  fontWeight:
-                                      FontWeight
-                                          .w700,
+                              // Flexible lets the label wrap instead of
+                              // overflowing on narrow screens.
+                              Flexible(
+                                child: Text(
+                                  'Get started',
+                                  style:
+                                      TextStyle(
+                                    fontWeight:
+                                        FontWeight
+                                            .w700,
+                                  ),
                                 ),
                               ),
                               SizedBox(
@@ -557,137 +543,74 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _action(
+  Widget _quickActions(
     BuildContext context,
-    IconData icon,
-    Color tint,
-    String label,
-    Widget page,
   ) {
-    final colors =
-        Theme.of(context).colorScheme;
+    // With large text, three columns would squeeze the labels, so the
+    // tiles stack as full-width rows instead.
+    final largeText = MediaQuery
+            .textScalerOf(context)
+            .scale(1) >=
+        1.4;
 
-    final dark =
-        colors.brightness ==
-        Brightness.dark;
+    final actions = [
+      _QuickAction(
+        icon: Icons.folder_copy_rounded,
+        tint: primaryBlue,
+        label: 'Document\nInventory',
+        horizontal: largeText,
+        onTap: () => _open(
+          context,
+          const ManageInventoryScreen(),
+        ),
+      ),
+      _QuickAction(
+        icon: Icons.location_on_rounded,
+        tint: const Color(0xFFC84648),
+        label: 'Office\nFinder',
+        horizontal: largeText,
+        onTap: () => _open(
+          context,
+          const OfficeFinderScreen(),
+        ),
+      ),
+      _QuickAction(
+        icon: Icons.badge_rounded,
+        tint: const Color(0xFFAA7309),
+        label: 'ID\nDirectory',
+        horizontal: largeText,
+        onTap: () =>
+            _openDirectory(context),
+      ),
+    ];
 
-    final pastel =
-        icon ==
-                Icons
-                    .folder_copy_rounded
-            ? const Color(
-                0xFFF0F5FA,
-              )
-            : icon ==
-                    Icons
-                        .location_on_rounded
-                ? const Color(
-                    0xFFFDF0F0,
-                  )
-                : const Color(
-                    0xFFFFF7E6,
-                  );
-
-    return Expanded(
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius:
-              BorderRadius.circular(
-            22,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: tint.withValues(
-                alpha:
-                    dark ? .05 : .08,
-              ),
-              blurRadius: 16,
-              offset:
-                  const Offset(0, 6),
-            ),
+    if (largeText) {
+      return Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, tile)
+              in actions.indexed) ...[
+            if (i > 0)
+              const SizedBox(height: 10),
+            tile,
           ],
-        ),
-        child: Material(
-          color: dark
-              ? Color.alphaBlend(
-                  tint.withValues(
-                    alpha: .12,
-                  ),
-                  colors
-                      .surfaceContainer,
-                )
-              : pastel,
-          borderRadius:
-              BorderRadius.circular(
-            22,
-          ),
-          clipBehavior:
-              Clip.antiAlias,
-          child: MotionInkWell(
-            onTap: () =>
-                _open(
-              context,
-              page,
-            ),
-            child: Padding(
-              padding:
-                  const EdgeInsets
-                      .symmetric(
-                horizontal: 6,
-                vertical: 22,
-              ),
-              child: Column(
-                mainAxisAlignment:
-                    MainAxisAlignment
-                        .center,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration:
-                        BoxDecoration(
-                      color: dark
-                          ? colors
-                              .surfaceContainerHighest
-                          : Colors.white,
-                      shape:
-                          BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon,
-                      color: dark
-                          ? Color.lerp(
-                              tint,
-                              Colors.white,
-                              .4,
-                            )
-                          : tint,
-                      size: 26,
-                    ),
-                  ),
+        ],
+      );
+    }
 
-                  const SizedBox(
-                    height: 12,
-                  ),
-
-                  Text(
-                    label,
-                    textAlign:
-                        TextAlign.center,
-                    style:
-                        const TextStyle(
-                      fontSize: 12,
-                      height: 1.35,
-                      fontWeight:
-                          FontWeight
-                              .w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, tile)
+              in actions.indexed) ...[
+            if (i > 0)
+              const SizedBox(width: 12),
+            Expanded(child: tile),
+          ],
+        ],
       ),
     );
   }
@@ -864,6 +787,120 @@ class HomeScreen extends StatelessWidget {
                     colors.onSurfaceVariant,
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Quick action tile: white card, colored icon block, centered content.
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.icon,
+    required this.tint,
+    required this.label,
+    required this.onTap,
+    this.horizontal = false,
+  });
+
+  final IconData icon;
+  final Color tint;
+  final String label;
+  final VoidCallback onTap;
+
+  /// Row layout for large text.
+  final bool horizontal;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    final shape = BorderRadius.circular(22);
+
+    final badge = ExcludeSemantics(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color.lerp(tint, Colors.white, .18)!, tint],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: tint.withValues(alpha: dark ? .2 : .28),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: SizedBox.square(
+          dimension: 50,
+          child: Icon(icon, color: Colors.white, size: 25),
+        ),
+      ),
+    );
+
+    final text = Text(
+      label,
+      textAlign: horizontal ? TextAlign.start : TextAlign.center,
+      style: TextStyle(
+        fontSize: 13,
+        height: 1.3,
+        fontWeight: FontWeight.w700,
+        color: dark ? colors.onSurface : AppTheme.navy,
+      ),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: shape,
+        boxShadow: dark
+            ? null
+            : [
+                BoxShadow(
+                  color: tint.withValues(alpha: .07),
+                  blurRadius: 26,
+                  spreadRadius: -4,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+      ),
+      child: Material(
+        color: dark ? colors.surfaceContainer : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: shape,
+          side: BorderSide(
+            color: dark
+                ? colors.outlineVariant.withValues(alpha: .35)
+                : const Color(0xFFE3ECF7),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: MotionInkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: horizontal
+                ? const EdgeInsets.all(14)
+                : const EdgeInsets.fromLTRB(8, 18, 8, 16),
+            child: horizontal
+                ? Row(
+                    children: [
+                      badge,
+                      const SizedBox(width: 14),
+                      Expanded(child: text),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [badge, const SizedBox(height: 12), text],
+                  ),
           ),
         ),
       ),

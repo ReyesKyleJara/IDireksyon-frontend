@@ -26,9 +26,27 @@ RoadmapPlan samplePlan() => RoadmapPlan.fromJson(
         satisfied: 1,
         total: 1,
       ),
-      planStep(2, 'Supporting ID', selected: false),
-      planStep(3, 'Another document', type: 'document', selected: false),
-      planStep(4, 'Target ID'),
+      planStep(
+        2,
+        'Supporting ID',
+        selected: false,
+        prerequisites: [missingPrerequisite(1, type: 'document')],
+      ),
+      planStep(
+        3,
+        'Another document',
+        type: 'document',
+        selected: false,
+        prerequisites: [missingPrerequisite(2)],
+      ),
+      planStep(
+        4,
+        'Target ID',
+        prerequisites: [
+          missingPrerequisite(3, type: 'document'),
+          missingPrerequisite(1, type: 'document'),
+        ],
+      ),
     ],
   ),
 );
@@ -70,9 +88,10 @@ void main() {
         for (final step in plan.steps) {
           expect(
             find.text(step.name),
-            step.id == 4 ? findsNWidgets(3) : findsOneWidget,
+            step.id == 4 ? findsNWidgets(2) : findsOneWidget,
           );
         }
+        expect(find.text('Target'), findsOneWidget);
         expect(find.textContaining('Readiness'), findsNothing);
         expect(find.textContaining('verified'), findsNothing);
       },
@@ -180,6 +199,11 @@ void main() {
       ),
     );
     expect(find.text('Choose supporting proof'), findsOneWidget);
-    expect(find.text('Upcoming'), findsNWidgets(2));
+    expect(
+      find.textContaining('Requirement needs manual preparation'),
+      findsOneWidget,
+    );
+    expect(find.text('Ready to start'), findsOneWidget);
+    expect(find.text('Upcoming'), findsOneWidget);
   });
 }

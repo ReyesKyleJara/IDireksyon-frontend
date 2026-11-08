@@ -17,6 +17,45 @@ class GovernmentIdDetails {
           .map((row) => Map<String, dynamic>.from(row))
           .toList();
 
+  List<Map<String, dynamic>> get requestMethods => requestPaths
+      .where(
+        (path) =>
+            path['is_request_method'] == true ||
+            (path['is_request_method'] != false &&
+                (_text(path['channel']) != null ||
+                    _text(path['provider']) != null)),
+      )
+      .toList();
+
+  /// Keep method-specific checklists out of general preparation and readiness.
+  GovernmentIdDetails get generalDetails {
+    final ids = requestMethods.map((method) => method['id']).toSet();
+    if (ids.isEmpty) return this;
+    final methodFeeIds = requestMethods
+        .expand(
+          (method) => method.containsKey('fee_ids')
+              ? method['fee_ids'] as List? ?? const []
+              : (method['fees'] as List? ?? const []).map(
+                  (fee) => (fee as Map)['id'],
+                ),
+        )
+        .toSet();
+    final generalFees = (raw['fees'] as List? ?? const [])
+        .where((fee) => !methodFeeIds.contains((fee as Map)['id']))
+        .toList();
+    return GovernmentIdDetails.fromJson({
+      ...raw,
+      'fees': generalFees,
+      if (fees.isNotEmpty && generalFees.isEmpty) 'fee': null,
+      'request_paths': requestPaths
+          .where((path) => !ids.contains(path['id']))
+          .toList(),
+      'requirement_sets': (raw['requirement_sets'] as List? ?? [])
+          .where((set) => !ids.contains((set as Map)['id']))
+          .toList(),
+    });
+  }
+
   /// Offices linked directly to this record, never selected from a request path.
   List<Map<String, dynamic>> get offices => (raw['offices'] as List? ?? [])
       .whereType<Map>()

@@ -12,7 +12,7 @@ void main() {
           'name': 'Processing fixture',
           'record_type': type,
           'processing_time': '1–10 working days',
-          if (note != null) 'processing_time_note': note,
+          'processing_time_note': ?note,
         });
         final hasNote = note != null && note.trim().isNotEmpty;
         expect(record.processingTimeNote, hasNote ? note.trim() : null);

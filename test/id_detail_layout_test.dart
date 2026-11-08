@@ -61,6 +61,9 @@ GovernmentIdDetails fixture() {
     'processing_time':
         'Delivery depends on verification and the selected request channel.',
     'processing_time_note': 'Keep the reference slip and confirm the delivery details with the issuing agency.',
+    'fees': [
+      {'id': 1, 'label': 'Application fee', 'type': 'free'},
+    ],
     'request_paths': [
       {
         'id': 1,
@@ -117,11 +120,8 @@ void main() {
                 .color,
             AppTheme.navy,
           );
-          expect(find.text('Validity: No expiration'), findsOneWidget);
-          expect(
-            find.text('Typical use: Identity verification'),
-            findsOneWidget,
-          );
+          expect(find.text('Validity: No expiration'), findsNothing);
+          expect(find.text('Typical use: Identity verification'), findsNothing);
           expect(
             find.descendant(
               of: find.byKey(const ValueKey('detail-brand-header')),
@@ -136,7 +136,6 @@ void main() {
             'Overview',
             'Requirements',
             'Estimated Cost',
-            'Offices',
             'Guide',
           ]);
           expect(find.text('Information'), findsNothing);
@@ -152,6 +151,20 @@ void main() {
           );
           expect(find.text(record.processingTime!), findsOneWidget);
           expect(find.text(record.processingTimeNote!), findsOneWidget);
+          final overviewContent = find
+              .descendant(
+                of: find.byType(ListView).first,
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          for (final value in [record.validity!, record.purpose!]) {
+            await tester.scrollUntilVisible(
+              find.text(value),
+              160,
+              scrollable: overviewContent,
+            );
+            expect(find.text(value), findsOneWidget);
+          }
           final titleY = tester
               .getTopLeft(find.byKey(const ValueKey('compact-id-title')))
               .dy;
@@ -320,13 +333,7 @@ void main() {
           expect(ring.color, AppTheme.accentGold);
           expect(find.text('50%'), findsOneWidget);
         }
-        await tester.ensureVisible(find.text('Offices'));
-        await tester.tap(find.text('Offices'));
-        await tester.pumpAndSettle();
-        expect(
-          find.text('No offices have been added for this ID yet.'),
-          findsOneWidget,
-        );
+        expect(find.text('Offices'), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );

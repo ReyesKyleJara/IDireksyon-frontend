@@ -4,6 +4,7 @@ import 'active_journey_screen.dart';
 import '../../core/auth/auth_service.dart';
 import 'id_journey.dart';
 import 'roadmap_plan_panel.dart';
+import 'roadmap_widgets.dart';
 import '../../models/roadmap_plan.dart';
 import 'suggested_journey_view.dart';
 
@@ -41,7 +42,19 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
   bool get _passport =>
       targetIds.length == 1 && _goalTitle.toLowerCase().contains('passport');
 
-  static const primaryBlue = Color(0xFF12499A);
+  bool get _usesPlan =>
+      targetCatalogIds.isNotEmpty || widget.targetDocumentIds.isNotEmpty;
+
+  /// A saved roadmap can't be changed later, so choices are made before saving.
+  int get _openChoices =>
+      _plan?.steps
+          .where((step) => step.isUnresolved && step.suggestions.isNotEmpty)
+          .length ??
+      0;
+
+  /// True once the plan shows there is nothing left to obtain.
+  bool get _nothingToDo =>
+      _plan != null && _plan!.steps.every((step) => step.alreadyOwned);
 
   Future<void> _confirm() async {
     if (_saving) return;
@@ -87,103 +100,101 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final choices = _openChoices;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        toolbarHeight: 48,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
+          tooltip: 'Back',
           onPressed: () => Navigator.pop(context),
           icon: Icon(Icons.arrow_back_rounded, color: colors.primary),
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Suggested Roadmap',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: colors.primary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _passport
-                      ? 'Here’s the recommended sequence for your Passport journey.'
-                      : 'Here’s the recommended sequence for your journey.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.35,
-                    color: colors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (targetCatalogIds.isNotEmpty ||
-                    widget.targetDocumentIds.isNotEmpty)
-                  RoadmapPlanPanel(
-                    targetIds: targetCatalogIds,
-                    targetDocumentIds: widget.targetDocumentIds,
-                    guidedPresentation: true,
-                    onPlan: (plan) {
-                      if (mounted) setState(() => _plan = plan);
-                    },
-                  )
-                else ...[
-                  RoadmapGoalCard(
-                    title: _goalTitle,
-                    stepCount: targetIds.length,
-                  ),
-                  const SizedBox(height: 16),
-                  for (var i = 0; i < targetIds.length; i++)
-                    SuggestedJourneyStep(
-                      number: i + 1,
-                      name: targetIds[i] == 'Passport ID'
-                          ? 'Philippine Passport'
-                          : targetIds[i],
-                      isGoal: true,
-                      isLast: i == targetIds.length - 1,
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    RoadmapStepHeader(
+                      step: 'STEP 3 OF 3',
+                      title: 'Suggested Roadmap',
+                      subtitle: targetIds.length > 1
+                          ? 'Anything an item requires comes before it. Items with no link can be done in any order.'
+                          : _passport
+                          ? 'Here’s the recommended sequence for your Passport journey.'
+                          : 'Here’s the recommended sequence for your journey.',
                     ),
-                ],
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: ElevatedButton(
-                    onPressed:
-                        _saving ||
-                            ((targetCatalogIds.isNotEmpty ||
-                                    widget.targetDocumentIds.isNotEmpty) &&
-                                (_plan == null || _plan!.blocked))
-                        ? null
-                        : _confirm,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryBlue,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 16),
+                    if (_usesPlan)
+                      RoadmapPlanPanel(
+                        targetIds: targetCatalogIds,
+                        targetDocumentIds: widget.targetDocumentIds,
+                        guidedPresentation: true,
+                        onPlan: (plan) {
+                          if (mounted) setState(() => _plan = plan);
+                        },
+                      )
+                    else ...[
+                      RoadmapGoalCard(
+                        title: _goalTitle,
+                        stepCount: targetIds.length,
                       ),
-                    ),
-                    child: const Text(
-                      'Confirm Suggested Journey',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                      const SizedBox(height: 16),
+                      for (var i = 0; i < targetIds.length; i++)
+                        SuggestedJourneyStep(
+                          number: i + 1,
+                          name: targetIds[i] == 'Passport ID'
+                              ? 'Philippine Passport'
+                              : targetIds[i],
+                          isGoal: true,
+                          isLast: i == targetIds.length - 1,
+                        ),
+                    ],
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+            RoadmapBottomBar(
+              note: choices == 0 && !_nothingToDo
+                  ? null
+                  : Text(
+                      _nothingToDo
+                          ? 'You already have everything in this roadmap.'
+                          : choices == 1
+                          ? 'Make the 1 choice above to continue'
+                          : 'Make the $choices choices above to continue',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+              action: ElevatedButton(
+                onPressed:
+                    _saving ||
+                        (_usesPlan &&
+                            (_plan == null ||
+                                _plan!.blocked ||
+                                choices > 0 ||
+                                _nothingToDo))
+                    ? null
+                    : _confirm,
+                style: roadmapPrimaryButtonStyle(context),
+                child: const Text('Confirm Suggested Journey'),
+              ),
+            ),
+          ],
         ),
       ),
     );

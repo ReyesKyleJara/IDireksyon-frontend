@@ -19,7 +19,7 @@ GovernmentIdDetails fixture({bool informational = false}) =>
 
 void main() {
   testWidgets(
-    'assistance opens separately below request choices and survives channel switching and back',
+    'assistance stays independent of optional request-method exploration',
     (tester) async {
       final record = fixture();
       final original = jsonEncode(record.raw['special_cases']);
@@ -34,15 +34,20 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Guide'));
-      await tester.tap(find.text('Guide'));
+      await tester.tap(find.text('Ways to Request'));
       await tester.pumpAndSettle();
-      expect(find.text('How do I request it?'), findsOneWidget);
+      await tester.tap(find.text('In Person'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RequestMethodScreen), findsOneWidget);
+      expect(find.text('Normal copy step'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Special Cases'));
+      await tester.tap(find.text('Special Cases'));
+      await tester.pumpAndSettle();
+      expect(find.text('How do I request it?'), findsNothing);
       expect(find.text("Don't have a Birth Certificate yet?"), findsOneWidget);
       expect(find.text('Normal copy step'), findsNothing);
-      await tester.tap(find.widgetWithText(OutlinedButton, 'In Person'));
-      await tester.pumpAndSettle();
-      expect(find.text('Normal copy step'), findsOneWidget);
       await tester.ensureVisible(find.text('Learn about delayed registration'));
       await tester.tap(find.text('Learn about delayed registration'));
       await tester.pumpAndSettle();
@@ -84,9 +89,15 @@ void main() {
       await tester.tap(find.text('Back to ${record.name}'));
       await tester.pumpAndSettle();
       expect(find.byType(SpecialCaseGuideScreen), findsNothing);
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Online'));
+      await tester.tap(find.text('Ways to Request'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Online'));
       await tester.pumpAndSettle();
       expect(find.text('Normal copy step'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Special Cases'));
+      await tester.pumpAndSettle();
       expect(find.text('Learn about delayed registration'), findsOneWidget);
       expect(jsonEncode(record.raw['special_cases']), original);
       expect(tester.takeException(), isNull);
@@ -217,8 +228,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Guide'));
-      await tester.tap(find.text('Guide'));
+      await tester.ensureVisible(find.text('Special Cases'));
+      await tester.tap(find.text('Special Cases'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Open second fixture'),

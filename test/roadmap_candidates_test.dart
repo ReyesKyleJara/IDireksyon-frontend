@@ -57,7 +57,7 @@ void main() {
     expect(find.byType(IdsScreen), findsOneWidget);
   });
 
-  testWidgets('single selection replaces the previous government ID', (
+  testWidgets('several targets can be selected and deselected', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -83,15 +83,20 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('National ID'));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
+    expect(find.byIcon(Icons.check_box_rounded), findsNWidgets(2));
+    await tester.tap(find.text('Passport'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check_box_rounded), findsOneWidget);
+    await tester.tap(find.text('Passport'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Continue'));
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
     final confirmation = tester.widget<ConfirmDocumentsScreen>(
       find.byType(ConfirmDocumentsScreen),
     );
-    expect(confirmation.targetCatalogIds, [56]);
-    expect(confirmation.targetIds, ['National ID']);
+    expect(confirmation.targetCatalogIds, [56, 55]);
+    expect(confirmation.targetIds, ['National ID', 'Passport']);
   });
 
   testWidgets('search and typed document selection reach the real roadmap', (
@@ -123,6 +128,9 @@ void main() {
     );
     expect(find.text('Hidden document'), findsNothing);
     await tester.tap(find.text('Philippine Passport'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Philippine Passport')); // Deselects it again.
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'birth');
     await tester.pumpAndSettle();
     expect(find.text('Philippine Passport'), findsNothing);

@@ -70,11 +70,7 @@ void main() {
       }
       for (final fact in [
         'Issuing institution',
-        'National',
-        'Professional Credential',
         'Factual reference description',
-        'Available',
-        'Profession-Based',
         'Licensed professionals',
         'Three years',
       ]) {
@@ -93,6 +89,14 @@ void main() {
               .first,
         );
         expect(content, findsOneWidget);
+      }
+      for (final hidden in [
+        'National',
+        'Professional Credential',
+        'Available',
+        'Profession-Based',
+      ]) {
+        expect(find.text(hidden), findsNothing);
       }
       expect(find.text('Saved acquisition requirement'), findsNothing);
       expect(record.requirements, 'Saved acquisition requirement');

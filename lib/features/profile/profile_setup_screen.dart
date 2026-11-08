@@ -323,7 +323,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
     if (leave != true) return;
 
-    await AuthService.instance.logout();
+    try {
+      await AuthService.instance.logout();
+    } on AuthException {
+      // Local cleanup runs even when the backend logout request fails.
+    }
 
     if (!mounted) return;
 
@@ -518,8 +522,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       ),
       child: Column(
         children: [
-          SizedBox(
-            height: 42,
+          // Grows with large text instead of clipping the title.
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: 42,
+            ),
             child: Row(
               children: [
                 SizedBox(
@@ -548,16 +555,27 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   ),
                 ),
 
+                // One line, shrunk only as far as needed, so large text
+                // leaves room for the step's own heading and options.
                 const Expanded(
-                  child: Text(
-                    'Set Up Profile',
-                    textAlign:
-                        TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight:
-                          FontWeight.w700,
-                      color: Colors.black,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 6,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Set Up Profile',
+                        maxLines: 1,
+                        textAlign:
+                            TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight:
+                              FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -924,221 +942,234 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         filteredOptions,
     Set<int> selected,
   ) {
-    return Padding(
-      padding:
-          const EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        0,
-      ),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            _documentsStep
-                ? 'Which documents do you currently have?'
-                : 'Which government IDs do you already have?',
-            style: const TextStyle(
-              fontFamily:
-                  'Bricolage Grotesque',
-              fontSize: 23,
-              height: 1.15,
-              fontWeight:
-                  FontWeight.w800,
-              color: Colors.black,
-            ),
+    // The intro, search and options share one scroll view, so large text
+    // can never squeeze the option list off a small screen.
+    return CustomScrollView(
+      physics:
+          const BouncingScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding:
+              const EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            8,
           ),
-
-          const SizedBox(height: 12),
-
-          const Text(
-            'Select all that apply. If none, you can skip this step.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              color: Color(0xFF4F5663),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          TextField(
-            controller:
-                _searchController,
-            textInputAction:
-                TextInputAction.search,
-            style: const TextStyle(
-              color: Color(0xFF20242B),
-              fontSize: 14,
-              fontWeight:
-                  FontWeight.w500,
-            ),
-            cursorColor: _blue,
-            decoration:
-                InputDecoration(
-              hintText: _documentsStep
-                  ? 'Search documents...'
-                  : 'Search government IDs...',
-              hintStyle:
-                  const TextStyle(
-                color:
-                    Color(0xFF8E96A3),
-                fontSize: 14,
-              ),
-              prefixIcon:
-                  const Icon(
-                Icons.search_rounded,
-                color:
-                    Color(0xFF8E96A3),
-              ),
-              suffixIcon:
-                  _searchController
-                          .text
-                          .isNotEmpty
-                      ? IconButton(
-                          onPressed:
-                              _searchController
-                                  .clear,
-                          icon:
-                              const Icon(
-                            Icons
-                                .close_rounded,
-                            size: 19,
-                          ),
-                        )
-                      : null,
-              filled: true,
-              fillColor:
-                  const Color(
-                0xFFF7F8FA,
-              ),
-              contentPadding:
-                  const EdgeInsets
-                      .symmetric(
-                horizontal: 14,
-                vertical: 12,
-              ),
-              border:
-                  OutlineInputBorder(
-                borderRadius:
-                    BorderRadius
-                        .circular(14),
-                borderSide:
-                    const BorderSide(
-                  color:
-                      Color(0xFFDDE1E6),
+          sliver: SliverList.list(
+            children: [
+              Text(
+                _documentsStep
+                    ? 'Which documents do you currently have?'
+                    : 'Which government IDs do you already have?',
+                style: const TextStyle(
+                  fontFamily:
+                      'Bricolage Grotesque',
+                  fontSize: 23,
+                  height: 1.15,
+                  fontWeight:
+                      FontWeight.w800,
+                  color: Colors.black,
                 ),
               ),
-              enabledBorder:
-                  OutlineInputBorder(
-                borderRadius:
-                    BorderRadius
-                        .circular(14),
-                borderSide:
-                    const BorderSide(
-                  color:
-                      Color(0xFFDDE1E6),
+
+              const SizedBox(height: 12),
+
+              const Text(
+                'Select all that apply. If none, you can skip this step.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: Color(0xFF4F5663),
                 ),
               ),
-              focusedBorder:
-                  OutlineInputBorder(
-                borderRadius:
-                    BorderRadius
-                        .circular(14),
-                borderSide:
-                    const BorderSide(
-                  color: _blue,
-                  width: 1.5,
+
+              const SizedBox(height: 16),
+
+              TextField(
+                controller:
+                    _searchController,
+                textInputAction:
+                    TextInputAction.search,
+                style: const TextStyle(
+                  color: Color(0xFF20242B),
+                  fontSize: 14,
+                  fontWeight:
+                      FontWeight.w500,
                 ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Expanded(
-            child: filteredOptions.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize:
-                          MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons
-                              .search_off_rounded,
-                          size: 36,
-                          color: Color(
-                            0xFF9CA3AF,
-                          ),
-                        ),
-
-                        const SizedBox(
-                          height: 10,
-                        ),
-
-                        Text(
-                          _searchQuery
-                                  .isEmpty
-                              ? 'No options are available yet.'
-                              : 'No matching results found.',
-                          textAlign:
-                              TextAlign
-                                  .center,
-                          style:
-                              const TextStyle(
-                            color:
-                                Color(
-                              0xFF777D89,
-                            ),
-                            fontSize:
-                                13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.separated(
-                    padding:
-                        const EdgeInsets
-                            .only(
-                      top: 2,
-                      bottom: 16,
-                    ),
-                    physics:
-                        const BouncingScrollPhysics(),
-                    itemCount:
-                        filteredOptions
-                            .length,
-                    separatorBuilder:
-                        (_, _) =>
-                            const SizedBox(
-                      height: 8,
-                    ),
-                    itemBuilder:
-                        (context, index) {
-                      final option =
-                          filteredOptions[
-                              index];
-
-                      final isSelected =
-                          selected.contains(
-                        option.id,
-                      );
-
-                      return _buildOptionRow(
-                        option: option,
-                        isSelected:
-                            isSelected,
-                        selected:
-                            selected,
-                      );
-                    },
+                cursorColor: _blue,
+                decoration:
+                    InputDecoration(
+                  hintText: _documentsStep
+                      ? 'Search documents...'
+                      : 'Search government IDs...',
+                  hintStyle:
+                      const TextStyle(
+                    color:
+                        Color(0xFF8E96A3),
+                    fontSize: 14,
                   ),
+                  prefixIcon:
+                      const Icon(
+                    Icons.search_rounded,
+                    color:
+                        Color(0xFF8E96A3),
+                  ),
+                  suffixIcon:
+                      _searchController
+                              .text
+                              .isNotEmpty
+                          ? IconButton(
+                              onPressed:
+                                  _searchController
+                                      .clear,
+                              icon:
+                                  const Icon(
+                                Icons
+                                    .close_rounded,
+                                size: 19,
+                              ),
+                            )
+                          : null,
+                  filled: true,
+                  fillColor:
+                      const Color(
+                    0xFFF7F8FA,
+                  ),
+                  contentPadding:
+                      const EdgeInsets
+                          .symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  border:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius
+                            .circular(14),
+                    borderSide:
+                        const BorderSide(
+                      color:
+                          Color(0xFFDDE1E6),
+                    ),
+                  ),
+                  enabledBorder:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius
+                            .circular(14),
+                    borderSide:
+                        const BorderSide(
+                      color:
+                          Color(0xFFDDE1E6),
+                    ),
+                  ),
+                  focusedBorder:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius
+                            .circular(14),
+                    borderSide:
+                        const BorderSide(
+                      color: _blue,
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+
+        if (filteredOptions.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 16,
+              ),
+              child: Center(
+                  child: Column(
+                    mainAxisSize:
+                        MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons
+                            .search_off_rounded,
+                        size: 36,
+                        color: Color(
+                          0xFF9CA3AF,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 10,
+                      ),
+
+                      Text(
+                        _searchQuery
+                                .isEmpty
+                            ? 'No options are available yet.'
+                            : 'No matching results found.',
+                        textAlign:
+                            TextAlign
+                                .center,
+                        style:
+                            const TextStyle(
+                          color:
+                              Color(
+                            0xFF777D89,
+                          ),
+                          fontSize:
+                              13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding:
+                const EdgeInsets.fromLTRB(
+              20,
+              2,
+              20,
+              16,
+            ),
+            sliver: SliverList.separated(
+              itemCount:
+                  filteredOptions.length,
+              separatorBuilder:
+                  (_, _) =>
+                      const SizedBox(
+                height: 8,
+              ),
+              itemBuilder:
+                  (context, index) {
+                final option =
+                    filteredOptions[
+                        index];
+
+                final isSelected =
+                    selected.contains(
+                  option.id,
+                );
+
+                return _buildOptionRow(
+                  option: option,
+                  isSelected:
+                      isSelected,
+                  selected:
+                      selected,
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 

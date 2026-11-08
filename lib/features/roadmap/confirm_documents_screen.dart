@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../profile/manage_inventory_screen.dart';
+import 'roadmap_widgets.dart';
 import 'suggested_roadmap_screen.dart';
 import 'id_journey.dart';
 
@@ -17,7 +18,6 @@ class ConfirmDocumentsScreen extends StatefulWidget {
   final List<int> targetCatalogIds;
   final List<int> targetDocumentIds;
   final List<IdJourney> existingJourneys;
-  static const primaryBlue = Color(0xFF12499A);
   @override
   State<ConfirmDocumentsScreen> createState() => _ConfirmDocumentsScreenState();
 }
@@ -80,127 +80,188 @@ class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
     }
   }
 
+  void _continue() => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => SuggestedRoadmapScreen(
+        targetIds: widget.targetIds,
+        targetCatalogIds: widget.targetCatalogIds,
+        targetDocumentIds: widget.targetDocumentIds,
+        ownedItems: _owned.map((item) => item.name).toList(),
+        existingJourneys: widget.existingJourneys,
+      ),
+    ),
+  );
+
+  Widget _section(String title, String type) {
+    final colors = Theme.of(context).colorScheme;
+    final items = _owned.where((item) => item.type == type).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        RoadmapCard(
+          child: items.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Text(
+                    'No saved items.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    for (final (index, item) in items.indexed) ...[
+                      if (index > 0)
+                        Divider(
+                          height: 1,
+                          color: colors.outlineVariant.withValues(alpha: .35),
+                        ),
+                      Padding(
+                        key: ValueKey((item.type, item.id)),
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            RoadmapRecordIcon(
+                              document: type == 'document',
+                              size: 36,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                item.name,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(),
-    body: SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 48,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+      ),
+      body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Confirm your current documents',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Review your saved IDs and documents before we build your roadmap.',
-            ),
-            const SizedBox(height: 17),
-            if (_loading) const Text('Loading saved Inventory…'),
-            if (_error != null) ...[
-              Text(_error!),
-              TextButton(
-                onPressed: _load,
-                child: const Text('Retry Inventory'),
-              ),
-            ],
-            if (!_loading && _error == null) ...[
-              for (final type in ['government_id', 'document']) ...[
-                Text(
-                  type == 'government_id' ? 'Owned IDs' : 'Owned Documents',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                for (final item in _owned.where((item) => item.type == type))
-                  Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outlineVariant,
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const RoadmapStepHeader(
+                      step: 'STEP 2 OF 3',
+                      title: 'Confirm your current documents',
+                      subtitle:
+                          'Review your saved IDs and documents before we build your roadmap.',
+                    ),
+                    const SizedBox(height: 16),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          const TextSpan(text: 'Your roadmap will cover: '),
+                          TextSpan(
+                            text: widget.targetIds.join(', '),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: colors.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 2,
-                      ),
-                      key: ValueKey((item.type, item.id)),
-                      leading: Icon(
-                        type == 'government_id'
-                            ? Icons.badge_outlined
-                            : Icons.description_outlined,
-                      ),
-                      title: Text(
-                        item.name,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                    const SizedBox(height: 18),
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'Loading saved Inventory…',
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                      trailing: const Icon(
-                        Icons.check_circle_outline,
-                        color: ConfirmDocumentsScreen.primaryBlue,
-                        size: 22,
+                    if (_error != null) ...[
+                      Text(_error!, textAlign: TextAlign.center),
+                      TextButton(
+                        onPressed: _load,
+                        child: const Text('Retry Inventory'),
                       ),
-                    ),
-                  ),
-                if (!_owned.any((item) => item.type == type))
-                  const Text('No saved items.'),
-                const SizedBox(height: 16),
-              ],
-            ],
-            OutlinedButton(
-              onPressed: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const ManageInventoryScreen(),
-                  ),
-                );
-                if (mounted) await _load();
-              },
-              child: const Text('Manage Inventory'),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loading || _error != null
-                  ? null
-                  : () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SuggestedRoadmapScreen(
-                          targetIds: widget.targetIds,
-                          targetCatalogIds: widget.targetCatalogIds,
-                          targetDocumentIds: widget.targetDocumentIds,
-                          ownedItems: _owned.map((item) => item.name).toList(),
-                          existingJourneys: widget.existingJourneys,
+                    ],
+                    if (!_loading && _error == null) ...[
+                      _section('Owned IDs', 'government_id'),
+                      const SizedBox(height: 16),
+                      _section('Owned Documents', 'document'),
+                      const SizedBox(height: 16),
+                    ],
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ManageInventoryScreen(),
+                          ),
+                        );
+                        if (mounted) await _load();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Manage Inventory'),
                     ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ConfirmDocumentsScreen.primaryBlue,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  ],
                 ),
               ),
-              child: const Text('Save & Continue'),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Update your saved items in Manage Inventory.',
-              style: TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
+            RoadmapBottomBar(
+              action: ElevatedButton(
+                onPressed: _loading || _error != null ? null : _continue,
+                style: roadmapPrimaryButtonStyle(context),
+                child: const Text('Save & Continue'),
+              ),
             ),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }

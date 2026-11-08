@@ -101,9 +101,13 @@ void main() {
         expect(find.text('Get Directions'), findsOneWidget);
         expect(find.text('Monday: open 08:00:00–17:00:00'), findsOneWidget);
         expect(find.text('Path-only legacy office'), findsNothing);
-        await tester.tap(find.byType(DropdownButtonFormField<int>));
+        await tester.tap(find.text('Ways to Request'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Online').last);
+        await tester.ensureVisible(find.text('Online'));
+        await tester.tap(find.text('Online'));
+        await tester.pumpAndSettle();
+        expect(find.byType(RequestMethodScreen), findsOneWidget);
+        await tester.pageBack();
         await tester.pumpAndSettle();
         await tester.tap(find.text('Offices'));
         await tester.pumpAndSettle();
@@ -120,7 +124,7 @@ void main() {
 
   for (final type in ['government_id', 'document']) {
     testWidgets(
-      '$type empty state does not fall back to Request Method offices',
+      '$type hides empty record Offices without borrowing method offices',
       (tester) async {
         final data = GovernmentIdDetails.fromJson({
           ...record(type, 'Empty fixture'),
@@ -138,16 +142,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Offices'));
-        await tester.pumpAndSettle();
-        expect(
-          find.text(
-            type == 'document'
-                ? 'No offices have been added for this document yet.'
-                : 'No offices have been added for this ID yet.',
-          ),
-          findsOneWidget,
-        );
+        expect(find.text('Offices'), findsNothing);
         expect(find.text('Path-only legacy office'), findsNothing);
         expect(tester.takeException(), isNull);
       },

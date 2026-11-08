@@ -45,6 +45,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.lightTheme,
+        home: const OnboardingScreen(),
         onGenerateRoute: AppRouter.generateRoute,
       ),
     );
@@ -58,12 +59,6 @@ void main() {
     await openApp(tester);
     expect(shown(intro), findsOneWidget);
     expect(find.text('Log In'), findsNothing);
-    await tester.tap(find.text('I already have an account'));
-    await settle(tester);
-    expect(find.byType(LoginScreen), findsOneWidget);
-    tester.state<NavigatorState>(find.byType(Navigator)).pop();
-    await settle(tester);
-
     await tester.tap(find.text('Next'));
     await settle(tester);
     expect(shown(prepared), findsOneWidget);

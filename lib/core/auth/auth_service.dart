@@ -5,11 +5,16 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
+import 'session_store.dart';
 import '../../models/roadmap_plan.dart';
 import '../../services/application_preparation.dart';
 
 class AuthException implements Exception {
-  const AuthException(this.message, {this.fieldErrors = const {}, this.retryAfterSeconds});
+  const AuthException(
+    this.message, {
+    this.fieldErrors = const {},
+    this.retryAfterSeconds,
+  });
 
   final String message;
   final int? retryAfterSeconds;
@@ -19,11 +24,15 @@ class AuthException implements Exception {
 }
 
 class AuthService extends ChangeNotifier {
-  AuthService({http.Client? client, String? baseUrl})
-    : _client = client ?? http.Client(),
-      baseUrl = baseUrl == null || baseUrl.trim().isEmpty
-          ? ApiConfig.baseUrl
-          : baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+  AuthService({
+    http.Client? client,
+    String? baseUrl,
+    SessionStore? sessionStore,
+  }) : _client = client ?? http.Client(),
+       sessionStore = sessionStore ?? SessionStore(),
+       baseUrl = baseUrl == null || baseUrl.trim().isEmpty
+           ? ApiConfig.baseUrl
+           : baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
 
   static AuthService instance = AuthService();
 
@@ -31,8 +40,12 @@ class AuthService extends ChangeNotifier {
 
   String baseUrl;
 
-  // Session is currently kept in memory.
-  // Restarting the app requires signing in again.
+  final SessionStore sessionStore;
+  DateTime? _expiresAt;
+
+  // Mirrors ResidentAuthController::session(): tokens expire after 30 days.
+  // This local upper bound also avoids restoring an expired token offline.
+  static const _sessionLifetime = Duration(days: 30);
   String? token;
   int inventoryRevision = 0;
   int preparationRevision = 0;
@@ -44,6 +57,86 @@ class AuthService extends ChangeNotifier {
   set user(Map<String, dynamic>? value) {
     _user = value;
     notifyListeners();
+  }
+
+  Future<String> startupRoute() async {
+    final saved = await sessionStore.read();
+    if (saved != null) {
+      if (!DateTime.now().toUtc().isBefore(saved.expiresAt)) {
+        await _clearSession();
+        return '/login';
+      }
+      token = saved.token;
+      _expiresAt = saved.expiresAt;
+      user = saved.user;
+      try {
+        final response = await _client
+            .get(
+              Uri.parse('$baseUrl/auth/me'),
+              headers: {
+                'Accept': 'application/json',
+                'Authorization': 'Bearer ${saved.token}',
+              },
+            )
+            .timeout(const Duration(seconds: 20));
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          await _clearSession();
+          return '/login';
+        }
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final data = jsonDecode(response.body);
+          if (data is Map<String, dynamic> &&
+              data['user'] is Map<String, dynamic>) {
+            await _cacheProfile(data['user'] as Map<String, dynamic>);
+          }
+        }
+        // 5xx, rate limits and unexpected responses do not revoke credentials.
+      } on TimeoutException {
+        // Keep the saved session while the server cannot be reached.
+      } on http.ClientException {
+        // Home can show cached data and retry its requests later.
+      } on FormatException {
+        // A malformed response does not prove that the token is invalid.
+      }
+      return '/home';
+    }
+    token = null;
+    user = null;
+    return await sessionStore.onboardingCompleted ? '/login' : '/onboarding';
+  }
+
+  Future<void> _clearSession() async {
+    try {
+      await sessionStore.clear();
+    } catch (_) {
+      throw const AuthException(
+        'Could not clear the saved session. Please try again.',
+      );
+    } finally {
+      token = null;
+      _expiresAt = null;
+      user = null;
+    }
+  }
+
+  Future<void> _cacheProfile(Map<String, dynamic> profile) async {
+    final session = token;
+    if (session != null) {
+      try {
+        await sessionStore.save(
+          SavedSession(
+            session,
+            profile,
+            _expiresAt ?? DateTime.now().toUtc().add(_sessionLifetime),
+          ),
+        );
+      } catch (_) {
+        throw const AuthException(
+          'Could not save your session securely. Please try again.',
+        );
+      }
+    }
+    user = profile;
   }
 
   Future<Map<String, dynamic>> getRequirementPreparation(
@@ -144,13 +237,12 @@ class AuthService extends ChangeNotifier {
   );
 
   Future<void> logout() async {
-    try {
-      if (token != null) {
-        await _post('logout', {});
-      }
-    } finally {
-      token = null;
-      user = null;
+    final session = token;
+    // Clear locally before waiting for the network, so closing the app during
+    // a slow logout cannot restore the session on the next launch.
+    await _clearSession();
+    if (session != null) {
+      await _post('logout', {}, sessionToken: session);
     }
   }
 
@@ -169,8 +261,7 @@ class AuthService extends ChangeNotifier {
         'Your session changed. Please reload before continuing.',
       );
     }
-    token = null;
-    user = null;
+    await _clearSession();
   }
 
   Future<String> sendPasswordResetEmail(String email) async {
@@ -229,7 +320,8 @@ class AuthService extends ChangeNotifier {
   int signupResendSeconds(String email) {
     final deadline = _signupResendAt[email.trim().toLowerCase()];
     if (deadline == null) return 0;
-    final seconds = (deadline.difference(DateTime.now()).inMilliseconds / 1000).ceil();
+    final seconds = (deadline.difference(DateTime.now()).inMilliseconds / 1000)
+        .ceil();
     return seconds > 0 ? seconds : 0;
   }
 
@@ -240,15 +332,18 @@ class AuthService extends ChangeNotifier {
     final key = email.trim().toLowerCase();
     final remaining = signupResendSeconds(key);
     if (remaining > 0) {
-      throw AuthException(_signupCooldownMessage(remaining), retryAfterSeconds: remaining);
+      throw AuthException(
+        _signupCooldownMessage(remaining),
+        retryAfterSeconds: remaining,
+      );
     }
     try {
-      final data = await _post('email-verification/send', {
-        'email': key,
-      });
+      final data = await _post('email-verification/send', {'email': key});
       final id = data['challenge_id'];
       if (id is! String) {
-        throw const AuthException('The server returned an unexpected response.');
+        throw const AuthException(
+          'The server returned an unexpected response.',
+        );
       }
       final seconds = (data['resend_after'] as num?)?.toInt() ?? 60;
       _signupResendAt[key] = DateTime.now().add(Duration(seconds: seconds));
@@ -275,15 +370,28 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> _authenticate(String path, Map<String, dynamic> body) async {
+    final issuedAt = DateTime.now().toUtc();
     final data = await _post(path, body);
 
     final newToken = data['token'];
     final newUser = data['user'];
 
-    if (newToken is! String || newUser is! Map<String, dynamic>) {
+    if (newToken is! String ||
+        newToken.trim().isEmpty ||
+        newUser is! Map<String, dynamic>) {
       throw const AuthException('The server returned an unexpected response.');
     }
 
+    final expiresAt = issuedAt.add(_sessionLifetime);
+    try {
+      await sessionStore.completeOnboarding();
+      await sessionStore.save(SavedSession(newToken, newUser, expiresAt));
+    } catch (_) {
+      throw const AuthException(
+        'Could not save your session securely. Please try again.',
+      );
+    }
+    _expiresAt = expiresAt;
     token = newToken;
     user = newUser;
   }
@@ -313,13 +421,15 @@ class AuthService extends ChangeNotifier {
       throw const AuthException('The server returned an unexpected response.');
     }
 
-    user = profile;
+    await _cacheProfile(profile);
   }
 
   Future<Map<String, dynamic>> _post(
     String path,
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    String? sessionToken,
+  }) async {
+    final bearerToken = sessionToken ?? token;
     try {
       final response = await _client
           .post(
@@ -327,8 +437,8 @@ class AuthService extends ChangeNotifier {
             headers: {
               'Accept': 'application/json',
               'Content-Type': 'application/json',
-              if (path != 'login' && path != 'register' && token != null)
-                'Authorization': 'Bearer $token',
+              if (path != 'login' && path != 'register' && bearerToken != null)
+                'Authorization': 'Bearer $bearerToken',
             },
             body: jsonEncode(body),
           )
@@ -348,11 +458,13 @@ class AuthService extends ChangeNotifier {
         } on FormatException {
           // A proxy may return a non-JSON response; still honor Retry-After.
         }
-        final seconds = int.tryParse('${cooldown?['remaining_seconds']}') ??
+        final seconds =
+            int.tryParse('${cooldown?['remaining_seconds']}') ??
             int.tryParse(response.headers['retry-after'] ?? '');
         throw AuthException(
           path == 'email-verification/send' && seconds != null
-              ? (cooldown?['message']?.toString() ?? _signupCooldownMessage(seconds))
+              ? (cooldown?['message']?.toString() ??
+                    _signupCooldownMessage(seconds))
               : 'Too many attempts. Please wait a minute and try again.',
           retryAfterSeconds: seconds,
         );
@@ -426,7 +538,7 @@ class AuthService extends ChangeNotifier {
       throw const AuthException('The server returned an unexpected response.');
     }
 
-    user = profile;
+    await _cacheProfile(profile);
   }
 
   Future<void> updatePassword({

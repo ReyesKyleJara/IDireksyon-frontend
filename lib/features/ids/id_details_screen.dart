@@ -10,7 +10,7 @@ import 'fees_tab.dart';
 import 'offices_tab.dart';
 import 'inventory_readiness_card.dart';
 
-/// Shared, typed catalog detail. Request-channel context applies to every section.
+/// General catalog details with optional, read-only request-method information.
 class IdDetailsScreen extends StatefulWidget {
   final String idName, recordType;
   final int? governmentId;
@@ -32,7 +32,6 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
     with CatalogDetailContent {
   late Future<GovernmentIdDetails>? _detail;
   int? _pathId;
-  bool _preferGuide = false;
   Future<GovernmentIdDetails>? _load() {
     final id = widget.governmentId;
     if (id == null) return null;
@@ -102,17 +101,23 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         );
       }
       final record = snapshot.data!;
-      final paths = record.requestPaths;
+      final general = record.generalDetails;
+      final paths = general.requestPaths;
       final path =
           paths.where((row) => row['id'] == _pathId).firstOrNull ??
           paths.firstOrNull;
-      final selected = path == null ? record : record.forPath(path);
+      final selected = path == null ? general : general.forPath(path);
       final hidden = List<String>.from(
         record.research['hidden_sections'] as List? ?? [],
       );
       final specialCases = hidden.contains('troubleshooting')
           ? <Map<String, dynamic>>[]
-          : _maps(record.raw['special_cases']);
+          : _maps(record.raw['special_cases'])
+                .where(
+                  (item) =>
+                      _has(item['title']) || _has(item['assistance_title']),
+                )
+                .toList();
       final sections = <(String, Widget)>[];
       if (!record.isInformational) {
         if (!hidden.contains('requirements') &&
@@ -127,15 +132,17 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           ));
         }
         if (!hidden.contains('fees') &&
-            (selected.fees.isNotEmpty ||
-                (path == null && selected.legacyFee != null))) {
+            (general.fees.isNotEmpty || _has(general.legacyFee))) {
           sections.add((
             'Estimated Cost',
-            FeesTab(key: ValueKey(path?['id']), record: selected),
+            FeesTab(
+              key: ValueKey(('general-fees', record.id)),
+              record: general,
+            ),
           ));
         }
         final offices = record.offices;
-        if (!hidden.contains('offices')) {
+        if (!hidden.contains('offices') && offices.isNotEmpty) {
           sections.add((
             'Offices',
             OfficesTab(
@@ -146,82 +153,103 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
             ),
           ));
         }
-        final guide = _maps(path?['guide']);
-        if (!hidden.contains('guide') &&
-            (guide.isNotEmpty || specialCases.isNotEmpty)) {
-          sections.add((
-            'Guide',
-            _list([
-              if (specialCases.isNotEmpty) ...[
-                const Text(
-                  'Application Guide',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+      }
+      final guide = record.isInformational || hidden.contains('guide')
+          ? <Map<String, dynamic>>[]
+          : _maps(path?['guide'])
+                .where(
+                  (step) =>
+                      _has(step['title']) ||
+                      _has(step['short_description']) ||
+                      _maps(step['blocks']).isNotEmpty,
+                )
+                .toList();
+      final methods = record.requestMethods
+          .where((method) => _has(method['label']))
+          .toList();
+      final cases = hidden.contains('troubleshooting')
+          ? <Map<String, dynamic>>[]
+          : _maps(path?['troubleshooting'])
+                .where(
+                  (item) =>
+                      _has(item['title']) ||
+                      _has(item['body']) ||
+                      _has(item['url']),
+                )
+                .toList();
+      final assistance = specialCases;
+      if (guide.isNotEmpty) {
+        sections.add((
+          'Guide',
+          _list([
+            _sectionTitle('Application Guide'),
+            for (var index = 0; index < guide.length; index++)
+              _guide(guide[index], index, path!),
+          ]),
+        ));
+      }
+      if (methods.isNotEmpty) {
+        sections.add((
+          'Ways to Request',
+          _list([
+            _card('Request options', [
+              const Text(
+                'Explore the available ways to request this item. No selection is required.',
+              ),
+              for (final method in methods)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${method['label']}'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          RequestMethodScreen(record: record, method: method),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'How do I request it?',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    for (final option in paths)
-                      OutlinedButton(
-                        onPressed: () => setState(() {
-                          _pathId = option['id'] as int;
-                          _preferGuide = true;
-                        }),
-                        child: Text('${option['label']}'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (specialCases.isEmpty || _pathId != null || paths.length == 1)
-                for (var index = 0; index < guide.length; index++)
-                  _guide(guide[index], index, path!),
-              for (final specialCase in specialCases)
-                _card(
-                  '${specialCase['assistance_title'] ?? specialCase['title']}',
-                  [
+            ]),
+          ]),
+        ));
+      }
+      if (assistance.isNotEmpty || cases.isNotEmpty) {
+        sections.add((
+          'Special Cases',
+          _list([
+            for (final specialCase in assistance)
+              _card(
+                '${specialCase['assistance_title'] ?? specialCase['title']}',
+                [
+                  if (_has(
+                    specialCase['assistance_description'] ??
+                        specialCase['description'],
+                  ))
                     Text(
                       '${specialCase['assistance_description'] ?? specialCase['description']}',
                     ),
-                    const SizedBox(height: 8),
-                    FilledButton.tonal(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => SpecialCaseGuideScreen(
-                            parent: record,
-                            guide: specialCase,
-                          ),
+                  const SizedBox(height: 8),
+                  FilledButton.tonal(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SpecialCaseGuideScreen(
+                          parent: record,
+                          guide: specialCase,
                         ),
                       ),
-                      child: Text('${specialCase['action_label']}'),
                     ),
-                  ],
-                ),
-            ]),
-          ));
-        }
-        final cases = _maps(path?['troubleshooting']);
-        if (!hidden.contains('troubleshooting') && cases.isNotEmpty) {
-          sections.add((
-            'Special cases',
-            _list([
-              for (final item in cases)
-                _card('${item['title']}', [
-                  Text('${item['body']}'),
-                  if (_has(item['url']))
-                    CatalogOfficialLink(url: '${item['url']}'),
-                ]),
-            ]),
-          ));
-        }
+                    child: Text('${specialCase['action_label']}'),
+                  ),
+                ],
+              ),
+            for (final item in cases)
+              _card('${item['title']}', [
+                if (_has(item['body'])) Text('${item['body']}'),
+                if (_has(item['url']))
+                  CatalogOfficialLink(url: '${item['url']}'),
+              ]),
+          ]),
+        ));
       }
-      final information = _information(record, path);
       sections.insert(0, (
         'Overview',
         _list([
@@ -230,7 +258,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
               key: ValueKey((record.recordType, record.id, path?['id'])),
               record: selected,
             ),
-          ...information,
+          ..._information(record),
         ]),
       ));
       return DefaultTabController(
@@ -241,10 +269,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           sections.map((s) => s.$1).join(','),
         )),
         length: sections.length,
-        initialIndex:
-            _preferGuide && sections.any((section) => section.$1 == 'Guide')
-            ? sections.indexWhere((section) => section.$1 == 'Guide')
-            : 0,
+        initialIndex: 0,
         child: Scaffold(
           appBar: AppBar(
             backgroundColor: AppTheme.navy,
@@ -281,7 +306,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                   ),
                   child: SingleChildScrollView(
                     key: const ValueKey('detail-overview-scroll'),
-                    child: _overview(record, path),
+                    child: _overview(general, path),
                   ),
                 ),
               ),
@@ -357,7 +382,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (record.issuedBy != null)
+                    if (_has(record.issuedBy))
                       Text(
                         record.issuedBy!,
                         style: const TextStyle(
@@ -367,20 +392,12 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                           color: Colors.white,
                         ),
                       ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _label(record.applicationAvailability),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: .8),
-                      ),
-                    ),
                   ],
                 ),
               ),
             ],
           ),
-          if (record.description != null)
+          if (_has(record.description))
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Tooltip(
@@ -396,26 +413,6 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                 ),
               ),
             ),
-          for (final fact in <String, String?>{
-            'Validity': record.validity,
-            'Typical use': record.purpose,
-          }.entries)
-            if (fact.value != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 5),
-                child: Tooltip(
-                  message: fact.value!,
-                  child: Text(
-                    '${fact.key}: ${fact.value}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white.withValues(alpha: .8),
-                    ),
-                  ),
-                ),
-              ),
           if (!record.isInformational && record.requestPaths.length > 1)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -425,7 +422,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                 dropdownColor: Colors.white,
                 style: const TextStyle(fontSize: 12, color: AppTheme.navy),
                 decoration: InputDecoration(
-                  labelText: 'Transaction / request method',
+                  labelText: 'Application / applicant checklist',
                   labelStyle: const TextStyle(color: AppTheme.navy),
                   floatingLabelStyle: const TextStyle(
                     color: AppTheme.accentGold,
@@ -452,8 +449,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                 onChanged: (value) => setState(() => _pathId = value),
               ),
             ),
-          if (record.processingTime != null ||
-              record.processingTimeNote != null)
+          if (_has(record.processingTime) || _has(record.processingTimeNote))
             Container(
               key: const ValueKey('detail-processing-summary'),
               margin: const EdgeInsets.only(top: 8),
@@ -480,7 +476,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                             color: accent,
                           ),
                         ),
-                        if (record.processingTime != null)
+                        if (_has(record.processingTime))
                           Padding(
                             padding: const EdgeInsets.only(top: 3),
                             child: Text(
@@ -492,7 +488,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                               ),
                             ),
                           ),
-                        if (record.processingTimeNote != null)
+                        if (_has(record.processingTimeNote))
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
@@ -515,22 +511,12 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
     );
   }
 
-  List<Widget> _information(
-    GovernmentIdDetails record,
-    Map<String, dynamic>? path,
-  ) {
+  List<Widget> _information(GovernmentIdDetails record) {
     final facts = <String, dynamic>{
       'Issuing Agency': record.issuedBy,
-      'Government Level': record.level,
-      'Category': record.category,
       'About / Description': record.description,
       'Purpose': record.purpose,
-      'Application Availability': record.applicationAvailability,
-      'Acquisition Type': record.acquisitionType,
       'Target Group / Qualification': record.targetGroup,
-      'Eligibility': record.raw['eligibility'],
-      'Validity': record.validity,
-      'Validity / recency': record.research['validity_note'],
     };
     return [
       if (record.isInformational)
@@ -539,30 +525,33 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
             'IDireksyon provides reference information for this credential but does not currently provide step-by-step acquisition guidance.',
           ),
         ]),
-      if (_has(record.raw['resident_notice']))
-        _card('Research status', [Text('${record.raw['resident_notice']}')]),
+      if (_has(record.raw['eligibility']) ||
+          _has(record.validity) ||
+          _has(record.research['validity_note']))
+        _card('Key information', [
+          for (final fact in <String, dynamic>{
+            'Eligibility': record.raw['eligibility'],
+            'Validity': record.validity,
+            'Validity / recency': record.research['validity_note'],
+          }.entries)
+            if (_has(fact.value))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fact.key,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    SelectableText('${fact.value}'),
+                  ],
+                ),
+              ),
+        ]),
       for (final entry in facts.entries)
         if (_has(entry.value))
           _card(entry.key, [SelectableText(_label('${entry.value}'))]),
-      if (!record.isInformational && path != null)
-        _card('Request channel', [
-          if (_has(path['channel']))
-            Text('Channel: ${_label('${path['channel']}')}'),
-          if (_has(path['provider'])) Text('Provider: ${path['provider']}'),
-          if (_has(path['applicability'])) Text('${path['applicability']}'),
-          Text('Appointment: ${_label('${path['appointment'] ?? 'unknown'}')}'),
-          if ((path['fulfillment'] as List? ?? []).isNotEmpty)
-            Text(
-              'Fulfillment: ${(path['fulfillment'] as List).map((value) => _label('$value')).join(', ')}',
-            ),
-          if (_has(path['processing']))
-            Text('Processing / fulfillment: ${path['processing']}'),
-          if (_has(path['portal_url']))
-            CatalogOfficialLink(
-              url: '${path['portal_url']}',
-              label: 'Open official request portal',
-            ),
-        ]),
       if (_has(record.officialLink))
         CatalogOfficialLink(url: record.officialLink!),
       for (final source in _maps(record.research['sources']))
@@ -574,6 +563,86 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
             Text('Page / section: ${source['section']}'),
         ]),
     ];
+  }
+}
+
+/// Optional reference page. Opening it never selects a method or writes progress.
+class RequestMethodScreen extends StatelessWidget with CatalogDetailContent {
+  const RequestMethodScreen({
+    super.key,
+    required this.record,
+    required this.method,
+  });
+  final GovernmentIdDetails record;
+  final Map<String, dynamic> method;
+
+  @override
+  Widget build(BuildContext context) {
+    final hidden = List<String>.from(
+      record.research['hidden_sections'] as List? ?? [],
+    );
+    final scoped = record.forPath(method);
+    final guide = _maps(method['guide']);
+    return Scaffold(
+      appBar: AppBar(title: Text('${method['label']}')),
+      body: _list([
+        const Text(
+          'Information only. You do not need to select or save a request method.',
+        ),
+        const SizedBox(height: 12),
+        if (_has(method['provider']))
+          _card('Provider', [Text('${method['provider']}')]),
+        if (_has(method['applicability']))
+          _card('Who this applies to', [Text('${method['applicability']}')]),
+        if (_has(method['portal_url']))
+          CatalogOfficialLink(
+            url: '${method['portal_url']}',
+            label: 'Open official request portal',
+          ),
+        if (!hidden.contains('guide')) ...[
+          if (_has(method['preparation']))
+            _card('Before you request', [
+              CatalogRichText(value: method['preparation']),
+            ]),
+          if (_has(method['application_guide_text']))
+            _card('Instructions', [
+              CatalogRichText(value: method['application_guide_text']),
+            ]),
+          for (var index = 0; index < guide.length; index++)
+            _guide(guide[index], index, method),
+        ],
+        if (!hidden.contains('requirements') &&
+            scoped.requirementSets.any((set) => set.groups.isNotEmpty))
+          _card('Requirements for this method', [
+            AssistanceRequirements(record: scoped),
+          ]),
+        if (!hidden.contains('fees') && scoped.fees.isNotEmpty)
+          _card('Estimated Cost', [FeesTab(record: scoped, embedded: true)]),
+        if (_has(method['processing']))
+          _card('Processing time', [Text('${method['processing']}')]),
+        _card('Request information', [
+          Text(
+            'Appointment: ${_label('${method['appointment'] ?? 'unknown'}')}',
+          ),
+          if ((method['fulfillment'] as List? ?? []).isNotEmpty)
+            Text(
+              'Fulfillment: ${(method['fulfillment'] as List).map((value) => _label('$value')).join(', ')}',
+            ),
+        ]),
+        if (!hidden.contains('offices'))
+          for (final office in _maps(method['offices'])) _office(office),
+        if (!hidden.contains('troubleshooting'))
+          for (final note in _maps(method['troubleshooting']))
+            _card('${note['title']}', [
+              Text('${note['body']}'),
+              if (_has(note['url'])) CatalogOfficialLink(url: '${note['url']}'),
+            ]),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Back to ${record.name}'),
+        ),
+      ]),
+    );
   }
 }
 
@@ -731,7 +800,20 @@ mixin CatalogDetailContent {
             .map((row) => Map<String, dynamic>.from(row))
             .toList()
       : [];
-  bool _has(dynamic value) => value is String && value.trim().isNotEmpty;
+  bool _has(dynamic value) =>
+      value is String &&
+      value.trim().isNotEmpty &&
+      !{
+        'notapplicable',
+        'na',
+      }.contains(value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ''));
+  Widget _sectionTitle(String title) => Padding(
+    padding: const EdgeInsets.only(top: 6, bottom: 12),
+    child: Text(
+      title,
+      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+    ),
+  );
   String _label(String value) =>
       const {
         'national': 'National',

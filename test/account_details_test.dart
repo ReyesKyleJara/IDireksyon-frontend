@@ -27,6 +27,13 @@ void main() {
       if (request.url.path.endsWith('/barangays')) {
         return http.Response('{"data":[]}', 200);
       }
+      // The directory and Home load saved Inventory for readiness.
+      if (request.url.path == '/api/auth/inventory') {
+        return http.Response(
+          jsonEncode({'data': {'government_ids': [], 'documents': []}}),
+          200,
+        );
+      }
       accountRequests++;
       expect(request.url.path, '/api/auth/account');
       return http.Response(jsonEncode({'user': {
@@ -42,6 +49,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(find.text('Kai'), findsOneWidget);
+      final startupDirectoryRequests = directoryRequests;
 
       for (final name in ['Kyle', 'Kai']) {
         await tester.tap(find.text('Profile').last);
@@ -65,12 +73,13 @@ void main() {
         expect(find.text(name), findsOneWidget);
       }
       expect(accountRequests, 2);
-      expect(directoryRequests, 1);
+      // Switching tabs and saving the account never reloads the catalog.
+      expect(directoryRequests, startupDirectoryRequests);
       expect(tester.takeException(), isNull);
     }, () => MockClient((request) async {
       if (request.url.path.endsWith('/documents')) return http.Response('{"data":[]}', 200);
       directoryRequests++;
-      expect(request.url.path, '/api/government-ids');
+      expect(request.url.path, anyOf('/api/government-ids', '/api/documents'));
       return http.Response('{"data":[]}', 200);
     }));
   });
@@ -96,23 +105,27 @@ void main() {
           expect(find.text('Could not load the ID directory.'), findsOneWidget);
           expect(find.text('Retry'), findsOneWidget);
         } else {
-          await tester.enterText(find.descendant(of: directory, matching: find.byType(TextField)), 'Directory test credential');
+          expect(find.text('Could not load the ID directory.'), findsNothing);
+          // Records are listed when browsing a category, not on the front page.
+          await tester.tap(
+            find.descendant(of: directory, matching: find.widgetWithText(ChoiceChip, 'IDs')),
+          );
           await tester.pumpAndSettle();
           expect(find.text('Directory test credential'), findsWidgets);
-          expect(find.text('Could not load the ID directory.'), findsNothing);
         }
+        // One catalog load; the mock answers documents without counting them.
         expect(requests, 1);
         expect(tester.takeException(), isNull);
       }, () => MockClient((request) async {
         if (request.url.path.endsWith('/documents')) return http.Response('{"data":[]}', 200);
         requests++;
         expect(request.method, 'GET');
-        expect(request.url.path, '/api/government-ids');
-        return offline
-            ? http.Response('Unavailable', 503)
-            : http.Response(jsonEncode({'data': [
-                {'id': 34, 'name': 'Directory test credential'},
-              ]}), 200);
+        expect(request.url.path, anyOf('/api/government-ids', '/api/documents'));
+        if (offline) return http.Response('Unavailable', 503);
+        return http.Response(jsonEncode({'data': [
+          if (request.url.path == '/api/government-ids')
+            {'id': 34, 'name': 'Directory test credential'},
+        ]}), 200);
       }));
     });
   }
