@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/app_motion.dart';
+import '../../core/widgets/frosted.dart';
 
 import '../roadmap/id_journey.dart';
 
@@ -146,6 +147,7 @@ class _JourneyBannerState extends State<JourneyBanner> {
                       colors: [Color(0xFF103765), Color(0xFF246AA5)],
                     ),
                   ),
+                  foregroundDecoration: frostedBannerEdge,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

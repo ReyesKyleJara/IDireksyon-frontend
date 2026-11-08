@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_motion.dart';
+import '../../core/widgets/frosted.dart';
 
 /// Same gradient, corners and shadow as Home's "Get started" banner.
 class RoadmapGradientCard extends StatelessWidget {
@@ -32,7 +33,11 @@ class RoadmapGradientCard extends StatelessWidget {
               colors: [AppTheme.navy, Color(0xFF246AA5)],
             ),
           ),
-          child: child,
+          child: DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: frostedBannerEdge,
+            child: child,
+          ),
         ),
       ),
     );
@@ -116,10 +121,7 @@ class RoadmapDirectoryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colors.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
             ],
           ),
         ),
@@ -231,15 +233,13 @@ class RoadmapBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final dark = colors.brightness == Brightness.dark;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: dark ? colors.surfaceContainer : Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: dark
-                ? colors.outlineVariant.withValues(alpha: .35)
-                : const Color(0xFFE3ECF7),
-          ),
+    return FrostedSurface(
+      opacity: .82,
+      border: Border(
+        top: BorderSide(
+          color: dark
+              ? colors.outlineVariant.withValues(alpha: .35)
+              : const Color(0xFFE3ECF7),
         ),
       ),
       child: SafeArea(

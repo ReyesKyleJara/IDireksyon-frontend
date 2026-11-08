@@ -1,5 +1,6 @@
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_motion.dart';
+import '../../core/widgets/frosted.dart';
 import '../../core/widgets/page_header.dart';
 
 import 'package:flutter/material.dart';
@@ -465,9 +466,10 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
 
   // Header --------------------------------------------------------------------
 
-  Widget _backButton() => IconButton(
+  Widget _backButton(ColorScheme colors) => IconButton(
     tooltip: 'Back',
     onPressed: () => Navigator.maybePop(context),
+    color: colors.primary,
     icon: const Icon(Icons.arrow_back_rounded),
   );
 
@@ -587,7 +589,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
           children: [
             Row(
               children: [
-                _backButton(),
+                _backButton(colors),
                 Expanded(child: _searchField(colors)),
                 IconButton(
                   tooltip: 'Use my current location',
@@ -601,42 +603,30 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
         ),
       );
     }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
+    // The arrow shares the title's line, with its left edge on the page margin.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const BackPageHeader(
+          'Office Finder',
+          subtitle: 'Find government offices near you',
+        ),
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Transform.translate(
-                offset: const Offset(-8, 0),
-                child: _backButton(),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const PageHeader('Office Finder'),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Find government offices near you',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _searchField(colors),
+              const SizedBox(height: 8),
+              _locationButton(colors),
+              if (_message != null) _messageBanner(colors),
             ],
           ),
-          const SizedBox(height: 12),
-          _searchField(colors),
-          const SizedBox(height: 8),
-          _locationButton(colors),
-          if (_message != null) _messageBanner(colors),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -705,9 +695,9 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                                 child: ListView(
                                   controller: scrollController,
                                   padding: EdgeInsets.fromLTRB(
-                                    16,
+                                    20,
                                     8,
-                                    16,
+                                    20,
                                     MediaQuery.paddingOf(context).bottom + 24,
                                   ),
                                   children: [
@@ -736,43 +726,55 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
 
   Widget _mapControls(List<OfficeModel> offices, ColorScheme colors) =>
       PointerInterceptor(
-        child: Material(
-          color: _surface(colors),
-          elevation: 4,
-          shadowColor: Colors.black.withValues(alpha: .18),
-          borderRadius: BorderRadius.circular(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: 'Zoom in',
-                onPressed: () =>
-                    _map?.animateCamera(google.CameraUpdate.zoomIn()),
-                icon: const Icon(Icons.add),
-              ),
-              IconButton(
-                tooltip: 'Zoom out',
-                onPressed: () =>
-                    _map?.animateCamera(google.CameraUpdate.zoomOut()),
-                icon: const Icon(Icons.remove),
-              ),
-              IconButton(
-                tooltip: 'Show all offices',
-                onPressed: () => _fit(_located(offices)),
-                icon: const Icon(Icons.zoom_out_map_rounded),
-              ),
-              IconButton(
-                tooltip: 'My location',
-                onPressed: _busy ? null : _locate,
-                icon: _busy
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.my_location_rounded),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: .14),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
+          ),
+          child: FrostedSurface(
+            borderRadius: BorderRadius.circular(18),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Zoom in',
+                    onPressed: () =>
+                        _map?.animateCamera(google.CameraUpdate.zoomIn()),
+                    icon: const Icon(Icons.add),
+                  ),
+                  IconButton(
+                    tooltip: 'Zoom out',
+                    onPressed: () =>
+                        _map?.animateCamera(google.CameraUpdate.zoomOut()),
+                    icon: const Icon(Icons.remove),
+                  ),
+                  IconButton(
+                    tooltip: 'Show all offices',
+                    onPressed: () => _fit(_located(offices)),
+                    icon: const Icon(Icons.zoom_out_map_rounded),
+                  ),
+                  IconButton(
+                    tooltip: 'My location',
+                    onPressed: _busy ? null : _locate,
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location_rounded),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
