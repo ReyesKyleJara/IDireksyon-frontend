@@ -1,4 +1,5 @@
 import '../../core/widgets/app_motion.dart';
+import '../../core/widgets/frosted.dart';
 
 import 'package:flutter/material.dart';
 
@@ -319,6 +320,11 @@ class HomeScreen extends StatelessWidget {
 
               return Stack(
                 children: [
+                  const Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: frostedBannerEdge,
+                    ),
+                  ),
                   Positioned(
                     right: -55,
                     top: -65,

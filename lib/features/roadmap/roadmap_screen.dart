@@ -103,12 +103,7 @@ class _EmptyRoadmapBanner extends StatelessWidget {
                   child: ExcludeSemantics(child: _RouteArt()),
                 ),
               Padding(
-                padding: EdgeInsets.fromLTRB(
-                  22,
-                  24,
-                  showArt ? 126 : 22,
-                  24,
-                ),
+                padding: EdgeInsets.fromLTRB(22, 24, showArt ? 126 : 22, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

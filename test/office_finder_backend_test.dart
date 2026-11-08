@@ -247,7 +247,7 @@ void main() {
     await tester.tap(find.text('DFA Annex'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Get directions'),
+      find.textContaining('no map location yet'),
       100,
       scrollable: find.byType(Scrollable).last,
     );
