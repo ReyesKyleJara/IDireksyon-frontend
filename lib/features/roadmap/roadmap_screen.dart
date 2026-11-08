@@ -18,8 +18,7 @@ class RoadmapScreen extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('ID Directory')),
-          body: const IdsScreen(),
+          body: const IdsScreen(showBack: true),
         ),
       ),
     );

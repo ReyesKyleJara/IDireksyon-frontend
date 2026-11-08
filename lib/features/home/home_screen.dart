@@ -40,12 +40,7 @@ class HomeScreen extends StatelessWidget {
     _open(
       context,
       Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'ID Directory',
-          ),
-        ),
-        body: const IdsScreen(),
+        body: const IdsScreen(showBack: true),
       ),
     );
   }

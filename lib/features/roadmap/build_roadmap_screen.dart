@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_motion.dart';
+import '../../core/widgets/catalog_image.dart';
 import '../ids/ids_screen.dart';
 import 'confirm_documents_screen.dart';
 import 'id_journey.dart';
@@ -85,8 +86,7 @@ class _BuildRoadmapScreenState extends State<BuildRoadmapScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('ID Directory')),
-          body: const IdsScreen(),
+          body: const IdsScreen(showBack: true),
         ),
       ),
     );
@@ -504,7 +504,12 @@ class _TargetRow extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                RoadmapRecordIcon(document: document),
+                CatalogImage(
+                  url: record.imageUrl,
+                  size: 42,
+                  radius: 12,
+                  fallback: RoadmapRecordIcon(document: document),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

@@ -94,8 +94,8 @@ ChecklistReadinessSummary? summarizeChecklistReadiness(
       ? 'Almost Ready'
       : 'Needs Preparation';
   final message =
-      '$matched of ${groups.length} checklist groups matched.'
-      '${review ? ' Review other checks.' : ''}';
+      'You have $matched of ${groups.length} requirements.'
+      '${review ? ' Check the guide for other requirements.' : ''}';
   return (
     completion: completion,
     ready: ready,

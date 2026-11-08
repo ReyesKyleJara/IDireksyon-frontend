@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/government_id.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/catalog_image.dart';
 import '../../services/api_service.dart';
 import 'requirements_tab.dart';
 import 'fees_tab.dart';
@@ -363,18 +364,22 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  record.recordType == 'document'
-                      ? Icons.description_outlined
-                      : Icons.badge_outlined,
-                  color: Colors.white,
-                  size: 24,
+              CatalogImage(
+                url: record.imageUrl,
+                size: record.imageUrl == null ? 40 : 72,
+                fallback: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    record.recordType == 'document'
+                        ? Icons.description_outlined
+                        : Icons.badge_outlined,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
