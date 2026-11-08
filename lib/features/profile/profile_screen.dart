@@ -105,77 +105,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
   
-
-Future<void> _confirmLogout() async {
-  if (_loggingOut) return;
-
-  final shouldLogout = await showDialog<bool>(
-    context: context,
-    barrierDismissible: true,
-    builder: (dialogContext) {
-      final colors = Theme.of(dialogContext).colorScheme;
-
-      return AlertDialog(
-        backgroundColor: colors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-        contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        title: const Text(
-          'Log out of IDireksyon?',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        content: Text(
-          "You'll need to sign in again to access your account.",
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.5,
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext, false);
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: colors.onSurfaceVariant,
-            ),
-            child: const Text('Stay here'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(dialogContext, true);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: ProfileScreen.primaryBlue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Log out'),
-          ),
-        ],
-      );
-    },
-  );
-
-  if (!mounted || shouldLogout != true) return;
-
-  await _logout();
-}
-
-
   // LOGOUT
   Future<void> _logout() async {
     if (_loggingOut) return;
@@ -401,7 +330,7 @@ Future<void> _confirmLogout() async {
               // LOG OUT
               
 OutlinedButton.icon(
-  onPressed: _loggingOut ? null : _confirmLogout,
+  onPressed: _loggingOut ? null : _logout,
   icon: const Icon(
     Icons.logout_rounded,
     size: 19,

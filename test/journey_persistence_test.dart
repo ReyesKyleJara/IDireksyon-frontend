@@ -261,7 +261,13 @@ void main() {
       await tester.tap(find.text('Try again'));
       await tester.pumpAndSettle();
       expect(find.text('33%'), findsOneWidget);
-      expect(find.text('Completed'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('active-step-document:1')),
+          matching: find.text('Completed'),
+        ),
+        findsOneWidget,
+      );
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('active-step-government_id:2')),

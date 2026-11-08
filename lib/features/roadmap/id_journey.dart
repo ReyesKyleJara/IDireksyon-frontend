@@ -10,6 +10,7 @@ class IdJourney {
     this.progress = 0,
     this.id,
     this.confirmedPlan,
+    this.completedAt,
     Set<String> completedStepIdentities = const {},
   }) : targetIds = List.unmodifiable(targetIds),
        targetCatalogIds = List.unmodifiable(targetCatalogIds),
@@ -24,6 +25,9 @@ class IdJourney {
 
   /// Reviewed steps, retained independently of later Inventory readiness.
   RoadmapPlan? confirmedPlan;
+
+  /// When the last step was finished, as reported by the account API.
+  DateTime? completedAt;
 
   /// Explicit journey completion only. Confirmation and Inventory never add here.
   /// Restored from the account API; never inferred from Inventory.
@@ -40,6 +44,7 @@ class IdJourney {
       if (id is! int || id <= 0) {
         throw const FormatException('Invalid saved journey');
       }
+      final finished = json['completed_at'];
       final names = plan.steps
           .where(
             (step) =>
@@ -56,6 +61,9 @@ class IdJourney {
         targetCatalogIds: plan.targetIds,
         targetDocumentIds: plan.targetDocumentIds,
         confirmedPlan: plan,
+        completedAt: finished is String
+            ? DateTime.tryParse(finished)?.toLocal()
+            : null,
         completedStepIdentities: Set<String>.from(
           json['completed_step_identities'] as List,
         ),
@@ -70,6 +78,7 @@ class IdJourney {
       throw const FormatException('Journey identity changed');
     }
     confirmedPlan = saved.confirmedPlan;
+    completedAt = saved.completedAt;
     _completedStepIdentities = Set.unmodifiable(saved.completedStepIdentities);
   }
 
@@ -89,6 +98,31 @@ class IdJourney {
       totalSteps == 0 ? 0 : completedSteps / totalSteps;
   String get completionLabel =>
       '${completedSteps < totalSteps ? (completionProgress * 100).round().clamp(0, 99) : (completionProgress * 100).round()}%';
+
+  /// Every step of a saved plan is done, so it belongs in the journey log.
+  bool get isCompleted =>
+      confirmedPlan != null && totalSteps > 0 && completedSteps == totalSteps;
+
+  /// For example "Nov 9, 2026"; null when the date is not known.
+  String? get completedDateLabel {
+    final date = completedAt;
+    if (date == null) return null;
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
 
   /// Readiness from 0 to 1; new journeys start with no completed steps.
   final double progress;

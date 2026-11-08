@@ -749,7 +749,7 @@ class _IdsScreenState extends State<IdsScreen> {
                     _searchField(colors),
                     // A category page already holds a single type of record.
                     if (categoryTitle == null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 12),
                       _filters(colors),
                     ],
                     if (snapshot.connectionState != ConnectionState.done) ...[

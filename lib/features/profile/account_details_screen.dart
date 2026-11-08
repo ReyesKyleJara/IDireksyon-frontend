@@ -36,6 +36,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         '',
   );
 
+  late DateTime? _birthDate = _savedBirthDate();
+  late final _birthday = TextEditingController(
+    text: _birthDate == null ? '' : _displayDate(_birthDate!),
+  );
+
   int? _selectedBarangayId = int.tryParse(
     '${AuthService.instance.user?['barangay_id']}',
   );
@@ -81,7 +86,41 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     _photoService.removeListener(_onPhotoChanged);
     _name.dispose();
     _contact.dispose();
+    _birthday.dispose();
     super.dispose();
+  }
+
+  /// Date only: a saved time zone must never move the birthday by a day.
+  DateTime? _savedBirthDate() {
+    final saved = AuthService.instance.user?['date_of_birth'];
+    return saved is String ? DateTime.tryParse(saved.split('T').first) : null;
+  }
+
+  String _displayDate(DateTime date) =>
+      '${date.month.toString().padLeft(2, '0')}/'
+      '${date.day.toString().padLeft(2, '0')}/${date.year}';
+
+  String _apiDate(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  Future<void> _pickBirthDate() async {
+    if (_busy) return;
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime(now.year - 18, now.month, now.day),
+      firstDate: DateTime(1900),
+      // A birthday has to be before today, the same rule as profile setup.
+      lastDate: DateTime(now.year, now.month, now.day - 1),
+      helpText: 'Select your birthday',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _birthDate = picked;
+      _birthday.text = _displayDate(picked);
+    });
   }
 
   void _onPhotoChanged() {
@@ -173,11 +212,17 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         barangayId: _barangays.any((row) => row['id'] == _selectedBarangayId)
             ? _selectedBarangayId
             : null,
+        dateOfBirth: _birthDate == null ? null : _apiDate(_birthDate!),
       );
 
       if (!mounted) return;
 
       final user = AuthService.instance.user;
+      final savedBirthDate = _savedBirthDate();
+      if (savedBirthDate != null) {
+        _birthDate = savedBirthDate;
+        _birthday.text = _displayDate(savedBirthDate);
+      }
 
       _name.text = user?['name'] as String? ?? _name.text;
       _contact.text =
@@ -317,7 +362,29 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                       },
                     ),
 
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 23),
+
+                    // BIRTHDAY
+                    _field(
+                      label: 'Birthday',
+                      controller: _birthday,
+                      readOnly: true,
+                      onTap: _pickBirthDate,
+                      hint: 'MM/DD/YYYY',
+                      suffixIcon: Icon(
+                        Icons.calendar_today_outlined,
+                        size: 19,
+                        color: colors.primary,
+                      ),
+                      validator: (_) => null,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Used to check age-based eligibility.',
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
+
+                    const SizedBox(height: 23),
 
                     Text(
                       'Barangay',
@@ -459,6 +526,10 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     required String? Function(String?) validator,
     TextInputType? keyboardType,
     Iterable<String>? autofill,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    String? hint,
+    Widget? suffixIcon,
   }) {
     final colors = Theme.of(context).colorScheme;
 
@@ -477,7 +548,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
           keyboardType: keyboardType,
           autofillHints: autofill,
           autocorrect: false,
+          readOnly: readOnly,
+          onTap: onTap,
           decoration: InputDecoration(
+            hintText: hint,
+            suffixIcon: suffixIcon,
             errorMaxLines: 3,
             filled: true,
             fillColor: colors.surface,

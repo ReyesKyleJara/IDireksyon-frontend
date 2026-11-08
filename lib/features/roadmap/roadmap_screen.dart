@@ -6,13 +6,20 @@ import 'build_roadmap_screen.dart';
 import 'roadmap_widgets.dart';
 import '../ids/ids_screen.dart';
 
-class RoadmapScreen extends StatelessWidget {
+class RoadmapScreen extends StatefulWidget {
   const RoadmapScreen({super.key, this.onOpenDirectory});
   final VoidCallback? onOpenDirectory;
 
+  @override
+  State<RoadmapScreen> createState() => _RoadmapScreenState();
+}
+
+class _RoadmapScreenState extends State<RoadmapScreen> {
+  bool _showCompleted = false;
+
   void _openDirectory(BuildContext context) {
-    if (onOpenDirectory != null) {
-      onOpenDirectory!();
+    if (widget.onOpenDirectory != null) {
+      widget.onOpenDirectory!();
       return;
     }
     Navigator.of(context).push(
@@ -39,41 +46,53 @@ class RoadmapScreen extends StatelessWidget {
               'Track your progress and get to the IDs you need.',
               style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
             ),
-            const SizedBox(height: 20),
-            const _EmptyRoadmapBanner(),
-            const SizedBox(height: 28),
-            const Text(
-              'How it works',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+            const SizedBox(height: 16),
+            JourneyStatusTabs(
+              showCompleted: _showCompleted,
+              onChanged: (value) => setState(() => _showCompleted = value),
             ),
-            const SizedBox(height: 14),
-            const RoadmapCard(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 18, 16, 18),
-                child: Column(
-                  children: [
-                    _StepRow(
-                      number: 1,
-                      title: 'Choose your goal',
-                      detail: 'Pick the ID or document you want to get.',
-                    ),
-                    _StepRow(
-                      number: 2,
-                      title: 'Review what you have',
-                      detail: 'Confirm the documents you already own.',
-                    ),
-                    _StepRow(
-                      number: 3,
-                      title: 'Follow your plan',
-                      detail: 'Get your steps in the right order.',
-                      last: true,
-                    ),
-                  ],
+            const SizedBox(height: 20),
+            if (_showCompleted)
+              const JourneyLogEmpty(
+                title: 'No completed journeys yet',
+                message: 'Journeys you finish will be saved here.',
+              )
+            else ...[
+              const _EmptyRoadmapBanner(),
+              const SizedBox(height: 28),
+              const Text(
+                'How it works',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 14),
+              const RoadmapCard(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 18, 16, 18),
+                  child: Column(
+                    children: [
+                      _StepRow(
+                        number: 1,
+                        title: 'Choose your goal',
+                        detail: 'Pick the ID or document you want to get.',
+                      ),
+                      _StepRow(
+                        number: 2,
+                        title: 'Review what you have',
+                        detail: 'Confirm the documents you already own.',
+                      ),
+                      _StepRow(
+                        number: 3,
+                        title: 'Follow your plan',
+                        detail: 'Get your steps in the right order.',
+                        last: true,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            RoadmapDirectoryCard(onTap: () => _openDirectory(context)),
+              const SizedBox(height: 12),
+              RoadmapDirectoryCard(onTap: () => _openDirectory(context)),
+            ],
           ],
         ),
       ),

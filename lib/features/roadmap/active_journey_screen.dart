@@ -9,6 +9,7 @@ import '../shell/resident_app_shell.dart';
 import 'build_roadmap_screen.dart';
 import 'id_journey.dart';
 import 'roadmap_plan_panel.dart';
+import 'roadmap_widgets.dart';
 import 'suggested_options_dialog.dart';
 
 class JourneyLoadingScreen extends StatelessWidget {
@@ -69,9 +70,37 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
           orElse: () => _journeys.last,
         );
 
+  late bool _showCompleted =
+      widget.initialJourney?.isCompleted ??
+      _journeys.every((journey) => journey.isCompleted);
+
   bool _saving = false;
   String? _savingStep;
   bool _confirming = false;
+
+  List<IdJourney> get _inProgress =>
+      _journeys.where((journey) => !journey.isCompleted).toList();
+
+  /// Finished journeys, the most recently finished first.
+  List<IdJourney> get _completed =>
+      _journeys.where((journey) => journey.isCompleted).toList()..sort((a, b) {
+        final first = a.completedAt, second = b.completedAt;
+        return first != null && second != null
+            ? second.compareTo(first)
+            : (b.id ?? 0).compareTo(a.id ?? 0);
+      });
+
+  /// Shows a journey in its new tab right after its last step is finished.
+  void _applySaved(IdJourney journey, IdJourney saved) {
+    final finishedNow = !journey.isCompleted;
+    setState(() {
+      journey.applyCompletion(saved);
+      if (finishedNow && journey.isCompleted) {
+        _showCompleted = true;
+        _openJourney = journey;
+      }
+    });
+  }
 
   Future<void> _complete(IdJourney journey, RoadmapPlanStep step) async {
     if (_saving || _confirming || journey.id == null) return;
@@ -115,7 +144,7 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
         ),
       );
       if (!mounted) return;
-      setState(() => journey.applyCompletion(saved));
+      _applySaved(journey, saved);
       widget.onJourneyChanged?.call();
     } on AuthException catch (error) {
       if (mounted) {
@@ -177,7 +206,7 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
         await auth.resolveJourneyStep(journey.id!, resolution),
       );
       if (!mounted || auth.token != session) return;
-      setState(() => journey.applyCompletion(saved));
+      _applySaved(journey, saved);
       widget.onJourneyChanged?.call();
     } on AuthException catch (error) {
       if (mounted) {
@@ -213,74 +242,117 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
   });
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    child: ListView(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
-      children: [
-        const PageHeader('My ID Journey'),
-        const SizedBox(height: 6),
-        Text(
-          'Track your progress and get to the IDs you need.',
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.4,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 20),
-        for (final journey in [
-          _openJourney,
-          ..._journeys.where((item) => item != _openJourney),
-        ]) ...[
-          if (journey.confirmedPlan != null ||
-              (journey.targetCatalogIds.isEmpty &&
-                  journey.targetDocumentIds.isEmpty))
-            ActiveJourneyView(
-              key: ObjectKey(journey),
-              title: journey.title,
-              steps: journey.confirmedPlan?.steps ?? const [],
-              fallbackTitles: journey.targetIds,
-              completedStepIdentities: journey.completedStepIdentities,
-              expanded: journey == _openJourney,
-              onOpen: () => _open(journey),
-              onResolve: journey.id == null
-                  ? null
-                  : (step) => _resolve(journey, step),
-              saving: _saving,
-              savingStep: _savingStep,
-              onComplete: journey.id == null
-                  ? null
-                  : (step) => _complete(journey, step),
-            )
-          else if (journey == _openJourney)
-            RoadmapPlanPanel(
-              key: ObjectKey(journey),
-              targetIds: journey.targetCatalogIds,
-              targetDocumentIds: journey.targetDocumentIds,
-              activeJourneyTitle: journey.title,
-              completedStepIdentities: journey.completedStepIdentities,
-            )
-          else
-            TextButton.icon(
-              onPressed: () => _open(journey),
-              icon: const Icon(Icons.alt_route_rounded, size: 18),
-              label: Text(journey.title),
+  Widget build(BuildContext context) {
+    final inProgress = _inProgress;
+    final completed = _completed;
+    final shown = _showCompleted ? completed : inProgress;
+    // The log opens collapsed; In Progress always has one journey open.
+    final open = shown.contains(_openJourney)
+        ? _openJourney
+        : _showCompleted
+        ? null
+        : inProgress.lastOrNull;
+    final ordered = _showCompleted || open == null
+        ? shown
+        : [open, ...shown.where((item) => item != open)];
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+        children: [
+          const PageHeader('My ID Journey'),
+          const SizedBox(height: 6),
+          Text(
+            'Track your progress and get to the IDs you need.',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-          const SizedBox(height: 18),
-        ],
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => BuildRoadmapScreen(existingJourneys: _journeys),
+          ),
+          const SizedBox(height: 16),
+          JourneyStatusTabs(
+            showCompleted: _showCompleted,
+            inProgress: inProgress.length,
+            completed: completed.length,
+            onChanged: (value) => setState(() => _showCompleted = value),
+          ),
+          const SizedBox(height: 20),
+          if (shown.isEmpty) ...[
+            JourneyLogEmpty(
+              title: _showCompleted
+                  ? 'No completed journeys yet'
+                  : 'No journeys in progress',
+              message: _showCompleted
+                  ? 'Journeys you finish will be saved here.'
+                  : 'Start a new journey whenever you need another ID or document.',
+            ),
+            const SizedBox(height: 18),
+          ],
+          for (final journey in ordered) ...[
+            if (_showCompleted && journey.completedDateLabel != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Completed ${journey.completedDateLabel}',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            if (journey.confirmedPlan != null ||
+                (journey.targetCatalogIds.isEmpty &&
+                    journey.targetDocumentIds.isEmpty))
+              ActiveJourneyView(
+                key: ObjectKey(journey),
+                title: journey.title,
+                steps: journey.confirmedPlan?.steps ?? const [],
+                fallbackTitles: journey.targetIds,
+                completedStepIdentities: journey.completedStepIdentities,
+                expanded: journey == open,
+                onOpen: () => _open(journey),
+                onResolve: journey.id == null
+                    ? null
+                    : (step) => _resolve(journey, step),
+                saving: _saving,
+                savingStep: _savingStep,
+                onComplete: journey.id == null
+                    ? null
+                    : (step) => _complete(journey, step),
+              )
+            else if (journey == open)
+              RoadmapPlanPanel(
+                key: ObjectKey(journey),
+                targetIds: journey.targetCatalogIds,
+                targetDocumentIds: journey.targetDocumentIds,
+                activeJourneyTitle: journey.title,
+                completedStepIdentities: journey.completedStepIdentities,
+              )
+            else
+              TextButton.icon(
+                onPressed: () => _open(journey),
+                icon: const Icon(Icons.alt_route_rounded, size: 18),
+                label: Text(journey.title),
+              ),
+            const SizedBox(height: 18),
+          ],
+          if (!_showCompleted)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        BuildRoadmapScreen(existingJourneys: _journeys),
+                  ),
+                ),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Add another ID journey'),
               ),
             ),
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Add another ID journey'),
-          ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

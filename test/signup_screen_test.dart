@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -44,6 +45,109 @@ void main() {
     expect(requests, isEmpty);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  group('password fields', () {
+    const mismatch = 'Passwords do not match';
+    final fields = find.byType(TextFormField);
+    Finder eye(int index) => find.byTooltip('Show password').at(index);
+    TextField input(WidgetTester tester, int field) => tester.widget<TextField>(
+      find.descendant(of: fields.at(field), matching: find.byType(TextField)),
+    );
+
+    Future<void> open(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(const MaterialApp(home: EmailSignupScreen()));
+      await settleSignup(tester);
+    }
+
+    testWidgets('both can be edited in any order, keeping their own text', (
+      tester,
+    ) async {
+      await open(tester);
+      await tester.enterText(fields.at(1), 'Password123!');
+      await tester.enterText(fields.at(2), 'Different123!');
+      await tester.enterText(fields.at(1), 'Password123!x');
+      expect(input(tester, 1).controller!.text, 'Password123!x');
+      expect(input(tester, 2).controller!.text, 'Different123!');
+      await tester.enterText(fields.at(2), 'Different123!y');
+      expect(input(tester, 1).controller!.text, 'Password123!x');
+      expect(input(tester, 2).controller!.text, 'Different123!y');
+      await tester.enterText(fields.at(0), 'juan@example.com');
+      await settleSignup(tester);
+      expect(input(tester, 1).controller!.text, 'Password123!x');
+      expect(input(tester, 2).controller!.text, 'Different123!y');
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('the mismatch message follows edits to either field', (
+      tester,
+    ) async {
+      await open(tester);
+      await tester.enterText(fields.at(1), 'Password123!');
+      await tester.pump();
+      expect(find.text(mismatch), findsNothing);
+      await tester.enterText(fields.at(2), 'Different123!');
+      await tester.pump();
+      expect(find.text(mismatch), findsOneWidget);
+      await tester.enterText(fields.at(1), 'Different123!');
+      await tester.pump();
+      expect(find.text(mismatch), findsNothing);
+      await tester.enterText(fields.at(2), 'Different123');
+      await tester.pump();
+      expect(find.text(mismatch), findsOneWidget);
+      await tester.enterText(fields.at(2), 'Different123!');
+      await tester.pump();
+      expect(find.text(mismatch), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('Tab and Shift+Tab go straight between the two fields', (
+      tester,
+    ) async {
+      await open(tester);
+      bool focused(int field) => tester
+          .widget<EditableText>(
+            find.descendant(
+              of: fields.at(field),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .focusNode
+          .hasFocus;
+      await tester.tap(fields.at(2));
+      await tester.pump();
+      expect(focused(2), isTrue);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
+      await tester.pump();
+      expect(focused(1), isTrue, reason: 'Shift+Tab reaches Password');
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(focused(2), isTrue, reason: 'Tab reaches Confirm Password');
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('show/hide changes only its own field and keeps the text', (
+      tester,
+    ) async {
+      await open(tester);
+      await tester.enterText(fields.at(1), 'Password123!');
+      await tester.enterText(fields.at(2), 'Different123!');
+      await tester.tap(eye(0));
+      await settleSignup(tester);
+      expect(input(tester, 1).obscureText, isFalse);
+      expect(input(tester, 2).obscureText, isTrue);
+      await tester.tap(find.byTooltip('Show password'));
+      await settleSignup(tester);
+      expect(input(tester, 2).obscureText, isFalse);
+      expect(input(tester, 1).controller!.text, 'Password123!');
+      expect(input(tester, 2).controller!.text, 'Different123!');
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   });
 
   for (final phone in [false,true]) {

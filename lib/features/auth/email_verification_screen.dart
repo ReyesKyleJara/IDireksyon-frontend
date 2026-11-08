@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/theme/app_theme.dart';
+import 'account_form_page.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   const EmailVerificationScreen({
@@ -111,80 +113,97 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     }
   }
 
+  static const _label = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: Color(0xFF20242B),
+  );
+  static const _codeText = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    color: Color(0xFF20242B),
+  );
+  static const _note = TextStyle(
+    fontSize: 13,
+    height: 1.4,
+    color: Color(0xFF526079),
+  );
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
-    child: Scaffold(
-      appBar: AppBar(title: const Text('Verify your email')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 32),
-                  const Icon(
-                    Icons.mark_email_unread_outlined,
-                    size: 56,
-                    color: Color(0xFF0B4295),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Enter the six-digit code sent to ${widget.email}. The code expires in 10 minutes.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Check your spam folder if you do not see the email.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _code,
-                    enabled: !_busy && _proof == null,
-                    keyboardType: TextInputType.number,
-                    autofillHints: const [AutofillHints.oneTimeCode],
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(6),
-                    ],
-                    textAlign: TextAlign.center,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _verify(),
-                    decoration: InputDecoration(
-                      labelText: 'Verification code',
-                      errorText: _error,
-                      errorMaxLines: 4,
-                      border: const OutlineInputBorder(),
+    child: AccountFormPage(
+      title: 'Verify your email',
+      subtitle:
+          'Enter the six-digit code sent to ${widget.email}. The code expires in 10 minutes.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Verification code', style: _label),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _code,
+            enabled: !_busy && _proof == null,
+            keyboardType: TextInputType.number,
+            autofillHints: const [AutofillHints.oneTimeCode],
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
+            textAlign: TextAlign.center,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _verify(),
+            style: _codeText,
+            decoration: AccountFormPage.inputDecoration(
+              'Enter the six-digit code',
+            ).copyWith(errorText: _error),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Check your spam folder if you do not see the email.',
+            style: _note,
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: _busy ? null : _verify,
+            style: AccountFormPage.primaryButton,
+            child: _busy
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: _busy ? null : _verify,
-                    child: Text(
-                      _busy ? 'Please wait...' : 'Verify and create account',
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _busy || _resendSeconds > 0 ? null : _resend,
-                    child: Text(
-                      _resendSeconds > 0
-                          ? 'Resend code in ${_resendSeconds}s'
-                          : 'Resend code',
-                    ),
-                  ),
-                  const Text(
-                    'Wrong email address? Go back to change it.',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                  )
+                : const Text('Verify and create account'),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton(
+              onPressed: _busy || _resendSeconds > 0 ? null : _resend,
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.primaryBlue,
+                textStyle: const TextStyle(
+                  fontFamily: 'Google Sans',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              child: Text(
+                _resendSeconds > 0
+                    ? 'Resend code in ${_resendSeconds}s'
+                    : 'Resend code',
               ),
             ),
           ),
-        ),
+          const SizedBox(height: 4),
+          const Text(
+            'Wrong email address? Go back to change it.',
+            textAlign: TextAlign.center,
+            style: _note,
+          ),
+        ],
       ),
     ),
   );

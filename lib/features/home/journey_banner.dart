@@ -6,6 +6,7 @@ import '../../core/widgets/app_motion.dart';
 import '../../core/widgets/frosted.dart';
 
 import '../roadmap/id_journey.dart';
+import 'diro_poses.dart';
 
 class JourneyBanner extends StatefulWidget {
   const JourneyBanner({
@@ -59,6 +60,8 @@ class _JourneyBannerState extends State<JourneyBanner> {
   );
   static const _detail =
       'Pick up where you left off and review your next steps.';
+  static const _diroSize = 104.0;
+  static const _diroGap = 6.0;
 
   @override
   void dispose() {
@@ -91,12 +94,30 @@ class _JourneyBannerState extends State<JourneyBanner> {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final width = math.max(1.0, constraints.maxWidth - 44);
+      // Diro gives his space back on narrow screens and with large text.
+      final showDiro =
+          constraints.maxWidth >= 320 &&
+          MediaQuery.textScalerOf(context).scale(1) < 1.5;
+      final textWidth = showDiro
+          ? math.max(1.0, width - _diroSize - _diroGap)
+          : width;
       final titleHeight = widget.journeys
           .map(
-            (j) =>
-                _textHeight(context, j.title, _titleStyle, width, maxLines: 3),
+            (j) => _textHeight(
+              context,
+              j.title,
+              _titleStyle,
+              textWidth,
+              maxLines: 3,
+            ),
           )
           .fold(0.0, math.max);
+      final introHeight =
+          _textHeight(context, 'ONGOING JOURNEY', _labelStyle, textWidth) +
+          12 +
+          titleHeight +
+          12 +
+          _textHeight(context, _detail, _detailStyle, textWidth);
       final buttonHeight = math.max(
         48.0,
         _textHeight(
@@ -109,11 +130,7 @@ class _JourneyBannerState extends State<JourneyBanner> {
       );
       final height =
           48 +
-          _textHeight(context, 'ONGOING JOURNEY', _labelStyle, width) +
-          12 +
-          titleHeight +
-          12 +
-          _textHeight(context, _detail, _detailStyle, width) +
+          math.max(introHeight, showDiro ? _diroSize : 0.0) +
           16 +
           _textHeight(context, 'Overall progress: 100%', _detailStyle, width) +
           10 +
@@ -151,16 +168,35 @@ class _JourneyBannerState extends State<JourneyBanner> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text('ONGOING JOURNEY', style: _labelStyle),
-                      const SizedBox(height: 12),
-                      Text(
-                        journey.title,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: _titleStyle,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'ONGOING JOURNEY',
+                                  style: _labelStyle,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  journey.title,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: _titleStyle,
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(_detail, style: _detailStyle),
+                              ],
+                            ),
+                          ),
+                          if (showDiro) ...[
+                            const SizedBox(width: _diroGap),
+                            const DiroPoses(size: _diroSize),
+                          ],
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      const Text(_detail, style: _detailStyle),
                       const SizedBox(height: 16),
                       Text(
                         'Overall progress: ${journey.completionLabel}',

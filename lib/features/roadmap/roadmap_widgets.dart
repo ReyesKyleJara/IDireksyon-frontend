@@ -278,6 +278,108 @@ ButtonStyle roadmapPrimaryButtonStyle(BuildContext context) {
   );
 }
 
+/// Switches the journey log between ongoing and finished journeys.
+class JourneyStatusTabs extends StatelessWidget {
+  const JourneyStatusTabs({
+    super.key,
+    required this.showCompleted,
+    required this.onChanged,
+    this.inProgress = 0,
+    this.completed = 0,
+  });
+
+  final bool showCompleted;
+  final ValueChanged<bool> onChanged;
+  final int inProgress, completed;
+
+  static String _label(String name, int count) =>
+      count > 0 ? '$name ($count)' : name;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    return SegmentedButton<bool>(
+      showSelectedIcon: false,
+      segments: [
+        ButtonSegment(
+          value: false,
+          label: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(_label('In Progress', inProgress)),
+          ),
+        ),
+        ButtonSegment(
+          value: true,
+          label: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(_label('Completed', completed)),
+          ),
+        ),
+      ],
+      selected: {showCompleted},
+      onSelectionChanged: (selection) => onChanged(selection.first),
+      style: SegmentedButton.styleFrom(
+        backgroundColor: dark ? colors.surfaceContainer : Colors.white,
+        foregroundColor: colors.onSurface,
+        selectedBackgroundColor: AppTheme.primaryBlue,
+        selectedForegroundColor: Colors.white,
+        side: BorderSide(
+          color: dark
+              ? colors.outlineVariant.withValues(alpha: .35)
+              : const Color(0xFFE3ECF7),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown when a journey log tab has nothing in it.
+class JourneyLogEmpty extends StatelessWidget {
+  const JourneyLogEmpty({
+    super.key,
+    required this.title,
+    required this.message,
+  });
+
+  final String title, message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return RoadmapCard(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+        child: Column(
+          children: [
+            Icon(
+              Icons.history_rounded,
+              size: 40,
+              color: colors.onSurfaceVariant,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Small rounded tile for a government ID or document.
 class RoadmapRecordIcon extends StatelessWidget {
   const RoadmapRecordIcon({super.key, required this.document, this.size = 42});

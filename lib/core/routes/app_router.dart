@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../auth/auth_service.dart';
 import '../../features/startup/startup_screen.dart';
 import '../../features/auth/welcome_screen.dart';
 import '../../features/auth/login_screen.dart';
@@ -13,7 +14,23 @@ import '../../features/profile/profile_setup_screen.dart';
 import '../../features/profile/profile_complete_screen.dart';
 
 class AppRouter {
+  static const _signedInRoutes = {
+    '/home',
+    '/profile/setup',
+    '/profile/loading',
+    '/profile/complete',
+  };
+
   static Route<dynamic> generateRoute(RouteSettings settings) {
+    // Decided here, not in the page builder, so a page already on screen is
+    // not swapped out while it animates away during logout. Web URLs can name
+    // these routes directly; startup restores a saved session or signs out.
+    if (_signedInRoutes.contains(settings.name) &&
+        AuthService.instance.token == null) {
+      return MaterialPageRoute(
+        builder: (_) => StartupScreen(resumeRoute: settings.name),
+      );
+    }
     switch (settings.name) {
       case '/':
         return MaterialPageRoute(builder: (_) => const StartupScreen());

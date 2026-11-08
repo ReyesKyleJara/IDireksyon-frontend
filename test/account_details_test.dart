@@ -113,8 +113,9 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.text('Directory test credential'), findsWidgets);
         }
-        // One catalog load; the mock answers documents without counting them.
-        expect(requests, 1);
+        // One load each for Home's recommendations and the Directory; opening
+        // the tab adds none. The mock answers documents without counting them.
+        expect(requests, 2);
         expect(tester.takeException(), isNull);
       }, () => MockClient((request) async {
         if (request.url.path.endsWith('/documents')) return http.Response('{"data":[]}', 200);

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_motion.dart';
+import '../../core/widgets/page_header.dart';
+import '../roadmap/roadmap_widgets.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -11,8 +14,6 @@ class ProfileSetupScreen extends StatefulWidget {
 }
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
-  static const _blue = Color(0xFF10469B);
-
   final _aboutFormKey = GlobalKey<FormState>();
 
   final List<_ProfileSetupOption> _ids = [];
@@ -426,81 +427,52 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
   }
 
+  // Profile setup is always light, whatever the device theme is.
+  static final _colors = AppTheme.lightTheme.colorScheme;
+  static const _border = Color(0xFFE3ECF7);
+  static const _error = Color(0xFFB3261E);
+
   @override
   Widget build(BuildContext context) {
-    final options = _documentsStep
-        ? _documents
-        : _ids;
+    final options = _documentsStep ? _documents : _ids;
+    final selected = _documentsStep ? _selectedDocuments : _selectedIds;
+    final filteredOptions = options
+        .where(
+          (option) =>
+              _searchQuery.isEmpty ||
+              option.name.toLowerCase().contains(_searchQuery),
+        )
+        .toList();
 
-    final selected = _documentsStep
-        ? _selectedDocuments
-        : _selectedIds;
-
-    final filteredOptions =
-        options.where((option) {
-      if (_searchQuery.isEmpty) {
-        return true;
-      }
-
-      return option.name
-          .toLowerCase()
-          .contains(_searchQuery);
-    }).toList();
-
-    // Profile setup is always light.
-    // The main app can still follow ThemeMode.system.
     return Theme(
       data: AppTheme.lightTheme,
       child: PopScope(
         canPop: false,
-        onPopInvokedWithResult: (
-          didPop,
-          result,
-        ) {
-          if (!didPop) {
-            _handleBack();
-          }
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) _handleBack();
         },
         child: Scaffold(
-          backgroundColor:
-              AppTheme.pageBackground,
+          backgroundColor: AppTheme.pageBackground,
           body: SafeArea(
+            bottom: false,
             child: Center(
               child: ConstrainedBox(
-                constraints:
-                    const BoxConstraints(
-                  maxWidth: 500,
-                ),
+                constraints: const BoxConstraints(maxWidth: 500),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildHeader(),
-
+                    _buildTopBar(),
                     Expanded(
                       child: _loading
-                          ? const Center(
-                              child:
-                                  CircularProgressIndicator(),
-                            )
-                          : _errorMessage !=
-                                  null
-                              ? _buildErrorState()
-                              : _aboutStep
-                                  ? _buildAboutContent()
-                                  : _buildSelectionContent(
-                                      filteredOptions,
-                                      selected,
-                                    ),
+                          ? const Center(child: CircularProgressIndicator())
+                          : _errorMessage != null
+                          ? _buildErrorState()
+                          : _aboutStep
+                          ? _buildAboutContent()
+                          : _buildSelectionContent(filteredOptions, selected),
                     ),
-
-                    if (!_loading &&
-                        _errorMessage == null) ...[
-                      if (!_aboutStep)
-                        _buildSelectionFooter(
-                          selected,
-                        ),
-
-                      _buildBottomButton(),
-                    ],
+                    if (!_loading && _errorMessage == null)
+                      _buildBottomBar(selected),
                   ],
                 ),
               ),
@@ -511,361 +483,187 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildTopBar() {
     return Padding(
-      padding:
-          const EdgeInsets.fromLTRB(
-        20,
-        18,
-        20,
-        0,
-      ),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(8, 14, 12, 8),
+      child: Row(
         children: [
-          // Grows with large text instead of clipping the title.
-          ConstrainedBox(
-            constraints: const BoxConstraints(
-              minHeight: 42,
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 60,
-                  child: Align(
-                    alignment:
-                        Alignment.centerLeft,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(),
-                      tooltip: _step == 0
-                          ? 'Back'
-                          : 'Previous step',
-                      onPressed:
-                          _saving
-                              ? null
-                              : _handleBack,
-                      icon: const Icon(
-                        Icons
-                            .arrow_back_ios_new_rounded,
-                        size: 20,
-                        color: _blue,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // One line, shrunk only as far as needed, so large text
-                // leaves room for the step's own heading and options.
-                const Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 6,
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Set Up Profile',
-                        maxLines: 1,
-                        textAlign:
-                            TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight:
-                              FontWeight.w700,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                SizedBox(
-                  width: 60,
-                  child: Align(
-                    alignment:
-                        Alignment.centerRight,
-                    child: _aboutStep
-                        ? const SizedBox()
-                        : TextButton(
-                            onPressed:
-                                _saving
-                                    ? null
-                                    : () =>
-                                        _advance(
-                                      skip: true,
-                                    ),
-                            style:
-                                TextButton
-                                    .styleFrom(
-                              foregroundColor:
-                                  _blue,
-                              padding:
-                                  EdgeInsets.zero,
-                            ),
-                            child:
-                                const Text(
-                              'Skip',
-                              style:
-                                  TextStyle(
-                                fontSize: 14,
-                                fontWeight:
-                                    FontWeight
-                                        .w600,
-                              ),
-                            ),
-                          ),
-                  ),
-                ),
-              ],
+          IconButton(
+            tooltip: _step == 0 ? 'Back' : 'Previous step',
+            onPressed: _saving ? null : _handleBack,
+            color: _colors.primary,
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
+          // One line, shrunk only as far as needed, so large text leaves
+          // room for the step's own heading and options.
+          const Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: PageHeader('Set Up Profile'),
             ),
           ),
-
-          const SizedBox(height: 12),
-
-          ClipRRect(
-            borderRadius:
-                BorderRadius.circular(
-              100,
-            ),
-            child:
-                LinearProgressIndicator(
-              minHeight: 4,
-              value: (_step + 1) / 3,
-              backgroundColor:
-                  const Color(
-                0xFFE4E6EA,
+          if (!_aboutStep)
+            TextButton(
+              onPressed: _saving ? null : () => _advance(skip: true),
+              style: TextButton.styleFrom(
+                foregroundColor: _colors.primary,
+                minimumSize: const Size(48, 40),
               ),
-              valueColor:
-                  const AlwaysStoppedAnimation<
-                      Color>(
-                _blue,
+              child: const Text(
+                'Skip',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
               ),
             ),
-          ),
-
-          const SizedBox(height: 9),
-
-          Text(
-            'Step ${_step + 1} of 3',
-            style: const TextStyle(
-              color: Color(0xFF777D89),
-              fontSize: 13,
-              fontWeight:
-                  FontWeight.w500,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildAboutContent() {
-    return SingleChildScrollView(
-      padding:
-          const EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        24,
+  Widget _buildStepHeader({
+    required String title,
+    required String subtitle,
+    Widget? below,
+  }) {
+    return RoadmapStepHeader(
+      step: 'STEP ${_step + 1} OF 3',
+      title: title,
+      subtitle: subtitle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(100),
+            child: LinearProgressIndicator(
+              minHeight: 5,
+              value: (_step + 1) / 3,
+              backgroundColor: Colors.white.withValues(alpha: .22),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppTheme.accentGold,
+              ),
+            ),
+          ),
+          if (below != null) ...[const SizedBox(height: 14), below],
+        ],
       ),
-      keyboardDismissBehavior:
-          ScrollViewKeyboardDismissBehavior
-              .onDrag,
+    );
+  }
+
+  Widget _fieldLabel(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w700,
+        color: _colors.onSurface,
+      ),
+    ),
+  );
+
+  Widget _fieldHint(String text) => Padding(
+    padding: const EdgeInsets.only(top: 6),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        height: 1.35,
+        color: _colors.onSurfaceVariant,
+      ),
+    ),
+  );
+
+  Widget _buildAboutContent() {
+    final fieldText = TextStyle(color: _colors.onSurface, fontSize: 15);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       child: Form(
         key: _aboutFormKey,
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'A little about you',
-              style: TextStyle(
-                fontFamily:
-                    'Bricolage Grotesque',
-                fontSize: 23,
-                height: 1.15,
-                fontWeight:
-                    FontWeight.w800,
-                color: Colors.black,
-              ),
+            _buildStepHeader(
+              title: 'A little about you',
+              subtitle:
+                  'We’ll use these details to check age-based eligibility and show relevant local offices.',
             ),
-
-            const SizedBox(height: 10),
-
-            const Text(
-              'We’ll use these details to check age-based eligibility and show relevant local offices.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.4,
-                color: Color(0xFF4F5663),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            const Text(
-              'What should we call you?',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight:
-                    FontWeight.w600,
-                color: Color(0xFF20242B),
-              ),
-            ),
-
-            const SizedBox(height: 6),
-
-            TextFormField(
-              controller: _nameController,
-              textInputAction:
-                  TextInputAction.next,
-              textCapitalization:
-                  TextCapitalization.words,
-              style: const TextStyle(
-                color: Color(0xFF20242B),
-                fontSize: 14,
-              ),
-              decoration:
-                  _inputDecoration(
-                hintText: 'e.g. Juan',
-              ),
-              validator: (value) {
-                if (value == null ||
-                    value.trim().isEmpty) {
-                  return 'Enter the name you want us to use.';
-                }
-
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 18),
-
-            const Text(
-              'Birthday',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight:
-                    FontWeight.w600,
-                color: Color(0xFF20242B),
-              ),
-            ),
-
-            const SizedBox(height: 6),
-
-            TextFormField(
-              controller:
-                  _birthDateController,
-              readOnly: true,
-              onTap: _pickBirthDate,
-              style: const TextStyle(
-                color: Color(0xFF20242B),
-                fontSize: 14,
-              ),
-              decoration:
-                  _inputDecoration(
-                hintText: 'MM/DD/YYYY',
-                suffixIcon: const Icon(
-                  Icons
-                      .calendar_today_outlined,
-                  size: 19,
-                  color:
-                      Color(0xFF697386),
-                ),
-              ),
-              validator: (_) {
-                if (_birthDate == null) {
-                  return 'Select your birthday.';
-                }
-
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 6),
-
-            const Text(
-              'Used to check age-based eligibility.',
-              style: TextStyle(
-                fontSize: 11.5,
-                color: Color(0xFF777D89),
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            const Text(
-              'Barangay of Residence',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight:
-                    FontWeight.w600,
-                color: Color(0xFF20242B),
-              ),
-            ),
-
-            const SizedBox(height: 6),
-
-            DropdownButtonFormField<int>(
-              initialValue:
-                  _selectedBarangayId,
-              isExpanded: true,
-              icon: const Icon(
-                Icons
-                    .keyboard_arrow_down_rounded,
-                color: Color(0xFF697386),
-              ),
-              decoration:
-                  _inputDecoration(
-                hintText:
-                    'Select your barangay',
-              ),
-              items: _barangays
-                  .map(
-                    (barangay) =>
-                        DropdownMenuItem<int>(
-                      value: barangay.id,
-                      child: Text(
-                        barangay.name,
-                        overflow:
-                            TextOverflow
-                                .ellipsis,
-                        style:
-                            const TextStyle(
-                          fontSize: 14,
-                          color: Color(
-                            0xFF20242B,
-                          ),
+            const SizedBox(height: 16),
+            RoadmapCard(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _fieldLabel('What should we call you?'),
+                    TextFormField(
+                      controller: _nameController,
+                      textInputAction: TextInputAction.next,
+                      textCapitalization: TextCapitalization.words,
+                      style: fieldText,
+                      decoration: _inputDecoration(hintText: 'e.g. Juan'),
+                      validator: (value) => value == null || value.trim().isEmpty
+                          ? 'Enter the name you want us to use.'
+                          : null,
+                    ),
+                    const SizedBox(height: 18),
+                    _fieldLabel('Birthday'),
+                    TextFormField(
+                      controller: _birthDateController,
+                      readOnly: true,
+                      onTap: _pickBirthDate,
+                      style: fieldText,
+                      decoration: _inputDecoration(
+                        hintText: 'MM/DD/YYYY',
+                        suffixIcon: Icon(
+                          Icons.calendar_today_outlined,
+                          size: 19,
+                          color: _colors.primary,
                         ),
                       ),
+                      validator: (_) =>
+                          _birthDate == null ? 'Select your birthday.' : null,
                     ),
-                  )
-                  .toList(),
-              onChanged: _saving
-                  ? null
-                  : (value) {
-                      setState(() {
-                        _selectedBarangayId =
-                            value;
-                      });
-                    },
-              validator: (value) {
-                if (value == null) {
-                  return 'Select your barangay.';
-                }
-
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 6),
-
-            const Text(
-              'Used to show relevant barangay offices and local services.',
-              style: TextStyle(
-                fontSize: 11.5,
-                color: Color(0xFF777D89),
+                    _fieldHint('Used to check age-based eligibility.'),
+                    const SizedBox(height: 18),
+                    _fieldLabel('Barangay of Residence'),
+                    DropdownButtonFormField<int>(
+                      initialValue: _selectedBarangayId,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(16),
+                      dropdownColor: Colors.white,
+                      style: fieldText,
+                      icon: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: _colors.primary,
+                      ),
+                      decoration: _inputDecoration(
+                        hintText: 'Select your barangay',
+                      ),
+                      items: _barangays
+                          .map(
+                            (barangay) => DropdownMenuItem<int>(
+                              value: barangay.id,
+                              child: Text(
+                                barangay.name,
+                                overflow: TextOverflow.ellipsis,
+                                style: fieldText,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _saving
+                          ? null
+                          : (value) =>
+                                setState(() => _selectedBarangayId = value),
+                      validator: (value) =>
+                          value == null ? 'Select your barangay.' : null,
+                    ),
+                    _fieldHint(
+                      'Used to show relevant barangay offices and local services.',
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -878,295 +676,126 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     required String hintText,
     Widget? suffixIcon,
   }) {
+    OutlineInputBorder outline(Color color, [double width = 1]) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: color, width: width),
+        );
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xFF98A2B3),
-        fontSize: 14,
-      ),
+      hintStyle: TextStyle(color: _colors.onSurfaceVariant, fontSize: 14),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: Colors.white,
-      contentPadding:
-          const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 14,
-      ),
-      border: OutlineInputBorder(
-        borderRadius:
-            BorderRadius.circular(12),
-      ),
-      enabledBorder:
-          OutlineInputBorder(
-        borderRadius:
-            BorderRadius.circular(12),
-        borderSide:
-            const BorderSide(
-          color: Color(0xFFDDE1E6),
-        ),
-      ),
-      focusedBorder:
-          OutlineInputBorder(
-        borderRadius:
-            BorderRadius.circular(12),
-        borderSide:
-            const BorderSide(
-          color: _blue,
-          width: 1.5,
-        ),
-      ),
-      errorBorder:
-          OutlineInputBorder(
-        borderRadius:
-            BorderRadius.circular(12),
-        borderSide:
-            const BorderSide(
-          color: Color(0xFFB3261E),
-        ),
-      ),
-      focusedErrorBorder:
-          OutlineInputBorder(
-        borderRadius:
-            BorderRadius.circular(12),
-        borderSide:
-            const BorderSide(
-          color: Color(0xFFB3261E),
-          width: 1.5,
+      fillColor: AppTheme.pageBackground,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      border: outline(_border),
+      enabledBorder: outline(_border),
+      focusedBorder: outline(_colors.primary, 1.5),
+      errorBorder: outline(_error),
+      focusedErrorBorder: outline(_error, 1.5),
+    );
+  }
+
+  Widget _buildSearchField() {
+    const navy = AppTheme.navy;
+    final noBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
+    );
+    return TextField(
+      controller: _searchController,
+      textInputAction: TextInputAction.search,
+      style: const TextStyle(color: navy, fontSize: 15),
+      cursorColor: AppTheme.primaryBlue,
+      decoration: InputDecoration(
+        hintText: _documentsStep
+            ? 'Search documents'
+            : 'Search government IDs',
+        hintStyle: const TextStyle(color: Color(0xFF5B6B7E), fontSize: 14),
+        prefixIcon: const Icon(Icons.search_rounded, color: navy),
+        suffixIcon: _searchController.text.isNotEmpty
+            ? IconButton(
+                tooltip: 'Clear search',
+                onPressed: _searchController.clear,
+                icon: const Icon(Icons.close_rounded, color: navy),
+              )
+            : null,
+        filled: true,
+        fillColor: Colors.white,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(vertical: 13),
+        border: noBorder,
+        enabledBorder: noBorder,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppTheme.accentGold, width: 2),
         ),
       ),
     );
   }
 
   Widget _buildSelectionContent(
-    List<_ProfileSetupOption>
-        filteredOptions,
+    List<_ProfileSetupOption> filteredOptions,
     Set<int> selected,
   ) {
     // The intro, search and options share one scroll view, so large text
     // can never squeeze the option list off a small screen.
     return CustomScrollView(
-      physics:
-          const BouncingScrollPhysics(),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
         SliverPadding(
-          padding:
-              const EdgeInsets.fromLTRB(
-            20,
-            16,
-            20,
-            8,
-          ),
-          sliver: SliverList.list(
-            children: [
-              Text(
-                _documentsStep
-                    ? 'Which documents do you currently have?'
-                    : 'Which government IDs do you already have?',
-                style: const TextStyle(
-                  fontFamily:
-                      'Bricolage Grotesque',
-                  fontSize: 23,
-                  height: 1.15,
-                  fontWeight:
-                      FontWeight.w800,
-                  color: Colors.black,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              const Text(
-                'Select all that apply. If none, you can skip this step.',
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.4,
-                  color: Color(0xFF4F5663),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              TextField(
-                controller:
-                    _searchController,
-                textInputAction:
-                    TextInputAction.search,
-                style: const TextStyle(
-                  color: Color(0xFF20242B),
-                  fontSize: 14,
-                  fontWeight:
-                      FontWeight.w500,
-                ),
-                cursorColor: _blue,
-                decoration:
-                    InputDecoration(
-                  hintText: _documentsStep
-                      ? 'Search documents...'
-                      : 'Search government IDs...',
-                  hintStyle:
-                      const TextStyle(
-                    color:
-                        Color(0xFF8E96A3),
-                    fontSize: 14,
-                  ),
-                  prefixIcon:
-                      const Icon(
-                    Icons.search_rounded,
-                    color:
-                        Color(0xFF8E96A3),
-                  ),
-                  suffixIcon:
-                      _searchController
-                              .text
-                              .isNotEmpty
-                          ? IconButton(
-                              onPressed:
-                                  _searchController
-                                      .clear,
-                              icon:
-                                  const Icon(
-                                Icons
-                                    .close_rounded,
-                                size: 19,
-                              ),
-                            )
-                          : null,
-                  filled: true,
-                  fillColor:
-                      const Color(
-                    0xFFF7F8FA,
-                  ),
-                  contentPadding:
-                      const EdgeInsets
-                          .symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  border:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius
-                            .circular(14),
-                    borderSide:
-                        const BorderSide(
-                      color:
-                          Color(0xFFDDE1E6),
-                    ),
-                  ),
-                  enabledBorder:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius
-                            .circular(14),
-                    borderSide:
-                        const BorderSide(
-                      color:
-                          Color(0xFFDDE1E6),
-                    ),
-                  ),
-                  focusedBorder:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius
-                            .circular(14),
-                    borderSide:
-                        const BorderSide(
-                      color: _blue,
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+          sliver: SliverToBoxAdapter(
+            child: _buildStepHeader(
+              title: _documentsStep
+                  ? 'Which documents do you have?'
+                  : 'Which government IDs do you have?',
+              subtitle:
+                  'Select all that apply. If none, you can skip this step.',
+              below: _buildSearchField(),
+            ),
           ),
         ),
-
         if (filteredOptions.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Center(
-                  child: Column(
-                    mainAxisSize:
-                        MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons
-                            .search_off_rounded,
-                        size: 36,
-                        color: Color(
-                          0xFF9CA3AF,
-                        ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.search_off_rounded,
+                      size: 40,
+                      color: _colors.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _searchQuery.isEmpty
+                          ? 'No options are available yet.'
+                          : 'No matching results found.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _colors.onSurfaceVariant,
+                        fontSize: 13,
                       ),
-
-                      const SizedBox(
-                        height: 10,
-                      ),
-
-                      Text(
-                        _searchQuery
-                                .isEmpty
-                            ? 'No options are available yet.'
-                            : 'No matching results found.',
-                        textAlign:
-                            TextAlign
-                                .center,
-                        style:
-                            const TextStyle(
-                          color:
-                              Color(
-                            0xFF777D89,
-                          ),
-                          fontSize:
-                              13,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
             ),
           )
         else
           SliverPadding(
-            padding:
-                const EdgeInsets.fromLTRB(
-              20,
-              2,
-              20,
-              16,
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             sliver: SliverList.separated(
-              itemCount:
-                  filteredOptions.length,
-              separatorBuilder:
-                  (_, _) =>
-                      const SizedBox(
-                height: 8,
+              itemCount: filteredOptions.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) => _buildOptionRow(
+                option: filteredOptions[index],
+                selected: selected,
               ),
-              itemBuilder:
-                  (context, index) {
-                final option =
-                    filteredOptions[
-                        index];
-
-                final isSelected =
-                    selected.contains(
-                  option.id,
-                );
-
-                return _buildOptionRow(
-                  option: option,
-                  isSelected:
-                      isSelected,
-                  selected:
-                      selected,
-                );
-              },
             ),
           ),
       ],
@@ -1175,251 +804,113 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Widget _buildOptionRow({
     required _ProfileSetupOption option,
-    required bool isSelected,
     required Set<int> selected,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _saving
-            ? null
-            : () {
-                setState(() {
-                  if (!selected
-                      .add(option.id)) {
-                    selected
-                        .remove(option.id);
-                  }
-                });
-              },
-        borderRadius:
-            BorderRadius.circular(12),
-        child: AnimatedContainer(
-          duration:
-              const Duration(
-            milliseconds: 150,
-          ),
-          padding:
-              const EdgeInsets.fromLTRB(
-            12,
-            10,
-            14,
-            10,
-          ),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? _blue.withValues(
-                    alpha: 0.07,
-                  )
-                : Colors.white,
-            borderRadius:
-                BorderRadius.circular(
-              12,
-            ),
-            border: Border.all(
-              color: isSelected
-                  ? _blue.withValues(
-                      alpha: 0.28,
-                    )
-                  : const Color(
-                      0xFFDDE1E6,
-                    ),
-            ),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 26,
-                height: 26,
-                child: Checkbox(
-                  value: isSelected,
-                  onChanged: _saving
-                      ? null
-                      : (_) {
-                          setState(() {
-                            if (!selected
-                                .add(
-                              option.id,
-                            )) {
-                              selected
-                                  .remove(
-                                option.id,
-                              );
-                            }
-                          });
-                        },
-                  activeColor: _blue,
-                  checkColor:
-                      Colors.white,
-                  side:
-                      const BorderSide(
-                    color:
-                        Color(
-                      0xFFAAB2BF,
-                    ),
-                    width: 1.5,
-                  ),
-                  shape:
-                      RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius
-                            .circular(4),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Text(
-                  option.name,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.3,
-                    fontWeight:
-                        isSelected
-                            ? FontWeight
-                                .w600
-                            : FontWeight
-                                .w500,
-                    color:
-                        const Color(
-                      0xFF20242B,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+    final isSelected = selected.contains(option.id);
+    final shape = BorderRadius.circular(16);
+    return Semantics(
+      selected: isSelected,
+      checked: isSelected,
+      child: Material(
+        color: isSelected
+            ? _colors.primary.withValues(alpha: .07)
+            : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: shape,
+          side: BorderSide(
+            width: isSelected ? 1.5 : 1,
+            color: isSelected ? _colors.primary : _border,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSelectionFooter(
-    Set<int> selected,
-  ) {
-    return Padding(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 20,
-      ),
-      child: SizedBox(
-        height: 38,
-        child: Row(
-          children: [
-            Text(
-              '${selected.length} selected',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight:
-                    FontWeight.w700,
-                color: Colors.black87,
-              ),
-            ),
-
-            const Spacer(),
-
-            if (selected.isNotEmpty)
-              TextButton(
-                onPressed: _saving
-                    ? null
-                    : () {
-                        setState(() {
-                          selected.clear();
-                        });
-                      },
-                style:
-                    TextButton.styleFrom(
-                  foregroundColor: _blue,
-                  padding: EdgeInsets.zero,
-                ),
-                child: const Text(
-                  'Clear all',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight:
-                        FontWeight.w600,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomButton() {
-    return Container(
-      padding:
-          const EdgeInsets.fromLTRB(
-        20,
-        10,
-        20,
-        18,
-      ),
-      decoration: BoxDecoration(
-        color: AppTheme.pageBackground,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(
-              alpha: 0.04,
-            ),
-            blurRadius: 12,
-            offset:
-                const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        child: FilledButton(
-          onPressed: _saving
+        clipBehavior: Clip.antiAlias,
+        child: MotionInkWell(
+          onTap: _saving
               ? null
-              : () => _advance(),
-          style:
-              FilledButton.styleFrom(
-            backgroundColor: _blue,
-            foregroundColor:
-                Colors.white,
-            disabledBackgroundColor:
-                _blue.withValues(
-              alpha: 0.55,
-            ),
-            minimumSize:
-                const Size.fromHeight(
-              52,
-            ),
-            shape:
-                RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(
-                12,
-              ),
+              : () => setState(() {
+                  if (!selected.add(option.id)) selected.remove(option.id);
+                }),
+          borderRadius: shape,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                RoadmapRecordIcon(document: _documentsStep),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    option.name,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: _colors.onSurface,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  isSelected
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
+                  color: isSelected
+                      ? _colors.primary
+                      : _colors.onSurfaceVariant,
+                  size: 22,
+                ),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(Set<int> selected) {
+    return RoadmapBottomBar(
+      note: _aboutStep
+          ? null
+          : Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      '${selected.length} selected',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _colors.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+                if (selected.isNotEmpty)
+                  TextButton(
+                    onPressed: _saving
+                        ? null
+                        : () => setState(selected.clear),
+                    style: TextButton.styleFrom(
+                      foregroundColor: _colors.primary,
+                      minimumSize: const Size(44, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: const Text('Clear all'),
+                  ),
+              ],
+            ),
+      action: Builder(
+        builder: (context) => FilledButton(
+          onPressed: _saving ? null : () => _advance(),
+          style: roadmapPrimaryButtonStyle(context),
           child: _saving
-              ? const SizedBox(
+              ? SizedBox(
                   width: 20,
                   height: 20,
-                  child:
-                      CircularProgressIndicator(
+                  child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color:
-                        Colors.white,
+                    color: _colors.primary,
                   ),
                 )
-              : Text(
-                  _documentsStep
-                      ? 'Finish Setup'
-                      : 'Next',
-                  style:
-                      const TextStyle(
-                    fontSize: 15,
-                    fontWeight:
-                        FontWeight.w700,
-                  ),
-                ),
+              : Text(_documentsStep ? 'Finish Setup' : 'Next'),
         ),
       ),
     );
@@ -1428,43 +919,29 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Widget _buildErrorState() {
     return Center(
       child: Padding(
-        padding:
-            const EdgeInsets.all(28),
+        padding: const EdgeInsets.all(28),
         child: Column(
-          mainAxisSize:
-              MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off_rounded,
-              size: 44,
-              color:
-                  Color(0xFF777D89),
+              size: 42,
+              color: _colors.onSurfaceVariant,
             ),
-
             const SizedBox(height: 14),
-
             Text(
               _errorMessage!,
-              textAlign:
-                  TextAlign.center,
-              style:
-                  const TextStyle(
+              textAlign: TextAlign.center,
+              style: TextStyle(
                 fontSize: 13,
                 height: 1.4,
-                color:
-                    Color(0xFF555B66),
+                color: _colors.onSurfaceVariant,
               ),
             ),
-
-            const SizedBox(height: 18),
-
+            const SizedBox(height: 16),
             FilledButton(
-              onPressed:
-                  _loadSetupData,
-              child:
-                  const Text(
-                'Try Again',
-              ),
+              onPressed: _loadSetupData,
+              child: const Text('Try Again'),
             ),
           ],
         ),
