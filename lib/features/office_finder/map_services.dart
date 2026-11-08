@@ -6,6 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+import 'models/office_model.dart';
+
 enum RouteTravelMode {
   drive('DRIVE', 'Drive'),
   walk('WALK', 'Walk'),
@@ -149,6 +151,20 @@ class OfficeMapServices {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
+
+  Future<List<OfficeModel>> offices() async {
+    final response = await _client
+        .get(Uri.parse('$_baseUrl/offices'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) {
+      throw StateError('Offices are unavailable. Please try again.');
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return (body['data'] as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(OfficeModel.fromJson)
+        .toList();
+  }
 
   Future<List<MapPlace>> search(String query) async {
     final key = query.trim().toLowerCase();

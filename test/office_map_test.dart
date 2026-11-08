@@ -9,7 +9,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:idireksyon_frontend/core/theme/app_theme.dart';
 import 'package:idireksyon_frontend/features/office_finder/map_services.dart';
 import 'package:idireksyon_frontend/features/office_finder/office_finder_screen.dart';
-import 'package:idireksyon_frontend/features/office_finder/models/office_catalog.dart';
+
+import 'fixtures/offices.dart';
 
 void main() {
   for (final mode in [RouteTravelMode.walk, RouteTravelMode.transit]) {
@@ -59,7 +60,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: OfficeFinderScreen(
-          initialOffice: officeCatalog.first,
+          initialOffice: dfaMalolos,
           services: services,
           mapBuilder: _testMap,
         ),
@@ -115,7 +116,12 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
-        MaterialApp(home: OfficeFinderScreen(mapBuilder: _testMap)),
+        MaterialApp(
+          home: OfficeFinderScreen(
+            services: FixtureOfficeServices(),
+            mapBuilder: _testMap,
+          ),
+        ),
       );
       await tester.pump(const Duration(milliseconds: 400));
       expect(tester.takeException(), isNull);
@@ -246,7 +252,10 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
-            home: OfficeFinderScreen(mapBuilder: _testMap),
+            home: OfficeFinderScreen(
+              services: FixtureOfficeServices(),
+              mapBuilder: _testMap,
+            ),
           ),
         );
         await tester.pump(const Duration(milliseconds: 300));
@@ -287,7 +296,7 @@ Widget _testMap(google.GoogleMap map) {
   return const SizedBox.expand();
 }
 
-class _TestServices extends OfficeMapServices {
+class _TestServices extends FixtureOfficeServices {
   bool denied = false;
   @override
   Future<LatLng> locate() async {
