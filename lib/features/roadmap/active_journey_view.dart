@@ -83,7 +83,7 @@ class ActiveJourneyView extends StatelessWidget {
       children: [
         _JourneySummary(
           title: title,
-          goals: [for (final goal in goals) goal.name],
+          goals: goals,
           progress: progress,
           completed: completed,
           count: count,
@@ -151,7 +151,7 @@ class ActiveJourneyView extends StatelessWidget {
   }
 }
 
-/// Navy while open, like Home's journey banner; a plain card when collapsed.
+/// Target on the left, progress on the right; stacks when that would not fit.
 class _JourneySummary extends StatelessWidget {
   const _JourneySummary({
     required this.title,
@@ -164,114 +164,237 @@ class _JourneySummary extends StatelessWidget {
   });
 
   final String title;
-  final List<String> goals;
+  final List<RoadmapPlanStep> goals;
   final double progress;
   final int completed, count;
   final bool expanded;
   final VoidCallback? onOpen;
 
+  /// Space three columns need, so a long word in a name is never split.
+  static const _minThreeColumnWidth = 289.0;
+  static const _chevronWidth = 24.0;
+  static const _maxThreeColumnTextScale = 1.15;
+  static const _minProgressWidth = 96.0;
+  static const _maxProgressWidth = 180.0;
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final strong = expanded ? Colors.white : colors.onSurface;
-    final muted = expanded ? const Color(0xFFD5E7FA) : colors.onSurfaceVariant;
     final percent =
         '${completed < count ? (progress * 100).round().clamp(0, 99) : (progress * 100).round()}%';
-    final several = goals.length > 1;
+    final divider = colors.outlineVariant.withValues(alpha: .6);
+    final target = _JourneyTarget(title: title, goals: goals);
+    Widget summaryProgress({required bool narrow}) => _JourneyProgress(
+      title: title,
+      percent: percent,
+      progress: progress,
+      completed: completed,
+      count: count,
+      narrow: narrow,
+    );
+    final chevron = expanded
+        ? const <Widget>[]
+        : [
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: colors.onSurfaceVariant,
+              size: 20,
+            ),
+          ];
     final content = Padding(
-      padding: EdgeInsets.all(expanded ? 20 : 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final needed = _minThreeColumnWidth + (expanded ? 0 : _chevronWidth);
+          final textFits =
+              MediaQuery.textScalerOf(context).scale(10) / 10 <=
+              _maxThreeColumnTextScale;
+          if (goals.length <= 1 && constraints.maxWidth >= needed && textFits) {
+            // Share spare width so the name column does not absorb all of it.
+            final progressWidth =
+                (_minProgressWidth + (constraints.maxWidth - needed) / 2).clamp(
+                  _minProgressWidth,
+                  _maxProgressWidth,
+                );
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: Center(child: target)),
+                  const SizedBox(width: 10),
+                  Container(width: 1, color: divider),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: progressWidth,
+                    child: summaryProgress(narrow: true),
+                  ),
+                  ...chevron,
+                ],
+              ),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      several ? '${goals.length} targets' : 'Target',
-                      style: TextStyle(fontSize: 11, color: muted),
-                    ),
-                    const SizedBox(height: 4),
-                    if (several)
-                      for (final goal in goals)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Text(
-                            goal,
-                            style: TextStyle(
-                              fontSize: 15,
-                              height: 1.3,
-                              fontWeight: FontWeight.w700,
-                              color: strong,
-                            ),
-                          ),
-                        )
-                    else
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 19,
-                          height: 1.25,
-                          fontWeight: FontWeight.w800,
-                          color: strong,
-                        ),
-                      ),
-                  ],
-                ),
+              Row(
+                children: [
+                  Expanded(child: target),
+                  ...chevron,
+                ],
               ),
-              if (!expanded)
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: colors.onSurfaceVariant,
-                  size: 20,
-                ),
+              const SizedBox(height: 12),
+              Container(height: 1, color: divider),
+              const SizedBox(height: 12),
+              summaryProgress(narrow: false),
             ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Overall Progress',
-                  style: TextStyle(fontSize: 12, color: muted),
-                ),
-              ),
-              Text(
-                percent,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: strong,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: progress,
-            minHeight: 6,
-            borderRadius: BorderRadius.circular(8),
-            backgroundColor: expanded
-                ? Colors.white.withValues(alpha: .2)
-                : colors.primary.withValues(alpha: .1),
-            color: expanded ? AppTheme.accentGold : colors.primary,
-            semanticsLabel: '$title journey progress',
-            semanticsValue: percent,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '$completed of $count completed',
-            style: TextStyle(fontSize: 11, color: muted),
-          ),
-        ],
+          );
+        },
       ),
     );
-    if (expanded) return RoadmapGradientCard(child: content);
     return RoadmapCard(
-      child: MotionInkWell(onTap: onOpen, child: content),
+      child: expanded ? content : MotionInkWell(onTap: onOpen, child: content),
+    );
+  }
+}
+
+/// One target as icon and name; several targets as a short labeled list.
+class _JourneyTarget extends StatelessWidget {
+  const _JourneyTarget({required this.title, required this.goals});
+
+  final String title;
+  final List<RoadmapPlanStep> goals;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final label = TextStyle(fontSize: 12, color: colors.onSurfaceVariant);
+    if (goals.length > 1) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${goals.length} targets', style: label),
+          for (final goal in goals)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  RoadmapRecordIcon(
+                    document: goal.type == 'document',
+                    size: 30,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      goal.name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        RoadmapRecordIcon(
+          document: goals.isNotEmpty && goals.first.type == 'document',
+          size: 52,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Target', style: label),
+              const SizedBox(height: 3),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.25,
+                  fontWeight: FontWeight.w800,
+                  color: colors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Explicit step completion; a narrow column puts the percentage on its own line.
+class _JourneyProgress extends StatelessWidget {
+  const _JourneyProgress({
+    required this.title,
+    required this.percent,
+    required this.progress,
+    required this.completed,
+    required this.count,
+    required this.narrow,
+  });
+
+  final String title, percent;
+  final double progress;
+  final int completed, count;
+  final bool narrow;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final label = Text(
+      'Overall Progress',
+      style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+    );
+    final value = Text(
+      percent,
+      style: TextStyle(
+        fontSize: 20,
+        height: 1.2,
+        fontWeight: FontWeight.w800,
+        color: colors.primary,
+      ),
+    );
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (narrow) ...[
+          label,
+          const SizedBox(height: 2),
+          value,
+        ] else
+          Row(
+            children: [
+              Expanded(child: label),
+              value,
+            ],
+          ),
+        const SizedBox(height: 6),
+        LinearProgressIndicator(
+          value: progress,
+          minHeight: 6,
+          borderRadius: BorderRadius.circular(8),
+          backgroundColor: colors.primary.withValues(alpha: .1),
+          color: colors.primary,
+          semanticsLabel: '$title journey progress',
+          semanticsValue: percent,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '$completed of $count completed',
+          style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
+        ),
+      ],
     );
   }
 }
