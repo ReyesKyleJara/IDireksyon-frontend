@@ -1,4 +1,4 @@
-package com.example.idireksyon_frontend
+package com.IDireksyon.myapp
 
 import io.flutter.embedding.android.FlutterActivity
 

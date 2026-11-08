@@ -12,6 +12,9 @@ import 'package:idireksyon_frontend/features/onboarding/onboarding_screen.dart';
 const intro = 'Hi! I’m Diro, your ID guide.';
 const prepared = 'Let’s get you prepared.';
 const welcome = 'Welcome to IDireksyon!';
+const disclaimer =
+    'IDireksyon is an independent informational guide and is not affiliated '
+    'with or operated by any Philippine government agency.';
 
 // Hidden copies of every slide reserve the sheet height; match visible text.
 Finder shown(String text) => find.text(text).hitTestable();
@@ -91,6 +94,41 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('Non-government disclaimer is visible from the first slide', (
+    tester,
+  ) async {
+    phone(tester);
+    await openApp(tester);
+    expect(shown(disclaimer), findsOneWidget);
+    final top = tester.getTopLeft(shown(disclaimer)).dy;
+
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.text('Next'));
+      await settle(tester);
+      expect(shown(disclaimer), findsOneWidget);
+      expect(tester.getTopLeft(shown(disclaimer)).dy, top);
+    }
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Returning users also see the disclaimer on Welcome', (
+    tester,
+  ) async {
+    phone(tester);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        initialRoute: '/welcome',
+        onGenerateRoute: AppRouter.generateRoute,
+      ),
+    );
+    await settle(tester);
+    expect(shown(disclaimer), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('Swipes change slides; there is no Skip button', (tester) async {
     phone(tester);
     await openApp(tester);
@@ -158,7 +196,7 @@ void main() {
       ),
     );
     await settle(tester);
-    for (final label in ['Log In', 'Sign Up']) {
+    for (final label in ['Log In', 'Sign Up', disclaimer]) {
       await tester.ensureVisible(find.text(label));
       expect(find.text(label).hitTestable(), findsOneWidget);
     }

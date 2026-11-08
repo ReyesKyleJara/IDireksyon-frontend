@@ -8,12 +8,30 @@ void main() {
     bool web = false,
     TargetPlatform platform = TargetPlatform.android,
     String page = 'http://localhost:5173/',
+    bool debug = true,
   }) => ApiConfig.resolveBaseUrl(
     override: override,
     isWeb: web,
     platform: platform,
     browserUri: Uri.parse(page),
+    debugBuild: debug,
   );
+
+  test('installed builds default to production, never a local server', () {
+    expect(resolve(debug: false), ApiConfig.productionBaseUrl);
+    expect(ApiConfig.productionBaseUrl, startsWith('https://'));
+    expect(
+      resolve(debug: false, override: 'http://10.0.2.2:8000/api'),
+      ApiConfig.productionBaseUrl,
+    );
+  });
+
+  test('installed builds accept an explicit HTTPS endpoint', () {
+    expect(
+      resolve(debug: false, override: 'https://staging.example.com/api/'),
+      'https://staging.example.com/api',
+    );
+  });
 
   test('web uses the browser host, including browsers on phones', () {
     expect(resolve(web: true), 'http://localhost:5173/api');

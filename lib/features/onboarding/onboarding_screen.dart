@@ -289,6 +289,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   child: _onWelcome ? _authButtons() : _nextButton(),
                 ),
+                const SizedBox(height: 14),
+                // Outside the switcher so it stays put on every slide.
+                const Text(
+                  'IDireksyon is an independent informational guide and is '
+                  'not affiliated with or operated by any Philippine '
+                  'government agency.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: Color(0xFF526579),
+                  ),
+                ),
               ],
             ),
           ),

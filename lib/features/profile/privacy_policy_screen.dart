@@ -1,231 +1,210 @@
-
 import 'package:flutter/material.dart';
+
+import 'legal_page.dart';
 
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key, this.isModal = false});
 
   final bool isModal;
 
-  static const _navy = Color(0xFF1E3A8A);
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final muted = colors.onSurfaceVariant;
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        automaticallyImplyLeading: !isModal,
-        actions: isModal
-            ? [IconButton(
-                tooltip: 'Close',
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
-              )]
-            : null,
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
-          children: [
-            const Text(
-              'Privacy Policy',
-              style: TextStyle(
-                fontSize: 27,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'How IDireksyon handles information '
-              'you provide while using the app.',
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.5,
-                color: muted,
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            _section(
-              context,
-              '01',
-              'Introduction',
-              'IDireksyon is an academic mobile application '
-                  'designed to help users understand government '
-                  'ID requirements, organize their documents, '
-                  'and plan their ID application journey.',
-            ),
-
-            _section(
-              context,
-              '02',
-              'Information you provide',
-              'Depending on the features you use, IDireksyon '
-                  'may handle your name, email address or mobile '
-                  'number, account credentials, profile photo, '
-                  'and information about the IDs and documents '
-                  'you indicate that you already have.',
-            ),
-
-            _section(
-              context,
-              '03',
-              'How your information is used',
-              'Your information is used to support your account, '
-                  'save your document inventory, and provide '
-                  'guidance based on the information you enter. '
-                  'It may also be used to support the operation '
-                  'and security of the application.',
-            ),
-
-            _section(
-              context,
-              '04',
-              'Profile photos',
-              'Profile photos are selected by you and are '
-                  'currently stored on your device. You can '
-                  'change or remove your photo through the '
-                  'Edit Profile screen.',
-            ),
-
-            _section(
-              context,
-              '05',
-              'Location and maps',
-              'IDireksyon includes an Office Finder feature '
-                  'that may use map and location services. '
-                  'Location access, when requested, helps '
-                  'provide location-related functionality. '
-                  'External map services may process information '
-                  'according to their own privacy practices.',
-            ),
-
-            _section(
-              context,
-              '06',
-              'Data protection',
-              'IDireksyon is designed to use account '
-                  'authentication and appropriate safeguards '
-                  'to help protect user information. '
-                  'No application can guarantee absolute '
-                  'security, so users should also keep '
-                  'their account credentials private.',
-            ),
-
-            _section(
-              context,
-              '07',
-              'Your choices',
-              'You can update your account details, change '
-                  'your password, manage your document inventory, '
-                  'and change or remove your locally stored '
-                  'profile photo through the available '
-                  'application features.',
-            ),
-
-            _section(
-              context,
-              '08',
-              'Changes to this notice',
-              'This privacy notice may be revised as '
-                  'IDireksyon is developed and its features '
-                  'or data-handling practices change.',
-            ),
-
-            const SizedBox(height: 10),
-
-            Container(
-              padding: const EdgeInsets.all(17),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE7EEF8),
-                borderRadius: BorderRadius.circular(17),
-              ),
-              child: const Text(
-                'IDireksyon is an academic project and '
-                'is not an official government application. '
-                'This notice should be reviewed against '
-                'the final implementation before deployment.',
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.55,
-                  color: Color(0xFF263C5C),
+    return LegalPage(
+      isModal: isModal,
+      title: 'Privacy Policy',
+      subtitle: 'Last updated: November 9, 2026',
+      introIcon: Icons.privacy_tip_outlined,
+      introTitle: 'What we collect, and why.',
+      introBody: const [
+        'IDireksyon helps residents understand Philippine government ID '
+            'requirements, keep track of their IDs and documents, and plan '
+            'the steps for getting them. This policy explains what the app '
+            'collects and how it is used.',
+        'IDireksyon is an independent academic project developed by GeoBytes. '
+            'It is not an official government app and is not affiliated with, '
+            'endorsed by, or operated by any government agency.',
+      ],
+      groups: const [
+        LegalGroup('WHAT THE APP COLLECTS', [
+          LegalSection(
+            icon: Icons.badge_outlined,
+            title: 'Information you give us',
+            body: [
+              LegalBullets([
+                LegalItem(
+                  'your email address or mobile number, and your password, '
+                  'which is stored in hashed form, not as readable text.',
+                  lead: 'Account details',
                 ),
-              ),
-            ),
-
-            const SizedBox(height: 28),
-            Divider(color: colors.outlineVariant),
-            const SizedBox(height: 14),
-
-            Text(
-              'IDireksyon • Privacy information',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: muted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _section(
-    BuildContext context,
-    String number,
-    String title,
-    String description,
-  ) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 27),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                number,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: _navy,
+                LegalItem(
+                  'your name, birth date, and barangay.',
+                  lead: 'Profile details',
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: colors.onSurface,
-                  ),
+                LegalItem(
+                  'the items you mark as already having in your inventory.',
+                  lead: 'IDs and documents you own',
                 ),
+                LegalItem(
+                  'your target IDs, journey plan, choices, completed steps, '
+                  'and the requirements you mark as prepared.',
+                  lead: 'Roadmap and journey progress',
+                ),
+              ]),
+              LegalParagraph(
+                'The app does not ask you to upload copies of your IDs or '
+                'documents, and does not ask for their ID numbers.',
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            description,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.65,
-              color: colors.onSurfaceVariant,
-            ),
+          LegalSection(
+            icon: Icons.location_on_outlined,
+            title: 'Location',
+            body: [
+              LegalParagraph(
+                'Office Finder can use your device\'s location to show '
+                'offices near you and to get directions. The app asks for '
+                'permission first, and only uses location while you are '
+                'using the app. It may ask when you tap "Use my current '
+                'location", request directions, or start typing in the '
+                'Office Finder search. You can decline and still browse '
+                'offices.',
+              ),
+              LegalParagraph(
+                'When you request directions inside Office Finder, the app '
+                'sends your current location and the office\'s location to '
+                'the IDireksyon server so a route can be calculated with '
+                'Google Maps Platform. Your location is not saved to your '
+                'IDireksyon account.',
+              ),
+              LegalParagraph(
+                'The Get Directions option on ID and document pages opens '
+                'Google Maps with the office as the destination.',
+              ),
+            ],
           ),
-        ],
-      ),
+          LegalSection(
+            icon: Icons.account_circle_outlined,
+            title: 'Profile photo',
+            body: [
+              LegalParagraph(
+                'If you add a profile photo, it stays on your device and is '
+                'not uploaded to IDireksyon\'s servers. You can change or '
+                'remove it in the app.',
+              ),
+            ],
+          ),
+        ]),
+        LegalGroup('HOW IT IS USED', [
+          LegalSection(
+            icon: Icons.tune_rounded,
+            title: 'How we use your information',
+            body: [
+              LegalParagraph(
+                'We use this information to run your account, save your '
+                'inventory and journey progress, and show guidance based on '
+                'what you enter. We also use your email address to send '
+                'sign-up verification codes and password reset links.',
+              ),
+            ],
+          ),
+          LegalSection(
+            icon: Icons.hub_outlined,
+            title: 'Services we use',
+            body: [
+              LegalBullets([
+                LegalItem(
+                  'hosts the IDireksyon server and database, where your '
+                  'account information is stored.',
+                  lead: 'Railway',
+                ),
+                LegalItem(
+                  'provides the maps, office locations, and directions. '
+                  'Google handles information it receives under its own '
+                  'privacy policy.',
+                  lead: 'Google Maps Platform',
+                ),
+                LegalItem(
+                  'delivers verification and password reset emails, and '
+                  'receives your email address for that purpose.',
+                  lead: 'Resend',
+                ),
+              ]),
+              LegalParagraph(
+                'Our hosting provider may keep technical request records, '
+                'such as IP addresses and access times, as part of running '
+                'the service.',
+              ),
+            ],
+          ),
+          LegalSection(
+            icon: Icons.block_rounded,
+            title: 'We do not sell your data',
+            body: [
+              LegalParagraph(
+                'IDireksyon does not sell your personal information. The app '
+                'does not contain advertising or analytics SDKs.',
+              ),
+            ],
+          ),
+        ]),
+        LegalGroup('YOUR DATA AND CHOICES', [
+          LegalSection(
+            icon: Icons.lock_outline_rounded,
+            title: 'How your information is protected',
+            body: [
+              LegalParagraph(
+                'The app connects to the production IDireksyon server over '
+                'HTTPS. Your sign-in session is kept in your device\'s '
+                'secure storage and expires after 30 days. No app or service '
+                'can guarantee complete security, so please keep your '
+                'password private.',
+              ),
+            ],
+          ),
+          LegalSection(
+            icon: Icons.delete_outline_rounded,
+            title: 'Keeping and deleting your information',
+            body: [
+              LegalParagraph(
+                'Your account information stays saved until your account is '
+                'deleted. You can edit your details, update your inventory, '
+                'change your password, or permanently delete your account in '
+                'Profile > Password & security. Deletion happens right away '
+                'and cannot be undone.',
+              ),
+              LegalParagraph(
+                'Technical records and backups held by our hosting provider '
+                'follow that provider\'s own practices.',
+              ),
+              LegalParagraph(
+                'If you cannot log in, see '
+                'www.idireksyon.online/account-deletion for how to request '
+                'deletion.',
+              ),
+            ],
+          ),
+          LegalSection(
+            icon: Icons.update_rounded,
+            title: 'Changes to this policy',
+            body: [
+              LegalParagraph(
+                'We may update this policy as the app changes. The date at '
+                'the top shows the latest version.',
+              ),
+            ],
+          ),
+          LegalSection(
+            icon: Icons.mail_outline_rounded,
+            title: 'Contact',
+            body: [
+              LegalParagraph(
+                'The contact email for GeoBytes is published at '
+                'www.idireksyon.online/privacy.',
+              ),
+            ],
+          ),
+        ]),
+      ],
     );
   }
 }

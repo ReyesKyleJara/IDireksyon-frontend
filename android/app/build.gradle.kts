@@ -1,4 +1,5 @@
 import java.util.Base64
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -11,8 +12,27 @@ val mapDefines = (project.findProperty("dart-defines") as String? ?: "")
     .map { String(Base64.getDecoder().decode(it)).split("=", limit = 2) }
     .filter { it.size == 2 }.associate { it[0] to it[1] }
 
+// Without this a release build would succeed and ship a blank map.
+val requireAndroidMapsKey = tasks.register("requireAndroidMapsKey") {
+    val keyIsSet = !mapDefines["GOOGLE_MAPS_ANDROID_API_KEY"].isNullOrBlank()
+    doLast {
+        if (!keyIsSet) {
+            throw GradleException(
+                "GOOGLE_MAPS_ANDROID_API_KEY is missing or blank. Release builds need " +
+                    "--dart-define=GOOGLE_MAPS_ANDROID_API_KEY=YOUR_ANDROID_KEY",
+            )
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(requireAndroidMapsKey) }
+
+// Git-ignored; release builds fail without it rather than using the debug key.
+val keystoreProperties = Properties().apply {
+    rootProject.file("key.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+
 android {
-    namespace = "com.example.idireksyon_frontend"
+    namespace = "com.IDireksyon.myapp"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,8 +42,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.idireksyon_frontend"
+        applicationId = "com.IDireksyon.myapp"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = maxOf(flutter.minSdkVersion, 24)
@@ -37,11 +56,18 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+            storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+            storePassword = keystoreProperties.getProperty("storePassword")
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
