@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/auth/auth_service.dart';
 import '../../core/widgets/app_motion.dart';
 import 'onboarding_hero.dart';
 
@@ -95,6 +96,43 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   late int _page = widget.initialPage.clamp(0, _last);
   int _direction = 1;
+  bool _openingAuth = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_onWelcome) _rememberCompletion();
+  }
+
+  Future<void> _rememberCompletion() async {
+    try {
+      await AuthService.instance.sessionStore.completeOnboarding();
+    } catch (_) {
+      // Auth navigation retries the write and shows a recoverable error.
+    }
+  }
+
+  Future<void> _openAuth(String route) async {
+    if (_openingAuth) return;
+    _openingAuth = true;
+    try {
+      await AuthService.instance.sessionStore.completeOnboarding();
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil(route, (_) => false);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not save onboarding progress. Please try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _openingAuth = false;
+    }
+  }
 
   OnboardingSlide get _slide => onboardingSlides[_page];
   bool get _onWelcome => _page == _last;
@@ -108,6 +146,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _direction = target > _page ? 1 : -1;
       _page = target;
     });
+    if (_onWelcome) _rememberCompletion();
   }
 
   void _onSwipe(DragEndDetails details) {
@@ -290,7 +329,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         constraints: const BoxConstraints(minHeight: 56),
         child: Center(
           child: TextButton(
-            onPressed: () => Navigator.of(context).pushNamed('/login'),
+            onPressed: () => _openAuth('/login'),
             style: TextButton.styleFrom(
               foregroundColor: AppTheme.royalBlue,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -312,13 +351,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       FilledButton(
-        onPressed: () => Navigator.of(context).pushNamed('/login'),
+        onPressed: () => _openAuth('/login'),
         style: _filled,
         child: const Text('Log In'),
       ),
       const SizedBox(height: 12),
       OutlinedButton(
-        onPressed: () => Navigator.of(context).pushNamed('/signup/email'),
+        onPressed: () => _openAuth('/signup/email'),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppTheme.royalBlue,
           minimumSize: const Size.fromHeight(56),

@@ -303,14 +303,160 @@ void main() {
     expect(confirmAction(tester), isNotNull);
   });
 
-  testWidgets('a choice with no options cannot trap the resident', (
+  testWidgets('a choice with no options becomes visible manual preparation', (
     tester,
   ) async {
     serve(threeGoals(extra: [choice(suggestions: const [])]));
     await tester.pumpWidget(suggested());
     await tester.pumpAndSettle();
     expect(confirmAction(tester), isNotNull);
+    expect(
+      find.textContaining('Requirement needs manual preparation'),
+      findsOneWidget,
+    );
+    expect(find.text('See Suggested Options'), findsNothing);
   });
+
+  testWidgets(
+    'manual preparation counts toward progress and only blocks its owner',
+    (tester) async {
+      final json = planData(
+        [57, 56],
+        [
+          choice(suggestions: const []),
+          planStep(57, 'Postal ID'),
+          planStep(56, 'PhilSys National ID'),
+        ],
+      );
+      final plan = RoadmapPlan.fromJson(json);
+      final tapped = <String>[];
+      Future<void> show(Set<String> completed) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ActiveJourneyView(
+                title: 'Goals',
+                steps: plan.steps,
+                completedStepIdentities: completed,
+                onComplete: (step) => tapped.add(step.identity),
+              ),
+            ),
+          ),
+        ),
+      );
+      await show({});
+      expect(find.text('0 of 3 completed'), findsOneWidget);
+      expect(find.text('Complete Valid IDs first.'), findsOneWidget);
+      expect(
+        find.textContaining('Requirement needs manual preparation'),
+        findsOneWidget,
+      );
+      expect(find.text('Mark as Completed'), findsNWidgets(2));
+      await tester.tap(find.text('Mark as Completed').first);
+      expect(tapped, [plan.steps.first.identity]);
+
+      // A legacy snapshot may already have completed targets. The unfinished
+      // requirement must still prevent both the UI and journey model showing 100%.
+      final completed = {'government_id:57', 'government_id:56'};
+      await show(completed);
+      expect(find.text('2 of 3 completed'), findsOneWidget);
+      expect(find.text('67%'), findsOneWidget);
+      final journey = IdJourney.fromJson({
+        'id': 1,
+        'plan': json,
+        'completed_step_identities': completed.toList(),
+      });
+      expect(journey.totalSteps, 3);
+      expect(journey.completionLabel, '67%');
+      await show({...completed, plan.steps.first.identity});
+      expect(find.text('3 of 3 completed'), findsOneWidget);
+      expect(find.text('100%'), findsOneWidget);
+    },
+  );
+
+  testWidgets('saved guided choices cannot disappear from progress totals', (
+    tester,
+  ) async {
+    final json = planData([57], [choice(), planStep(57, 'Postal ID')]);
+    final plan = RoadmapPlan.fromJson(json);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ActiveJourneyView(
+              title: 'Goal',
+              steps: plan.steps,
+              completedStepIdentities: const {'government_id:57'},
+              onComplete: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('1 of 2 completed'), findsOneWidget);
+    expect(find.text('50%'), findsOneWidget);
+    expect(find.text('Mark as Completed'), findsNothing);
+    final journey = IdJourney.fromJson({
+      'id': 1,
+      'plan': json,
+      'completed_step_identities': ['government_id:57'],
+    });
+    expect(journey.completionLabel, '50%');
+  });
+
+  testWidgets('document goals use the inclusive Target label', (tester) async {
+    final plan = RoadmapPlan.fromJson({
+      ...planData([], [planStep(1, 'Birth Certificate', type: 'document')]),
+      'target_document_ids': [1],
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ActiveJourneyView(
+            title: 'Birth Certificate',
+            steps: plan.steps,
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Target'), findsOneWidget);
+    expect(find.text('Target ID'), findsNothing);
+  });
+
+  testWidgets(
+    'large journeys cannot round incomplete manual preparation to 100 percent',
+    (tester) async {
+      final json = planData(
+        [57],
+        [
+          for (var id = 1; id <= 199; id++)
+            planStep(id, 'Target $id', selected: id == 57),
+          choice(suggestions: const []),
+        ],
+      );
+      final completed = {for (var id = 1; id <= 199; id++) 'government_id:$id'};
+      final journey = IdJourney.fromJson({
+        'id': 1,
+        'plan': json,
+        'completed_step_identities': completed.toList(),
+      });
+      expect(journey.completionLabel, '99%');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ActiveJourneyView(
+              title: 'Goals',
+              steps: RoadmapPlan.fromJson(json).steps,
+              completedStepIdentities: completed,
+              expanded: false,
+            ),
+          ),
+        ),
+      );
+      expect(find.text('99%'), findsOneWidget);
+      expect(find.text('100%'), findsNothing);
+    },
+  );
 
   testWidgets('unrelated goals can finish in any order, dependents must wait', (
     tester,
@@ -330,7 +476,7 @@ void main() {
         ),
       ),
     );
-    expect(find.text('3 target IDs'), findsOneWidget);
+    expect(find.text('3 targets'), findsOneWidget);
     expect(find.text('Current step'), findsOneWidget);
     expect(find.text('Ready to start'), findsOneWidget);
     expect(find.text('Upcoming'), findsOneWidget);

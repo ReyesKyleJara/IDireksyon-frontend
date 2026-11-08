@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../features/startup/startup_screen.dart';
 import '../../features/auth/welcome_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/email_signup_screen.dart';
@@ -15,6 +16,8 @@ class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case '/':
+        return MaterialPageRoute(builder: (_) => const StartupScreen());
+      case '/onboarding':
         return MaterialPageRoute(builder: (_) => const OnboardingScreen());
       case '/loading':
         return MaterialPageRoute(builder: (_) => const LoadingScreen());

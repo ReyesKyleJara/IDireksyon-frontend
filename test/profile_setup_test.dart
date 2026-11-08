@@ -14,13 +14,18 @@ import 'package:idireksyon_frontend/features/profile/profile_complete_screen.dar
 void main() {
   late List<http.Request> requests;
   var failSave = false;
+  var failLogout = false;
   setUp(() {
     requests = [];
     failSave = false;
+    failLogout = false;
     AuthService.instance =
         AuthService(
             client: MockClient((request) async {
               requests.add(request);
+              if (failLogout && request.url.path.endsWith('/logout')) {
+                throw http.ClientException('offline');
+              }
               if (request.url.path.endsWith('/inventory')) {
                 return http.Response(
                   jsonEncode({
@@ -248,4 +253,20 @@ void main() {
     expect(find.text('NBI Clearance').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('leaving setup reaches Login when backend logout fails', (tester) async {
+    failLogout = true;
+    await tester.pumpWidget(app(const ProfileSetupScreen()));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Leave profile setup?'), findsOneWidget);
+    await tester.tap(find.text('Go to Login'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(AuthService.instance.token, isNull);
+    expect(Navigator.of(tester.element(find.byType(LoginScreen))).canPop(), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
 }

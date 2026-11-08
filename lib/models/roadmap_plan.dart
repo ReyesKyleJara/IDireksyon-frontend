@@ -41,7 +41,9 @@ class RoadmapPlanStep {
     : type = json['type'] as String,
       id = json['id'] as int,
       name = json['name'] as String,
-      processingTime = displayProcessingTime(json['processing_time'] as String?),
+      processingTime = displayProcessingTime(
+        json['processing_time'] as String?,
+      ),
       ownerKey = json['owner_key'] as String?,
       resolutionKey = json['resolution_key'] as String?,
       resolutionKind = json['kind'] as String?,
@@ -98,8 +100,14 @@ class RoadmapPlanStep {
   bool get isUnresolved => type == 'unresolved_requirement';
   String get identity => isUnresolved ? resolutionKey! : '$type:$id';
   bool get isInformational => guidanceMode == 'informational_only';
+  bool get isManualPreparation =>
+      isUnresolved && resolutionKind == 'requirement' && suggestions.isEmpty;
+  bool get countsForProgress => isUnresolved || isActionable;
   bool get isActionable =>
-      !isUnresolved && !isInformational && !blocked && !alreadyOwned;
+      (!isUnresolved || isManualPreparation) &&
+      !isInformational &&
+      !blocked &&
+      !alreadyOwned;
   final int id;
   final bool blocked, selected, alreadyOwned;
   final List<String> issues;
@@ -115,6 +123,14 @@ List<RoadmapPlanStep> waitingOnSteps(
   Set<String> completed,
 ) {
   final waiting = <RoadmapPlanStep>[];
+  waiting.addAll(
+    steps.where(
+      (item) =>
+          item.isUnresolved &&
+          item.ownerKey == step.identity &&
+          !completed.contains(item.identity),
+    ),
+  );
   for (final row in step.prerequisites) {
     if (row['status'] != 'missing' ||
         row['resolution'] == 'reference_only' ||

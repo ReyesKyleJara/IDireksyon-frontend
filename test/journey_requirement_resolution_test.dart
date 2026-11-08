@@ -14,7 +14,7 @@ import 'fixtures/roadmap_auth.dart';
 Map<String, dynamic> unresolved({bool path = false, bool empty = false}) => {
   ...planStep(
     12,
-    path ? 'Choose a request path' : 'Valid ID / Supporting ID',
+    path ? 'Choose application requirements' : 'Valid ID / Supporting ID',
     type: 'unresolved_requirement',
     selected: false,
   ),
@@ -29,7 +29,11 @@ Map<String, dynamic> unresolved({bool path = false, bool empty = false}) => {
       ? []
       : [
           if (path)
-            {'set_id': 3, 'name': 'Online request', 'needs_review': false}
+            {
+              'set_id': 3,
+              'name': 'Adult first-time requirements',
+              'needs_review': false,
+            }
           else
             {
               'type': 'document',
@@ -206,32 +210,31 @@ void main() {
     (tester) async {
       connect(path: true);
       await show(tester);
-      await tester.tap(find.text('Choose Request Path'));
+      await tester.tap(find.text('Choose Application Requirements'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Use This Path'));
+      await tester.tap(find.text('Use This Checklist'));
       await tester.pumpAndSettle();
-      expect(find.text('Use Online request?'), findsOneWidget);
-      await tester.tap(find.text('Use This Path'));
+      expect(find.text('Use Adult first-time requirements?'), findsOneWidget);
+      await tester.tap(find.text('Use This Checklist'));
       await tester.pumpAndSettle();
       expect(requests.last['resolution'], {
         'key': 'government_id:1:path',
         'set_id': 3,
       });
-      expect(find.text('Choose a request path'), findsNothing);
+      expect(find.text('Choose application requirements'), findsNothing);
     },
   );
 
   testWidgets(
-    'empty suggestions explain manual review without inventing an option',
+    'empty suggestions explain manual preparation without inventing an option',
     (tester) async {
       connect(empty: true);
       await show(tester);
-      await tester.tap(find.text('See Suggested Options'));
-      await tester.pumpAndSettle();
       expect(
-        find.textContaining('No guided options are currently available.'),
+        find.textContaining('Requirement needs manual preparation'),
         findsOneWidget,
       );
+      expect(find.text('See Suggested Options'), findsNothing);
       expect(find.text('Add to Journey'), findsNothing);
       expect(requests, hasLength(1));
     },

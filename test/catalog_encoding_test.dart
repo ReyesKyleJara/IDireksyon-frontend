@@ -149,19 +149,32 @@ void main() {
       expect(find.text(record.name), findsOneWidget);
       if (record.isInformational) {
         expect(find.text('Informational Record'), findsOneWidget);
-        expect(find.byType(TabBar), findsNothing);
+        expect(find.text('Guide'), findsNothing);
       } else {
-        await tester.tap(find.text('Requirements'));
+        await tester.tap(find.text('Ways to Request'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.text(record.requestMethods.single['label'] as String),
+        );
+        await tester.tap(
+          find.text(record.requestMethods.single['label'] as String),
+        );
         await tester.pumpAndSettle();
         expect(find.text('Proof of authority'), findsOneWidget);
-        await tester.tap(find.text('Guide'));
-        await tester.pumpAndSettle();
         expect(
           find.text('Retrieve the record through the official channel'),
           findsOneWidget,
         );
-        await tester.tap(find.text('Special cases'));
-        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('No record found'),
+          200,
+          scrollable: find
+              .descendant(
+                of: find.byType(ListView).first,
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         expect(find.text('No record found'), findsOneWidget);
       }
       expect(tester.takeException(), isNull);
@@ -194,7 +207,7 @@ void main() {
   });
 
   testWidgets(
-    'switching request method changes channel content while record offices stay available',
+    'exploring request methods leaves the document and its record offices unchanged',
     (tester) async {
       final record = GovernmentIdDetails.fromJson({
         ...encodedDocument(),
@@ -211,30 +224,28 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Estimated Cost'));
+      await tester.tap(find.text('Ways to Request'));
       await tester.pumpAndSettle();
-      expect(find.text('Outlet fee'), findsOneWidget);
-      expect(find.text('Guide'), findsOneWidget);
-      expect(find.text('Offices'), findsOneWidget);
-      await tester.tap(find.text('Guide'));
+      expect(find.text('Ways to Request'), findsOneWidget);
+      expect(find.byType(DropdownButtonFormField<int>), findsNothing);
+      await tester.tap(find.text('Outlet copy'));
       await tester.pumpAndSettle();
       expect(
         find.text('Present the request at the saved counter'),
         findsOneWidget,
       );
       expect(find.text('Saved formatted instruction'), findsOneWidget);
-      expect(find.text('Passport Application Guide'), findsNothing);
-      await tester.tap(find.byType(DropdownButtonFormField<int>).first);
+      await tester.ensureVisible(find.text('Outlet fee'));
+      expect(find.text('Outlet fee'), findsOneWidget);
+      await tester.pageBack();
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Online retrieval').last);
+      await tester.tap(find.text('Online retrieval'));
       await tester.pumpAndSettle();
       expect(find.text('Outlet fee'), findsNothing);
-      expect(find.text('Offices'), findsOneWidget);
-      expect(find.text('Guide'), findsNothing);
-      expect(find.text('Unrelated legacy checklist'), findsNothing);
       expect(find.text('Fulfillment: download'), findsOneWidget);
       expect(find.text('Open official request portal'), findsOneWidget);
-      expect(find.text('DFA Consular Office'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Offices'));
       await tester.tap(find.text('Offices'));
       await tester.pumpAndSettle();
@@ -272,10 +283,12 @@ void main() {
         expect(find.text(name), findsOneWidget);
         if (mode) {
           expect(find.text('Informational Record'), findsOneWidget);
-          expect(find.byType(TabBar), findsNothing);
+          expect(find.text('Guide'), findsNothing);
         } else {
-          expect(find.text('Estimated Cost'), findsOneWidget);
-          expect(find.text('Special cases'), findsOneWidget);
+          await tester.tap(find.text('Ways to Request'));
+          await tester.pumpAndSettle();
+          expect(find.text('Ways to Request'), findsOneWidget);
+          expect(find.text('Offices'), findsOneWidget);
         }
         expect(find.text('Example address, Bulacan'), findsNothing);
         expect(tester.takeException(), isNull);

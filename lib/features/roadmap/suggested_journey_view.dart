@@ -216,7 +216,7 @@ class JourneyResolutionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'YOUR CHOICE',
+              step.isManualPreparation ? 'MANUAL PREPARATION' : 'YOUR CHOICE',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
@@ -248,31 +248,35 @@ class JourneyResolutionCard extends StatelessWidget {
               ),
             const SizedBox(height: 4),
             Text(
-              step.message ?? '',
+              step.isManualPreparation
+                  ? 'Requirement needs manual preparation. Prepare this requirement and mark its journey step as completed when ready.'
+                  : step.message ?? '',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.4,
                 color: colors.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 4),
-            TextButton(
-              onPressed: onOptions,
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 40),
-                textStyle: const TextStyle(
-                  fontFamily: 'Google Sans',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+            if (!step.isManualPreparation) ...[
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: onOptions,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 40),
+                  textStyle: const TextStyle(
+                    fontFamily: 'Google Sans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                child: Text(
+                  step.resolutionKind == 'path'
+                      ? 'Choose Application Requirements'
+                      : 'See Suggested Options',
                 ),
               ),
-              child: Text(
-                step.resolutionKind == 'path'
-                    ? 'Choose Request Path'
-                    : 'See Suggested Options',
-              ),
-            ),
+            ],
           ],
         ),
       ),

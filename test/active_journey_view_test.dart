@@ -88,9 +88,10 @@ void main() {
         for (final step in plan.steps) {
           expect(
             find.text(step.name),
-            step.id == 4 ? findsNWidgets(3) : findsOneWidget,
+            step.id == 4 ? findsNWidgets(2) : findsOneWidget,
           );
         }
+        expect(find.text('Target'), findsOneWidget);
         expect(find.textContaining('Readiness'), findsNothing);
         expect(find.textContaining('verified'), findsNothing);
       },
@@ -198,6 +199,11 @@ void main() {
       ),
     );
     expect(find.text('Choose supporting proof'), findsOneWidget);
-    expect(find.text('Upcoming'), findsNWidgets(2));
+    expect(
+      find.textContaining('Requirement needs manual preparation'),
+      findsOneWidget,
+    );
+    expect(find.text('Ready to start'), findsOneWidget);
+    expect(find.text('Upcoming'), findsOneWidget);
   });
 }

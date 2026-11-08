@@ -323,7 +323,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
     if (leave != true) return;
 
-    await AuthService.instance.logout();
+    try {
+      await AuthService.instance.logout();
+    } on AuthException {
+      // Local cleanup runs even when the backend logout request fails.
+    }
 
     if (!mounted) return;
 

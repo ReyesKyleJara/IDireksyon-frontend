@@ -46,6 +46,9 @@ class ActiveJourneyView extends StatelessWidget {
   String? _detail(int index, int current) {
     if (steps.isEmpty) return index == current ? _currentDetail : null;
     final step = steps[index];
+    if (step.isManualPreparation) {
+      return 'Requirement needs manual preparation. Prepare ${step.name} and mark this step as completed when ready.';
+    }
     if (step.isUnresolved) {
       return 'Review this requirement before continuing with your journey.';
     }
@@ -63,7 +66,9 @@ class ActiveJourneyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actionable = steps.where((step) => step.isActionable).toList();
-    final count = steps.isEmpty ? fallbackTitles.length : actionable.length;
+    final count = steps.isEmpty
+        ? fallbackTitles.length
+        : steps.where((step) => step.countsForProgress).length;
     final rowCount = steps.isEmpty ? fallbackTitles.length : steps.length;
     final completed = actionable
         .where((step) => completedStepIdentities.contains(step.identity))
@@ -156,7 +161,8 @@ class _JourneySummary extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final strong = expanded ? Colors.white : colors.onSurface;
     final muted = expanded ? const Color(0xFFD5E7FA) : colors.onSurfaceVariant;
-    final percent = '${(progress * 100).round()}%';
+    final percent =
+        '${completed < count ? (progress * 100).round().clamp(0, 99) : (progress * 100).round()}%';
     final several = goals.length > 1;
     final content = Padding(
       padding: EdgeInsets.all(expanded ? 20 : 16),
@@ -171,7 +177,7 @@ class _JourneySummary extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      several ? '${goals.length} target IDs' : 'Target ID',
+                      several ? '${goals.length} targets' : 'Target',
                       style: TextStyle(fontSize: 11, color: muted),
                     ),
                     const SizedBox(height: 4),

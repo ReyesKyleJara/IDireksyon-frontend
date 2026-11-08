@@ -106,7 +106,9 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
     final option = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(path ? 'Choose Request Path' : 'Suggested Options'),
+        title: Text(
+          path ? 'Choose Application Requirements' : 'Suggested Options',
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: SingleChildScrollView(
@@ -127,7 +129,7 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
                     inJourney: option['in_journey'] == true,
                     needsReview: option['needs_review'] == true,
                     actionLabel: path
-                        ? 'Use This Path'
+                        ? 'Use This Checklist'
                         : option['in_journey'] == true
                         ? 'Use This Option'
                         : 'Add to Journey',
@@ -157,7 +159,7 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
         ),
         content: Text(
           path
-              ? 'IDireksyon will use this requirement path and recalculate your roadmap.'
+              ? 'IDireksyon will use this application checklist and recalculate your roadmap.'
               : planned
               ? 'This is already in your roadmap. It will be scheduled before what needs it.'
               : 'IDireksyon will add this before your target and recalculate your roadmap.',
@@ -171,7 +173,7 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               path
-                  ? 'Use This Path'
+                  ? 'Use This Checklist'
                   : planned
                   ? 'Use This Option'
                   : 'Add to Journey',
@@ -316,7 +318,10 @@ class _OptionRow extends StatelessWidget {
                 ),
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(onPressed: onSelect, child: Text(actionLabel)),
+                child: TextButton(
+                  onPressed: onSelect,
+                  child: Text(actionLabel),
+                ),
               ),
             ],
           ),

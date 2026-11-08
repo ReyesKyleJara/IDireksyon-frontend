@@ -31,9 +31,10 @@ ChecklistReadinessSummary? summarizeChecklistReadiness(
 
   // Do not pick an applicant scenario or request channel on the resident's
   // behalf. A single universal acquisition checklist is the safe small pool.
-  final paths = detail.requestPaths;
+  final general = detail.generalDetails;
+  final paths = general.requestPaths;
   if (paths.length > 1) return null;
-  final scoped = paths.isEmpty ? detail : detail.forPath(paths.single);
+  final scoped = paths.isEmpty ? general : general.forPath(paths.single);
   final sets = scoped.requirementSets;
   if (sets.length != 1) return null;
   final set = sets.single;
