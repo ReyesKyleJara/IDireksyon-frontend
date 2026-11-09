@@ -29,6 +29,8 @@ class _SignupFormState
 
   final _formKey =
       GlobalKey<FormState>();
+  final _confirmationField =
+      GlobalKey<FormFieldState<String>>();
 
   final _contact =
       TextEditingController();
@@ -250,6 +252,7 @@ class _SignupFormState
     bool showSecret = false,
     VoidCallback? onToggleSecret,
     ValueChanged<String>? onChanged,
+    Key? fieldKey,
     String? helper,
     TextEditingController? controller,
     TextInputType? keyboard,
@@ -281,6 +284,7 @@ class _SignupFormState
           const SizedBox(height: 8),
 
           TextFormField(
+            key: fieldKey,
             controller: controller,
             obscureText:
                 secret && !showSecret,
@@ -308,16 +312,20 @@ class _SignupFormState
             ),
             decoration: AuthShell.inputDecoration(
               hint,
+              // Next and Tab must go from field to field. Otherwise focus stops
+              // on this icon between the passwords, and typing there is lost.
               suffixIcon: secret
-                  ? IconButton(
-                      tooltip: showSecret ? 'Hide password' : 'Show password',
-                      onPressed: onToggleSecret,
-                      icon: Icon(
-                        showSecret
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        size: 20,
-                        color: const Color(0xFF697386),
+                  ? ExcludeFocusTraversal(
+                      child: IconButton(
+                        tooltip: showSecret ? 'Hide password' : 'Show password',
+                        onPressed: onToggleSecret,
+                        icon: Icon(
+                          showSecret
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 20,
+                          color: const Color(0xFF697386),
+                        ),
                       ),
                     )
                   : null,
@@ -519,6 +527,10 @@ class _SignupFormState
                                           },
                                         );
                                       }
+                                      // Only once there is something to compare.
+                                      if (_confirmation.text.isNotEmpty) {
+                                        _confirmationField.currentState?.validate();
+                                      }
                                     },
                                     controller:
                                         _password,
@@ -563,7 +575,10 @@ class _SignupFormState
                                           },
                                         );
                                       }
+                                      _confirmationField.currentState?.validate();
                                     },
+                                    fieldKey:
+                                        _confirmationField,
                                     controller:
                                         _confirmation,
                                     autofill:
@@ -572,14 +587,11 @@ class _SignupFormState
                                           .newPassword,
                                     ],
                                     validator: (value) {
-  // Don't validate confirmation yet
-  // if the main password itself is invalid.
-  if (PasswordPolicy.validate(_password.text) != null) {
-    return null;
-  }
-
   if (value == null || value.isEmpty) {
-    return 'Confirm your password';
+    // One message at a time while the password itself still needs fixing.
+    return PasswordPolicy.validate(_password.text) != null
+        ? null
+        : 'Confirm your password';
   }
 
   if (value != _password.text) {
