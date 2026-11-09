@@ -220,7 +220,7 @@ void main() {
   );
 
   testWidgets(
-    'missing readiness hides suggestions and Ready Now stays graceful',
+    'missing readiness hides suggestions and offers no Ready Now filter',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -243,10 +243,7 @@ void main() {
         find.textContaining('Readiness suggestions are unavailable'),
         findsNothing,
       );
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Ready Now'));
-      await tester.pumpAndSettle();
-      expect(find.text('No matching entries.'), findsOneWidget);
-      expect(find.text('National ID'), findsNothing);
+      expect(find.widgetWithText(ChoiceChip, 'Ready Now'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -278,6 +275,12 @@ void main() {
             ),
           ),
         ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Birth Certificate'),
+        150,
+        scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
       expect(find.text('Birth Certificate'), findsOneWidget);

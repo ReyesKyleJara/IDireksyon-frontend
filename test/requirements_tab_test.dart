@@ -453,7 +453,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'not a matching name');
       await tester.pumpAndSettle();
-      expect(find.text('No matching entries.'), findsOneWidget);
+      expect(find.text('No results found'), findsOneWidget);
       expect(calls, 2);
     },
   );

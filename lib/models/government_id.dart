@@ -1,3 +1,5 @@
+import '../core/api_config.dart';
+
 // Read-only API models. Conditions and qualifications are displayed, not evaluated.
 String? _text(dynamic value) =>
     value is String && value.trim().isNotEmpty ? value.trim() : null;
@@ -61,6 +63,14 @@ class GovernmentIdDetails {
       .whereType<Map>()
       .map((row) => Map<String, dynamic>.from(row))
       .toList();
+  /// The square picture set in the Admin Panel, when there is one.
+  String? get imageUrl {
+    final path = _text(raw['image_url']);
+    return path == null
+        ? null
+        : Uri.parse(ApiConfig.baseUrl).resolve(path).toString();
+  }
+
   Map<String, dynamic> get research => raw['research_metadata'] is Map
       ? Map<String, dynamic>.from(raw['research_metadata'])
       : {};

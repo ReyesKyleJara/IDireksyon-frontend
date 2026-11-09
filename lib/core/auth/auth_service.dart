@@ -521,6 +521,7 @@ class AuthService extends ChangeNotifier {
     required String contact,
     required bool usePhone,
     int? barangayId,
+    String? dateOfBirth,
   }) async {
     if (token == null) {
       throw const AuthException('Please sign in again.');
@@ -529,6 +530,7 @@ class AuthService extends ChangeNotifier {
     final data = await _post('account', {
       'name': name.trim(),
       'barangay_id': ?barangayId,
+      'date_of_birth': ?dateOfBirth,
       usePhone ? 'phone' : 'email': contact.trim(),
     });
 

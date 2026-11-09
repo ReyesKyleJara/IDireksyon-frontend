@@ -7,7 +7,74 @@ import 'package:idireksyon_frontend/features/roadmap/active_journey_screen.dart'
 import 'package:idireksyon_frontend/features/roadmap/id_journey.dart';
 import 'package:idireksyon_frontend/features/shell/resident_app_shell.dart';
 
+import 'fixtures/roadmap_auth.dart';
+
+IdJourney savedJourney(int id, String name, {bool done = false}) =>
+    IdJourney.fromJson({
+      'id': id,
+      'plan': planData([id], [planStep(id, name)]),
+      'completed_step_identities': done ? ['government_id:$id'] : <String>[],
+      'completed_at': done ? '2026-11-09T04:00:00Z' : null,
+    });
+
+Widget homeWith(List<IdJourney> journeys) => MaterialApp(
+  theme: AppTheme.lightTheme,
+  home: Scaffold(body: HomeScreen(journeys: journeys)),
+);
+
 void main() {
+  testWidgets('all journeys completed shows the get started banner', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      homeWith([savedJourney(1, 'Passport', done: true)]),
+    );
+    expect(find.text('Get started'), findsOneWidget);
+    expect(find.text('ONGOING JOURNEY'), findsNothing);
+    expect(find.byType(JourneyBanner), findsNothing);
+  });
+
+  testWidgets('only unfinished journeys appear as ongoing', (tester) async {
+    await tester.pumpWidget(
+      homeWith([
+        savedJourney(1, 'Passport', done: true),
+        savedJourney(2, 'NBI Clearance'),
+      ]),
+    );
+    expect(find.text('ONGOING JOURNEY'), findsOneWidget);
+    expect(find.text('NBI Clearance'), findsOneWidget);
+    expect(find.text('Passport'), findsNothing);
+    expect(find.textContaining('Swipe to browse'), findsNothing);
+  });
+
+  testWidgets('banner recovers when the shown journey is finished', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      homeWith([
+        savedJourney(1, 'Passport'),
+        savedJourney(2, 'NBI Clearance'),
+        savedJourney(3, 'Postal ID'),
+      ]),
+    );
+    await tester.tap(find.byTooltip('Next journey'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Next journey'));
+    await tester.pumpAndSettle();
+    expect(find.text('Journey 3 of 3 · Swipe to browse'), findsOneWidget);
+
+    await tester.pumpWidget(
+      homeWith([
+        savedJourney(1, 'Passport'),
+        savedJourney(2, 'NBI Clearance'),
+        savedJourney(3, 'Postal ID', done: true),
+      ]),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Journey 1 of 2 · Swipe to browse'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('empty home keeps get started banner', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

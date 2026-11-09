@@ -7,12 +7,13 @@ import '../../core/auth/auth_service.dart';
 import '../../core/profile/profile_avatar.dart';
 import '../../core/theme/app_theme.dart';
 import '../ids/ids_screen.dart';
-import '../ids/id_details_screen.dart';
 import '../office_finder/office_finder_screen.dart';
 import '../profile/manage_inventory_screen.dart';
 import '../roadmap/build_roadmap_screen.dart';
 import '../roadmap/id_journey.dart';
 import '../roadmap/active_journey_screen.dart';
+import 'diro_poses.dart';
+import 'home_recommendations.dart';
 import 'journey_banner.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -40,12 +41,7 @@ class HomeScreen extends StatelessWidget {
     _open(
       context,
       Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'ID Directory',
-          ),
-        ),
-        body: const IdsScreen(),
+        body: const IdsScreen(showBack: true),
       ),
     );
   }
@@ -70,6 +66,11 @@ class HomeScreen extends StatelessWidget {
     final colors =
         Theme.of(context).colorScheme;
 
+    // The same rule as the Roadmap's In Progress tab.
+    final ongoing = journeys
+        .where((journey) => !journey.isCompleted)
+        .toList();
+
     return SafeArea(
       child: ColoredBox(
         color: Theme.of(context)
@@ -90,10 +91,13 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            journeys.isEmpty
+            ongoing.isEmpty
                 ? _banner(context)
                 : JourneyBanner(
-                    journeys: journeys,
+                    // A finished journey leaves the list, so the banner must
+                    // not stay on a page that no longer exists.
+                    key: ValueKey(ongoing.length),
+                    journeys: ongoing,
                     onOpen:
                         onOpenJourney ??
                         (journey) => _open(
@@ -177,17 +181,7 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            _recommendation(
-              context,
-              passport: true,
-            ),
-
-            const SizedBox(height: 12),
-
-            _recommendation(
-              context,
-              passport: false,
-            ),
+            const HomeRecommendations(),
           ],
         ),
       ),
@@ -350,13 +344,9 @@ class HomeScreen extends StatelessWidget {
 
                   if (showArt)
                     const Positioned(
-                      right: 8,
-                      bottom: 24,
-                      child:
-                          ExcludeSemantics(
-                        child:
-                            _JourneyArt(),
-                      ),
+                      right: -6,
+                      bottom: 8,
+                      child: DiroPoses(size: 164),
                     ),
 
                   Padding(
@@ -374,39 +364,14 @@ class HomeScreen extends StatelessWidget {
                           CrossAxisAlignment
                               .start,
                       children: [
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons
-                                  .auto_awesome_rounded,
-                              color: Color(
-                                0xFFFFD576,
-                              ),
-                              size: 14,
-                            ),
-                            SizedBox(
-                              width: 6,
-                            ),
-                            Flexible(
-                              child: Text(
-                                'YOUR NEXT CHAPTER',
-                                style:
-                                    TextStyle(
-                                  color:
-                                      Color(
-                                    0xFFD5E7FA,
-                                  ),
-                                  fontSize:
-                                      9,
-                                  fontWeight:
-                                      FontWeight
-                                          .w700,
-                                  letterSpacing:
-                                      1.2,
-                                ),
-                              ),
-                            ),
-                          ],
+                        const Text(
+                          'YOUR NEXT CHAPTER',
+                          style: TextStyle(
+                            color: Color(0xFFD5E7FA),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
                         ),
 
                         const SizedBox(
@@ -522,33 +487,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _surface(
-    BuildContext context, {
-    required Widget child,
-  }) {
-    final colors =
-        Theme.of(context).colorScheme;
-
-    return Material(
-      color:
-          colors.brightness ==
-                  Brightness.dark
-              ? colors.surfaceContainer
-              : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.circular(20),
-        side: BorderSide(
-          color: colors.outlineVariant
-              .withValues(alpha: .45),
-        ),
-      ),
-      clipBehavior:
-          Clip.antiAlias,
-      child: child,
-    );
-  }
-
   Widget _quickActions(
     BuildContext context,
   ) {
@@ -617,184 +555,6 @@ class HomeScreen extends StatelessWidget {
             Expanded(child: tile),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _recommendation(
-    BuildContext context, {
-    required bool passport,
-  }) {
-    final colors =
-        Theme.of(context).colorScheme;
-
-    return _surface(
-      context,
-      child: MotionInkWell(
-        onTap: () => _open(
-          context,
-          IdDetailsScreen(
-            idName: passport
-                ? 'Passport ID'
-                : 'PhilSys ID',
-          ),
-        ),
-        child: Padding(
-          padding:
-              const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              ExcludeSemantics(
-                child: Container(
-                  width: 76,
-                  height: 88,
-                  decoration:
-                      BoxDecoration(
-                    color: passport
-                        ? const Color(
-                            0xFFEAF1FB,
-                          )
-                        : const Color(
-                            0xFFFFF1EB,
-                          ),
-                    borderRadius:
-                        BorderRadius
-                            .circular(
-                      14,
-                    ),
-                  ),
-                  child: Center(
-                    child:
-                        Transform.rotate(
-                      angle: passport
-                          ? -.09
-                          : .08,
-                      child: passport
-                          ? Container(
-                              width: 44,
-                              height: 62,
-                              decoration:
-                                  BoxDecoration(
-                                color:
-                                    const Color(
-                                  0xFF234E7A,
-                                ),
-                                borderRadius:
-                                    BorderRadius
-                                        .circular(
-                                  5,
-                                ),
-                              ),
-                              child:
-                                  const Column(
-                                mainAxisAlignment:
-                                    MainAxisAlignment
-                                        .center,
-                                children: [
-                                  Icon(
-                                    Icons.public,
-                                    color: Color(
-                                      0xFFE9CB87,
-                                    ),
-                                    size: 26,
-                                  ),
-                                  SizedBox(
-                                    height: 5,
-                                  ),
-                                  Text(
-                                    'PASSPORT',
-                                    style:
-                                        TextStyle(
-                                      color:
-                                          Color(
-                                        0xFFE9CB87,
-                                      ),
-                                      fontSize:
-                                          6,
-                                      letterSpacing:
-                                          .8,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : const _MiniId(),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 14),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-                  children: [
-                    Text(
-                      passport
-                          ? 'TRAVEL & EXPLORATION'
-                          : 'EVERYDAY ESSENTIAL',
-                      style: TextStyle(
-                        color: colors
-                            .onSurfaceVariant,
-                        fontSize: 9,
-                        fontWeight:
-                            FontWeight
-                                .w700,
-                        letterSpacing:
-                            .7,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 6,
-                    ),
-
-                    Text(
-                      passport
-                          ? 'Philippine Passport'
-                          : 'PhilSys ID',
-                      style:
-                          const TextStyle(
-                        fontSize: 16,
-                        fontWeight:
-                            FontWeight
-                                .w800,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 5,
-                    ),
-
-                    Text(
-                      passport
-                          ? 'Your gateway to the world'
-                          : 'One ID. More possibilities.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colors
-                            .onSurfaceVariant,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 6),
-
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 22,
-                color:
-                    colors.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -909,287 +669,6 @@ class _QuickAction extends StatelessWidget {
                   ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MiniId extends StatelessWidget {
-  const _MiniId();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 62,
-      height: 42,
-      padding:
-          const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(5),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(
-              0x180E335B,
-            ),
-            blurRadius: 8,
-            offset:
-                Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            height: 3,
-            decoration:
-                const BoxDecoration(
-              gradient:
-                  LinearGradient(
-                colors: [
-                  Color(
-                    0xFF245FA0,
-                  ),
-                  Color(
-                    0xFFDA5C5C,
-                  ),
-                  Color(
-                    0xFFF0C660,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 5),
-
-          Row(
-            children: [
-              const Icon(
-                Icons.person_rounded,
-                size: 20,
-                color:
-                    HomeScreen.primaryBlue,
-              ),
-
-              const SizedBox(width: 4),
-
-              Expanded(
-                child: Column(
-                  children: [
-                    for (final width in [
-                      25.0,
-                      20.0,
-                      23.0,
-                    ])
-                      Container(
-                        margin:
-                            const EdgeInsets
-                                .only(
-                          bottom: 3,
-                        ),
-                        width: width,
-                        height: 2,
-                        color:
-                            const Color(
-                          0xFFCBD8E6,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _JourneyArt
-    extends StatelessWidget {
-  const _JourneyArt();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 116,
-      height: 174,
-      child: Stack(
-        alignment:
-            Alignment.center,
-        children: [
-          Container(
-            width: 112,
-            height: 112,
-            decoration:
-                BoxDecoration(
-              shape:
-                  BoxShape.circle,
-              color: Colors.white
-                  .withValues(
-                alpha: .08,
-              ),
-            ),
-          ),
-
-          Transform.rotate(
-            angle: .12,
-            child: Container(
-              width: 83,
-              height: 142,
-              decoration:
-                  BoxDecoration(
-                color:
-                    const Color(
-                  0xFFF1F6FC,
-                ),
-                borderRadius:
-                    BorderRadius
-                        .circular(
-                  17,
-                ),
-                border:
-                    Border.all(
-                  color:
-                      const Color(
-                    0xFF092A50,
-                  ),
-                  width: 5,
-                ),
-                boxShadow:
-                    const [
-                  BoxShadow(
-                    color:
-                        Color(
-                      0x40092343,
-                    ),
-                    blurRadius:
-                        14,
-                    offset:
-                        Offset(
-                      0,
-                      10,
-                    ),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 25,
-                    height: 4,
-                    margin:
-                        const EdgeInsets
-                            .only(
-                      top: 5,
-                    ),
-                    decoration:
-                        BoxDecoration(
-                      color:
-                          const Color(
-                        0xFF092A50,
-                      ),
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        4,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(
-                    height: 12,
-                  ),
-
-                  const Icon(
-                    Icons
-                        .verified_user_rounded,
-                    color:
-                        HomeScreen
-                            .primaryBlue,
-                    size: 25,
-                  ),
-
-                  const SizedBox(
-                    height: 10,
-                  ),
-
-                  const _MiniId(),
-
-                  const SizedBox(
-                    height: 10,
-                  ),
-
-                  Container(
-                    width: 36,
-                    height: 4,
-                    decoration:
-                        BoxDecoration(
-                      color:
-                          const Color(
-                        0xFFB8CEE4,
-                      ),
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          Positioned(
-            right: 0,
-            bottom: 15,
-            child: Container(
-              padding:
-                  const EdgeInsets
-                      .all(
-                9,
-              ),
-              decoration:
-                  BoxDecoration(
-                color:
-                    const Color(
-                  0xFFFFD576,
-                ),
-                borderRadius:
-                    BorderRadius
-                        .circular(
-                  13,
-                ),
-              ),
-              child:
-                  const Icon(
-                Icons
-                    .check_rounded,
-                size: 23,
-                color:
-                    Color(
-                  0xFF163F65,
-                ),
-              ),
-            ),
-          ),
-
-          const Positioned(
-            left: 1,
-            top: 12,
-            child: Icon(
-              Icons.auto_awesome,
-              size: 22,
-              color:
-                  Color(
-                0xFFFFD576,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

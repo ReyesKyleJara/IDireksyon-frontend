@@ -10,6 +10,20 @@ import 'package:idireksyon_frontend/features/auth/forgot_password_screen.dart';
 import 'package:idireksyon_frontend/features/auth/login_screen.dart';
 import 'package:idireksyon_frontend/features/profile/password_security_screen.dart';
 
+/// Keeps settling quick and predictable.
+Widget _noMotion(BuildContext context, Widget? child) => MediaQuery(
+  data: MediaQuery.of(context).copyWith(disableAnimations: true),
+  child: child!,
+);
+
+/// The default test window is too short to show the whole form.
+void _usePhoneSize(WidgetTester tester) {
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 void main() {
   for (final identifier in [
     ' resident@example.com ',
@@ -19,7 +33,9 @@ void main() {
     testWidgets(
       'login opens recovery with valid email prefill only: $identifier',
       (tester) async {
-        await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+        await tester.pumpWidget(
+          const MaterialApp(builder: _noMotion, home: LoginScreen()),
+        );
         await tester.pump(const Duration(milliseconds: 600));
         await tester.enterText(find.byType(TextFormField).first, identifier);
         await tester.ensureVisible(find.text('Forgot password?'));
@@ -40,6 +56,7 @@ void main() {
     'loading prevents duplicate requests and retry succeeds after failure',
     (tester) async {
       final previous = AuthService.instance;
+      _usePhoneSize(tester);
       final pending = Completer<http.Response>();
       var requests = 0;
       AuthService.instance = AuthService(
@@ -61,12 +78,13 @@ void main() {
       });
       await tester.pumpWidget(
         const MaterialApp(
+          builder: _noMotion,
           home: ForgotPasswordScreen(initialEmail: ' resident@example.com '),
         ),
       );
       await tester.tap(find.text('Send reset link'));
       await tester.pump();
-      expect(find.text('Sending…'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(
         tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
         isNull,
@@ -154,6 +172,7 @@ void main() {
     testWidgets('recovery shows backend error and permits retry: $status', (
       tester,
     ) async {
+      _usePhoneSize(tester);
       final previous = AuthService.instance;
       AuthService.instance = AuthService(
         client: MockClient(
@@ -169,6 +188,7 @@ void main() {
       });
       await tester.pumpWidget(
         const MaterialApp(
+          builder: _noMotion,
           home: ForgotPasswordScreen(initialEmail: 'resident@example.com'),
         ),
       );
@@ -192,6 +212,7 @@ void main() {
   testWidgets('security opens reset with account email and sends the request', (
     tester,
   ) async {
+    _usePhoneSize(tester);
     final previous = AuthService.instance;
     var requests = 0;
     AuthService.instance = AuthService(
@@ -209,7 +230,9 @@ void main() {
       AuthService.instance.dispose();
       AuthService.instance = previous;
     });
-    await tester.pumpWidget(const MaterialApp(home: PasswordSecurityScreen()));
+    await tester.pumpWidget(
+      const MaterialApp(builder: _noMotion, home: PasswordSecurityScreen()),
+    );
     await tester.tap(find.text('Forgot password?'));
     await tester.pumpAndSettle();
     expect(find.byType(ForgotPasswordScreen), findsOneWidget);
@@ -223,6 +246,7 @@ void main() {
   testWidgets('invalid email is blocked and server failures allow retry', (
     tester,
   ) async {
+    _usePhoneSize(tester);
     final previous = AuthService.instance;
     var requests = 0;
     AuthService.instance = AuthService(
@@ -235,7 +259,9 @@ void main() {
       AuthService.instance.dispose();
       AuthService.instance = previous;
     });
-    await tester.pumpWidget(const MaterialApp(home: ForgotPasswordScreen()));
+    await tester.pumpWidget(
+      const MaterialApp(builder: _noMotion, home: ForgotPasswordScreen()),
+    );
     await tester.tap(find.text('Send reset link'));
     await tester.pumpAndSettle();
     expect(find.text('Enter a valid email address.'), findsOneWidget);

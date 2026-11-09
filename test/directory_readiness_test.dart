@@ -204,12 +204,6 @@ void main() {
         containsAll(['Ready Now', 'Almost Ready', 'Needs Preparation']),
       );
       expect(text, isNot(contains('National Police Clearance')));
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Ready Now'));
-      await tester.pumpAndSettle();
-      expect(find.text('PhilSys National ID'), findsOneWidget);
-      expect(find.text('NBI Clearance'), findsNothing);
-      await tester.tap(find.widgetWithText(ChoiceChip, 'All'));
-      await tester.pumpAndSettle();
       await tester.tap(find.text('PhilSys National ID').first);
       await tester.pumpAndSettle();
       expect(
@@ -246,7 +240,7 @@ void main() {
       );
       expect(
         suggestionText(tester),
-        containsAll(['Needs Preparation', '0 of 2 checklist groups matched.']),
+        containsAll(['Needs Preparation', 'You have 0 of 2 requirements.']),
       );
       expect(inventoryCalls, 1);
     },
@@ -268,7 +262,7 @@ void main() {
       );
       expect(
         suggestionText(tester),
-        containsAll(['Ready Now', '1 of 1 checklist groups matched.']),
+        containsAll(['Ready Now', 'You have 1 of 1 requirements.']),
       );
     },
   );
@@ -287,9 +281,6 @@ void main() {
       ]),
     );
     expect(suggestionText(tester), contains('Almost Ready'));
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Ready Now'));
-    await tester.pumpAndSettle();
-    expect(find.text('No matching entries.'), findsOneWidget);
   });
 
   final reviewCases = <String, List<Map<String, dynamic>>>{
@@ -369,11 +360,8 @@ void main() {
       expect(suggestionText(tester), contains('Almost Ready'));
       expect(
         suggestionText(tester).join(' '),
-        contains('Review other checks.'),
+        contains('Check the guide for other requirements.'),
       );
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Ready Now'));
-      await tester.pumpAndSettle();
-      expect(find.text('No matching entries.'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -497,7 +485,7 @@ void main() {
       );
       expect(
         suggestionText(tester),
-        containsAll(['Needs Preparation', '0 of 1 checklist groups matched.']),
+        containsAll(['Needs Preparation', 'You have 0 of 1 requirements.']),
       );
     },
   );

@@ -7,11 +7,26 @@ import 'package:http/testing.dart';
 import 'package:idireksyon_frontend/core/auth/auth_service.dart';
 import 'package:idireksyon_frontend/features/auth/email_verification_screen.dart';
 
+/// Keeps settling quick and predictable.
+Widget _noMotion(BuildContext context, Widget? child) => MediaQuery(
+  data: MediaQuery.of(context).copyWith(disableAnimations: true),
+  child: child!,
+);
+
+/// The default test window is too short to show the whole form.
+void _usePhoneSize(WidgetTester tester) {
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 void main() {
   testWidgets('email account is created only after code verification', (
     tester,
   ) async {
     final original = AuthService.instance;
+    _usePhoneSize(tester);
     final paths = <String>[];
     final auth = AuthService(
       client: MockClient((request) async {
@@ -38,6 +53,7 @@ void main() {
     paths.clear();
     await tester.pumpWidget(
       MaterialApp(
+        builder: _noMotion,
         routes: {
           '/profile/setup': (_) => const Scaffold(body: Text('Profile setup')),
         },
@@ -85,6 +101,7 @@ void main() {
   testWidgets('invalid codes keep the user on verification with no account', (
     tester,
   ) async {
+    _usePhoneSize(tester);
     final original = AuthService.instance;
     final auth = AuthService(
       client: MockClient(
@@ -101,6 +118,7 @@ void main() {
     });
     await tester.pumpWidget(
       MaterialApp(
+        builder: _noMotion,
         home: EmailVerificationScreen(
           email: 'test@example.com',
           challengeId: 'challenge',
@@ -120,6 +138,7 @@ void main() {
     'registration retry retains proof after a temporary server error',
     (tester) async {
       final original = AuthService.instance;
+      _usePhoneSize(tester);
       var verifications = 0;
       var registrations = 0;
       final auth = AuthService(
@@ -135,6 +154,7 @@ void main() {
       });
       await tester.pumpWidget(
         MaterialApp(
+          builder: _noMotion,
           routes: {
             '/profile/setup': (_) =>
                 const Scaffold(body: Text('Profile setup')),
@@ -165,6 +185,7 @@ void main() {
   );
   testWidgets('backend 429 starts the remaining resend countdown', (tester) async {
     final original = AuthService.instance;
+    _usePhoneSize(tester);
     var requests = 0;
     final auth = AuthService(client: MockClient((_) async {
       requests++;
