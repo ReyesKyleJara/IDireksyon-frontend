@@ -106,12 +106,24 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
     if (_saving || _confirming || journey.id == null) return;
     _confirming = true;
     final session = AuthService.instance.token;
+    final waiting = waitingOnSteps(
+      step,
+      journey.confirmedPlan?.steps ?? const [],
+      journey.completedStepIdentities,
+    );
+    final outOfOrder = waiting.isEmpty
+        ? ''
+        : 'The suggested order is to finish ${waiting.map((item) => item.name).join(', ')} first. If this already happened, you can still record it.\n\n';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Complete ${step.name}?'),
-        content: const Text(
-          'Mark this journey step as completed? This updates your journey progress only and does not add anything to Inventory.',
+        title: Text(
+          step.needsConfirmation ? 'Confirm ${step.name}?' : 'Complete ${step.name}?',
+        ),
+        content: Text(
+          step.needsConfirmation
+              ? '$outOfOrder${step.message} This is saved to this Roadmap only. It does not change your Inventory or checklist, and it is not an official verification.'
+              : '${outOfOrder}Mark this journey step as completed? This updates your journey progress only and does not add anything to Inventory. It does not confirm that an agency accepted or issued anything.',
         ),
         actions: [
           TextButton(
@@ -141,6 +153,7 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
         await AuthService.instance.completeJourneyStep(
           journey.id!,
           step.identity,
+          acknowledgeOrder: waiting.isNotEmpty,
         ),
       );
       if (!mounted) return;
@@ -234,6 +247,126 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
     }
   }
 
+  /// Saves one resident action and keeps earlier state if it fails.
+  Future<void> _save(
+    IdJourney journey,
+    Future<Map<String, dynamic>> Function() request,
+  ) async {
+    if (_saving || _confirming) return;
+    setState(() => _saving = true);
+    try {
+      final saved = IdJourney.fromJson(await request());
+      if (!mounted) return;
+      setState(() => journey.applyCompletion(saved));
+      widget.onJourneyChanged?.call();
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on FormatException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to read your Roadmap. Please reload it.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<bool> _ask(String title, String message, String action) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(action),
+            ),
+          ],
+        ),
+      ) ==
+      true;
+
+  Future<void> _undo(IdJourney journey, RoadmapPlanStep step) async {
+    if (!await _ask(
+          'Undo ${step.name}?',
+          'This step will be marked as not completed. Your Inventory and checklist will not change.',
+          'Undo',
+        ) ||
+        !mounted) {
+      return;
+    }
+    await _save(
+      journey,
+      () => AuthService.instance.undoJourneyStep(journey.id!, step.identity),
+    );
+  }
+
+  Future<void> _changeChoice(
+    IdJourney journey,
+    Map<String, dynamic> choice,
+  ) async {
+    if (!await confirmChangeChoice(context) || !mounted) return;
+    await _save(
+      journey,
+      () => AuthService.instance.resolveJourneyStep(journey.id!, {
+        'key': choice['key'],
+        'reset': true,
+      }),
+    );
+  }
+
+  Future<void> _refresh(IdJourney journey) async {
+    if (!await _ask(
+          'Review updated Roadmap?',
+          'Your steps will use your current Inventory and the latest listed requirements. Steps you already completed stay saved.',
+          'Update Roadmap',
+        ) ||
+        !mounted) {
+      return;
+    }
+    await _save(
+      journey,
+      () => AuthService.instance.refreshJourney(journey.id!),
+    );
+  }
+
+  Future<void> _remove(IdJourney journey) async {
+    if (_saving || _confirming) return;
+    if (!await _ask(
+          'Remove this Roadmap?',
+          'This permanently removes ${journey.title}, its progress and its saved choices. Your Inventory and application checklists stay the same.',
+          'Remove',
+        ) ||
+        !mounted) {
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await AuthService.instance.removeJourney(journey.id!);
+      if (!mounted) return;
+      setState(() => _journeys.remove(journey));
+      widget.onJourneyChanged?.call();
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   void _open(IdJourney journey) => setState(() {
     _openJourney = journey;
     for (final item in _journeys) {
@@ -269,6 +402,8 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
+          const SizedBox(height: 8),
+          const RoadmapSuggestionNotice(),
           const SizedBox(height: 16),
           JourneyStatusTabs(
             showCompleted: _showCompleted,
@@ -320,6 +455,17 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
                 onComplete: journey.id == null
                     ? null
                     : (step) => _complete(journey, step),
+                onUndo: journey.id == null
+                    ? null
+                    : (step) => _undo(journey, step),
+                savedChoices: journey.confirmedPlan?.savedChoices ?? const [],
+                onChangeChoice: journey.id == null
+                    ? null
+                    : (choice) => _changeChoice(journey, choice),
+                onRefresh: journey.id == null
+                    ? null
+                    : () => _refresh(journey),
+                onRemove: journey.id == null ? null : () => _remove(journey),
               )
             else if (journey == open)
               RoadmapPlanPanel(

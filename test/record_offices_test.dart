@@ -99,7 +99,7 @@ void main() {
         expect(find.text('$name main office'), findsOneWidget);
         expect(find.text('Saved record address'), findsOneWidget);
         expect(find.text('Get Directions'), findsOneWidget);
-        expect(find.text('Monday: open 08:00:00–17:00:00'), findsOneWidget);
+        expect(find.text('Mon: 8:00 AM - 5:00 PM'), findsOneWidget);
         expect(find.text('Path-only legacy office'), findsNothing);
         await tester.tap(find.text('Ways to Request'));
         await tester.pumpAndSettle();
@@ -114,7 +114,7 @@ void main() {
         expect(find.text('$name main office'), findsOneWidget);
         expect(find.text('Saved record address'), findsOneWidget);
         expect(find.text('Get Directions'), findsOneWidget);
-        expect(find.text('Monday: open 08:00:00–17:00:00'), findsOneWidget);
+        expect(find.text('Mon: 8:00 AM - 5:00 PM'), findsOneWidget);
         expect(find.text('Path-only legacy office'), findsNothing);
         expect(jsonEncode(data.raw['request_paths']), before);
         expect(tester.takeException(), isNull);

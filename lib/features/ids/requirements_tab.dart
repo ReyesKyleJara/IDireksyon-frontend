@@ -310,13 +310,13 @@ class _RequirementsTabState extends State<RequirementsTab> {
         (widget.savePreparation != null || _auth.token != null);
     return ListView(
       key: ValueKey((record.recordType, record.id)),
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
         Text(
           'Choose the requirements you have prepared for this application.',
           style: TextStyle(
-            fontSize: 12,
-            height: 1.35,
+            fontSize: 13,
+            height: 1.45,
             color: colors.onSurfaceVariant,
           ),
         ),
@@ -354,8 +354,8 @@ class _RequirementsTabState extends State<RequirementsTab> {
                   ? 'Saving…'
                   : '${preparationSummary(selected, preparation).complete} of ${preparationSummary(selected, preparation).total} required groups prepared',
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
                 color: _accent(context),
               ),
             ),
@@ -377,19 +377,32 @@ class _RequirementsTabState extends State<RequirementsTab> {
           ),
         Container(
           key: const ValueKey('readiness-explanation'),
-          margin: const EdgeInsets.only(top: 12),
-          padding: const EdgeInsets.all(8),
+          margin: const EdgeInsets.only(top: 16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: _accent(context).withValues(alpha: .04),
-            borderRadius: BorderRadius.circular(8),
+            color: _accent(context).withValues(alpha: .06),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            'Items in Own IDs/Documents start checked unless you saved an unchecked choice. Checklist changes do not change Inventory. Conditional and issuing-office checks still apply.',
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.35,
-              color: colors.onSurfaceVariant,
-            ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 18,
+                color: _accent(context),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Items you own show “You have this” and stay unchecked until you confirm them for this application. Checklist changes do not change Inventory. Conditional and issuing-office checks still apply.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -431,18 +444,23 @@ class _RequirementSection extends StatelessWidget {
         : count > 0
         ? '$count of ${best!.requiredCount} prepared'
         : 'Not yet complete';
+    final statusColor = met
+        ? (colors.brightness == Brightness.dark
+              ? const Color(0xFF81C784)
+              : AppTheme.completedGreen)
+        : colors.onSurfaceVariant;
     final single =
         group.ways.length == 1 &&
         group.ways.single.items.length == 1 &&
         group.displayName == group.ways.single.items.single.name;
     return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colors.brightness == Brightness.dark
             ? colors.surfaceContainer
             : Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: colors.outlineVariant.withValues(alpha: .35)),
       ),
       child: Column(
@@ -452,24 +470,37 @@ class _RequirementSection extends StatelessWidget {
             Text(
               group.displayName,
               style: TextStyle(
-                fontSize: 14,
-                height: 1.3,
+                fontSize: 15,
+                height: 1.35,
                 fontWeight: FontWeight.w700,
                 color: _accent(context),
               ),
             ),
           if (checklist)
             Padding(
-              padding: const EdgeInsets.only(top: 2, bottom: 3),
-              child: Text(
-                status,
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.3,
-                  color: met
-                      ? const Color(0xFF2E7D32)
-                      : colors.onSurfaceVariant,
-                ),
+              padding: EdgeInsets.only(top: single ? 0 : 4, bottom: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    met
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 16,
+                    color: statusColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           if (group.conditionType != 'always')
@@ -478,8 +509,8 @@ class _RequirementSection extends StatelessWidget {
                   ? 'Check when this condition applies.'
                   : 'Only if: ${group.condition}',
               style: TextStyle(
-                fontSize: 12,
-                height: 1.35,
+                fontSize: 13,
+                height: 1.45,
                 color: colors.onSurfaceVariant,
               ),
             ),
@@ -487,15 +518,15 @@ class _RequirementSection extends StatelessWidget {
             Text(
               'Meet one of these alternatives, not all of them.',
               style: TextStyle(
-                fontSize: 12,
-                height: 1.35,
+                fontSize: 13,
+                height: 1.45,
                 color: colors.onSurfaceVariant,
               ),
             ),
           for (var i = 0; i < group.ways.length; i++) ...[
             if (i > 0)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 5),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
                     Expanded(child: Divider(color: colors.outlineVariant)),
@@ -503,7 +534,11 @@ class _RequirementSection extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Text(
                         'OR',
-                        style: TextStyle(fontSize: 10, color: _accent(context)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: _accent(context),
+                        ),
                       ),
                     ),
                     Expanded(child: Divider(color: colors.outlineVariant)),
@@ -514,8 +549,8 @@ class _RequirementSection extends StatelessWidget {
               Text(
                 'Option ${i + 1}',
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             _WayView(
@@ -573,7 +608,7 @@ class _WayView extends StatelessWidget {
             child: Text(
               way.instruction,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 height: 1.35,
                 fontWeight: FontWeight.w600,
                 color: _accent(context),
@@ -586,7 +621,7 @@ class _WayView extends StatelessWidget {
             child: Text(
               way.qualification!,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 height: 1.35,
                 color: colors.onSurfaceVariant,
               ),
@@ -594,7 +629,7 @@ class _WayView extends StatelessWidget {
           ),
         if (choice || way.items.length > 3)
           ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+            tilePadding: EdgeInsets.zero,
             childrenPadding: const EdgeInsets.only(bottom: 4),
             dense: true,
             visualDensity: VisualDensity.compact,
@@ -606,7 +641,11 @@ class _WayView extends StatelessWidget {
               choice
                   ? 'View ${way.items.length} accepted items'
                   : 'View all ${way.items.length} required items',
-              style: TextStyle(fontSize: 12, color: _accent(context)),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _accent(context),
+              ),
             ),
             children: items,
           )
@@ -637,8 +676,8 @@ class _ItemView extends StatelessWidget {
     final owned = inventory?.owns(item) == true;
     final checked = preparation?.owns(item) == true;
     final style = TextStyle(
-      fontSize: 12,
-      height: 1.35,
+      fontSize: 13,
+      height: 1.45,
       color: colors.onSurfaceVariant,
     );
     final linked =
@@ -651,14 +690,13 @@ class _ItemView extends StatelessWidget {
         children: [
           if (checklist)
             SizedBox(
-              width: 32,
-              height: 32,
+              width: 44,
+              height: 44,
               child: Checkbox(
                 key: ValueKey('prepare-item-${item.id}'),
                 value: checked,
                 activeColor: _accent(context),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
                 semanticLabel:
                     '${checked ? 'Unprepare' : 'Prepare'} ${item.name}',
                 onChanged: onToggle == null || item.id == null
@@ -671,7 +709,7 @@ class _ItemView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(top: 5),
+                  padding: EdgeInsets.only(top: checklist ? 12 : 4, bottom: 2),
                   child: Text(
                     item.name,
                     style: TextStyle(
@@ -682,11 +720,11 @@ class _ItemView extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (owned && !checked)
+                if (owned)
                   const Text(
-                    'Added to Own IDs/Documents',
+                    'You have this',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       color: Color(0xFF2E7D32),
                       height: 1.3,
                     ),
@@ -701,9 +739,12 @@ class _ItemView extends StatelessWidget {
                   TextButton(
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
-                      minimumSize: const Size(0, 28),
+                      minimumSize: const Size(0, 40),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      textStyle: const TextStyle(fontSize: 11),
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(

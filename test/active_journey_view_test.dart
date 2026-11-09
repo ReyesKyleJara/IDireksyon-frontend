@@ -201,7 +201,7 @@ void main() {
     );
     expect(find.text('Choose supporting proof'), findsOneWidget);
     expect(
-      find.textContaining('Requirement needs manual preparation'),
+      find.textContaining('yourself'),
       findsOneWidget,
     );
     expect(find.text('Ready to start'), findsOneWidget);

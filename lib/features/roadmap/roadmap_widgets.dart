@@ -3,6 +3,132 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_motion.dart';
 import '../../core/widgets/frosted.dart';
+import '../../models/roadmap_plan.dart';
+
+/// Shown once per Roadmap screen: catalog guidance is not agency-verified.
+class RoadmapSuggestionNotice extends StatelessWidget {
+  const RoadmapSuggestionNotice({super.key});
+
+  @override
+  Widget build(BuildContext context) => Text(
+    'Suggested based on currently available information. Confirm requirements with the issuing agency.',
+    style: TextStyle(
+      fontSize: 12,
+      height: 1.4,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
+  );
+}
+
+/// Requirements the app cannot check, kept visible without becoming steps.
+class RoadmapRequirementNotes extends StatelessWidget {
+  const RoadmapRequirementNotes({super.key, required this.step});
+
+  final RoadmapPlanStep step;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = TextStyle(
+      fontSize: 12,
+      height: 1.4,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    final heading = muted.copyWith(fontWeight: FontWeight.w700);
+    Widget section(String title, List<String> rows) => Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: heading),
+          for (final row in rows) Text('• $row', style: muted),
+        ],
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (step.alsoNeeded.isNotEmpty)
+          section('Also needed for this application', step.alsoNeeded),
+        if (step.mayApply.isNotEmpty) section('May apply to you', step.mayApply),
+      ],
+    );
+  }
+}
+
+/// Saved decisions, each of which can be cleared and chosen again.
+class RoadmapSavedChoices extends StatelessWidget {
+  const RoadmapSavedChoices({
+    super.key,
+    required this.choices,
+    required this.onChange,
+  });
+
+  final List<Map<String, dynamic>> choices;
+  final ValueChanged<Map<String, dynamic>>? onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return RoadmapCard(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your saved choices',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+            for (final choice in choices)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${choice['name']}: ${choice['selected']}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onChange == null
+                        ? null
+                        : () => onChange!(choice),
+                    child: const Text('Change'),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// True when the resident agrees to clear a saved choice.
+Future<bool> confirmChangeChoice(BuildContext context) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change this choice?'),
+        content: const Text(
+          'Your Roadmap will be updated so you can choose again. Steps you already completed stay saved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Change'),
+          ),
+        ],
+      ),
+    ) ==
+    true;
 
 /// Same gradient, corners and shadow as Home's "Get started" banner.
 class RoadmapGradientCard extends StatelessWidget {

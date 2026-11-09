@@ -146,8 +146,8 @@ void main() {
     expect(confirmation.targetCatalogIds, isEmpty);
     expect(confirmation.targetDocumentIds, [55]);
     expect(confirmation.targetIds, ['PSA Birth Certificate']);
-    await tester.ensureVisible(find.text('Save & Continue'));
-    await tester.tap(find.text('Save & Continue'));
+    await tester.ensureVisible(find.text('Continue'));
+    await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
     expect(find.text('Unable to load your roadmap.'), findsNothing);
     expect(find.text('Document 55'), findsNWidgets(2));
@@ -199,8 +199,8 @@ void main() {
       );
       expect(confirmation.targetIds, ['Allowed']);
       expect(confirmation.targetCatalogIds, [55]);
-      await tester.ensureVisible(find.text('Save & Continue'));
-      await tester.tap(find.text('Save & Continue'));
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       final suggested = tester.widget<SuggestedRoadmapScreen>(
         find.byType(SuggestedRoadmapScreen),

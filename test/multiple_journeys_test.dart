@@ -44,8 +44,8 @@ void main() {
           await tester.ensureVisible(find.text('Continue'));
           await tester.tap(find.text('Continue'));
           await tester.pumpAndSettle();
-          await tester.ensureVisible(find.text('Save & Continue'));
-          await tester.tap(find.text('Save & Continue'));
+          await tester.ensureVisible(find.text('Continue'));
+          await tester.tap(find.text('Continue'));
           await tester.pumpAndSettle();
           expect(find.text('Passport ID'), findsNothing);
           await tester.ensureVisible(find.text('Confirm Suggested Journey'));
@@ -62,6 +62,8 @@ void main() {
           expect(active.journeys.last.targetIds, ['PhilSys National ID']);
           expect(active.journeys.last.targetCatalogIds, [56]);
           expect(active.journeys.last.ownedItems, isEmpty);
+          await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+          await tester.pumpAndSettle();
           await tester.scrollUntilVisible(
             find.text(original.title).last,
             100,
@@ -148,6 +150,7 @@ void main() {
         ),
       ),
     );
+    await tester.scrollUntilVisible(find.text('Current step'), 200);
     expect(find.text('Current step'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

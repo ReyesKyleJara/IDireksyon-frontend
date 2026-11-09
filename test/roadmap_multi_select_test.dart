@@ -168,8 +168,8 @@ void main() {
       findsOneWidget,
     );
     // A real link says so; an unrelated goal isn't presented as dependent.
-    expect(find.text('Complete PhilSys National ID first.'), findsOneWidget);
-    expect(find.text('Needed for Postal ID.'), findsOneWidget);
+    expect(find.text('Suggested after PhilSys National ID.'), findsOneWidget);
+    expect(find.text('Suggested before Postal ID.'), findsOneWidget);
     expect(
       find.text('No required order. You can work on this anytime.'),
       findsOneWidget,
@@ -304,7 +304,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(confirmAction(tester), isNotNull);
     expect(
-      find.textContaining('Requirement needs manual preparation'),
+      find.textContaining('yourself'),
       findsOneWidget,
     );
     expect(find.text('See Suggested Options'), findsNothing);
@@ -339,12 +339,12 @@ void main() {
       );
       await show({});
       expect(find.text('0 of 3 completed'), findsOneWidget);
-      expect(find.text('Complete Valid IDs first.'), findsOneWidget);
+      expect(find.text('Suggested after Valid IDs.'), findsOneWidget);
       expect(
-        find.textContaining('Requirement needs manual preparation'),
+        find.textContaining('yourself'),
         findsOneWidget,
       );
-      expect(find.text('Mark as Completed'), findsNWidgets(2));
+      expect(find.text('Mark as Completed'), findsNWidgets(3));
       await tester.tap(find.text('Mark as Completed').first);
       expect(tapped, [plan.steps.first.identity]);
 
@@ -451,7 +451,7 @@ void main() {
     },
   );
 
-  testWidgets('unrelated goals can finish in any order, dependents must wait', (
+  testWidgets('unrelated goals can finish in any order, dependents show the suggested order', (
     tester,
   ) async {
     final plan = RoadmapPlan.fromJson(threeGoals());
@@ -473,10 +473,10 @@ void main() {
     expect(find.text('Current step'), findsOneWidget);
     expect(find.text('Ready to start'), findsOneWidget);
     expect(find.text('Upcoming'), findsOneWidget);
-    expect(find.text('Complete PhilSys National ID first.'), findsOneWidget);
-    expect(find.text('Mark as Completed'), findsNWidgets(2));
+    expect(find.text('Suggested after PhilSys National ID.'), findsOneWidget);
+    expect(find.text('Mark as Completed'), findsNWidgets(3));
 
-    await tester.tap(find.text('Mark as Completed').last);
+    await tester.tap(find.text('Mark as Completed').at(1));
     expect(tapped, ['government_id:55']);
   });
 

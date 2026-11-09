@@ -79,15 +79,35 @@ const _sss = OfficeModel(
   longitude: 120.9301,
 );
 
+/// Test-only coordinates, shaped like one row of `GET /api/offices`.
+Map<String, dynamic> _pilotJson(int id, String name, {bool located = true}) => {
+  'id': id,
+  'name': name,
+  'address': 'Pilot address',
+  'records': ['Philippine Passport'],
+  'latitude': located ? '14.8000000' : null,
+  'longitude': located ? '120.8000000' : null,
+};
+
 late google.GoogleMap _map;
 
-Future<void> _open(WidgetTester tester, OfficeMapServices services) async {
-  tester.view.physicalSize = const Size(390, 1000);
+Future<void> _open(
+  WidgetTester tester,
+  OfficeMapServices services, {
+  Size size = const Size(390, 1000),
+  double textScale = 1,
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: OfficeFinderScreen(
         services: services,
         mapBuilder: (map) {
@@ -126,15 +146,15 @@ void main() {
       expect(office.agency, 'DFA');
       expect(office.latitude, 14.8527);
       expect(office.address, 'SM City Malolos, Bulacan');
-      expect(office.serviceTag, 'Philippine Passport +1');
+      expect(office.serviceTag, 'Philippine Passport and 1 more');
       // Monday 2026-11-09.
       expect(
         office.hoursOn(manila(2026, 11, 9, 10)),
         'Today: 8:00 AM - 12:00 PM, 1:00 PM - 5:30 PM',
       );
       expect(office.hoursOn(manila(2026, 11, 8, 10)), 'Today: Closed');
-      expect(office.hoursOn(manila(2026, 11, 10, 10)), 'Hours not listed');
-      expect(office.hoursOn(manila(2026, 11, 11, 10)), 'Hours not listed');
+      expect(office.hoursOn(manila(2026, 11, 10, 10)), isNull);
+      expect(office.hoursOn(manila(2026, 11, 11, 10)), isNull);
     });
 
     test('uses Philippine time for the day of the week', () {
@@ -154,6 +174,28 @@ void main() {
       );
     });
 
+    test('tidies CMS typing slips for display', () {
+      final office = OfficeModel.fromJson({
+        'id': 1,
+        'name': ' BIR RDO 25A- West  Bulacan ',
+        'address': '2nd Floor, Provincial PESO Building,',
+        'municipality': 'Malolos',
+        'records': ['Student Driver`s License'],
+      });
+      expect(office.name, 'BIR RDO 25A - West Bulacan');
+      expect(office.address, '2nd Floor, Provincial PESO Building, Malolos');
+      expect(office.records.single, 'Student Driver’s License');
+
+      String address(String text, String town) => OfficeModel.fromJson({
+        'id': 1,
+        'name': 'A',
+        'address': text,
+        'municipality': town,
+      }).address;
+      expect(address('Sampaloc, Manila.', 'Manila'), 'Sampaloc, Manila');
+      expect(address('162 Sandico St.', 'Marilao'), '162 Sandico St., Marilao');
+    });
+
     test('treats missing or partial coordinates as no location', () {
       expect(OfficeModel.fromJson({'id': 1, 'name': 'A'}).latitude, isNull);
       final partial = OfficeModel.fromJson({
@@ -166,6 +208,89 @@ void main() {
       expect(partial.longitude, isNull);
       expect(partial.address, 'Address not yet added.');
     });
+
+    test('keeps saved coordinates with no further step', () {
+      final office = OfficeModel.fromJson(_pilotJson(19, 'PSA'));
+      expect(office.latitude, 14.8);
+      expect(office.longitude, 120.8);
+    });
+  });
+
+  group('pilot offices', () {
+    Future<void> select(WidgetTester tester, String name) async {
+      await tester.tap(find.text(name));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> done(WidgetTester tester) async {
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    for (final (id, name) in [
+      (3, 'DFA Malolos pilot'),
+      (19, 'PSA Bulacan CRS Outlet'),
+    ]) {
+      testWidgets('$name offers directions as soon as it has coordinates', (
+        tester,
+      ) async {
+        await _open(
+          tester,
+          _Services([OfficeModel.fromJson(_pilotJson(id, name))]),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          _map.markers.map((marker) => marker.markerId.value),
+          contains('office-$id'),
+        );
+        await select(tester, name);
+        expect(find.text('Get Directions'), findsOneWidget);
+        expect(find.textContaining('erified'), findsNothing);
+        await done(tester);
+      });
+
+      testWidgets('$name offers no directions without coordinates', (
+        tester,
+      ) async {
+        await _open(
+          tester,
+          _Services([
+            OfficeModel.fromJson(_pilotJson(id, name, located: false)),
+          ]),
+        );
+        await tester.pumpAndSettle();
+        expect(_map.markers, isEmpty);
+        await select(tester, name);
+        expect(find.text('Get Directions'), findsNothing);
+        await done(tester);
+      });
+    }
+
+    testWidgets(
+      'an office without coordinates stays listed without navigation or distance',
+      (tester) async {
+        final services = _Services([
+          OfficeModel.fromJson(
+            _pilotJson(14, 'PRC Regional Office III', located: false),
+          ),
+        ]);
+        await _open(tester, services);
+        await tester.tap(find.byTooltip('Use my current location'));
+        await tester.pumpAndSettle();
+        expect(find.text('PRC Regional Office III'), findsOneWidget);
+        expect(find.textContaining('Straight-line'), findsNothing);
+        expect(
+          _map.markers.map((marker) => marker.markerId.value),
+          isNot(contains('office-14')),
+        );
+        await select(tester, 'PRC Regional Office III');
+        expect(find.text('Get Directions'), findsNothing);
+        expect(find.textContaining('isn’t available'), findsOneWidget);
+        expect(find.textContaining('erified'), findsNothing);
+        await done(tester);
+      },
+    );
   });
 
   test('offices() reads GET /offices and reports failures', () async {
@@ -195,15 +320,19 @@ void main() {
     failing.dispose();
   });
 
-  testWidgets('searching DFA lists the nearest office first', (tester) async {
+  testWidgets('the location button ranks searched offices by distance', (
+    tester,
+  ) async {
     final services = _Services([_malolos, _noPin, _sss, _marilao]);
     await _open(tester, services);
 
-    await tester.enterText(find.byType(TextField), 'd');
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'dfa');
     await tester.pumpAndSettle();
+    expect(services.locates, 0);
+    expect(find.textContaining('Straight-line'), findsNothing);
 
+    await tester.tap(find.byTooltip('Use my current location'));
+    await tester.pumpAndSettle();
     expect(services.locates, 1);
     expect(find.text('SSS Marilao'), findsNothing);
     tester
@@ -214,7 +343,12 @@ void main() {
     double top(String name) => tester.getTopLeft(find.text(name)).dy;
     expect(top('DFA Marilao'), lessThan(top('DFA Malolos')));
     expect(top('DFA Malolos'), lessThan(top('DFA Annex')));
-    expect(find.text('3 offices found near you'), findsOneWidget);
+    expect(find.text('3 offices'), findsOneWidget);
+    expect(find.textContaining('found near you'), findsNothing);
+    expect(
+      find.text('Straight-line distances, not road distances.'),
+      findsOneWidget,
+    );
     expect(
       _map.markers.map((marker) => marker.markerId.value),
       isNot(contains('office-5')),
@@ -223,16 +357,15 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   });
 
-  testWidgets('a denied location still shows results and asks only once', (
-    tester,
-  ) async {
+  testWidgets('search works and never asks for location', (tester) async {
     final services = _Services([_malolos, _marilao], denied: true);
     await _open(tester, services);
     await tester.enterText(find.byType(TextField), 'd');
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'df');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
-    expect(services.locates, 1);
+    expect(services.locates, 0);
     expect(find.text('2 offices'), findsOneWidget);
     expect(find.text('DFA Malolos'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -246,19 +379,93 @@ void main() {
     await _open(tester, _Services([_noPin]));
     await tester.tap(find.text('DFA Annex'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.textContaining('no map location yet'),
-      100,
-      scrollable: find.byType(Scrollable).last,
+    expect(find.textContaining('isn’t available'), findsOneWidget);
+    expect(find.text('Get Directions'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('related IDs and documents read as plain rows', (tester) async {
+    const office = OfficeModel(
+      id: '8',
+      name: 'Regional Office',
+      address: 'Malolos',
+      records: ['TIN ID', 'Philippine Passport'],
+      latitude: 14.8,
+      longitude: 120.8,
     );
-    expect(find.textContaining('no map location yet'), findsOneWidget);
-    final button = tester.widget<ButtonStyleButton>(
-      find.ancestor(
-        of: find.text('Get directions'),
-        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
-      ),
+    await _open(tester, _Services([office]));
+    expect(find.text('TIN ID and 1 more'), findsOneWidget);
+    await tester.tap(find.text('Regional Office'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('More details'));
+    await tester.pumpAndSettle();
+    expect(find.text('IDs and documents'), findsOneWidget);
+    expect(find.text('TIN ID'), findsOneWidget);
+    expect(find.text('Philippine Passport'), findsOneWidget);
+    expect(find.byIcon(Icons.description_outlined), findsNWidgets(2));
+    expect(find.byType(Chip), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('the related section is hidden when an office has none', (
+    tester,
+  ) async {
+    const office = OfficeModel(
+      id: '9',
+      name: 'Bare Office',
+      address: 'Bulacan',
     );
-    expect(button.onPressed, isNull);
+    await _open(tester, _Services([office]));
+    await tester.tap(find.text('Bare Office'));
+    await tester.pumpAndSettle();
+    expect(find.text('IDs and documents'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('long CMS text wraps fully under large Android text', (
+    tester,
+  ) async {
+    final longName =
+        'Bureau of Internal Revenue Revenue District Office ${'Bulacan ' * 8}'
+            .trim();
+    final longAddress = 'Unit 11, ${'McArthur Highway, ' * 8}Bulacan';
+    final longRecord = 'Certificate of ${'Registration ' * 8}'.trim();
+    final office = OfficeModel(
+      id: '10',
+      name: longName,
+      address: longAddress,
+      records: [longRecord],
+      latitude: 14.8,
+      longitude: 120.8,
+    );
+    await _open(
+      tester,
+      _Services([office]),
+      size: const Size(320, 640),
+      textScale: 2,
+    );
+    final sheet = tester
+        .widget<DraggableScrollableSheet>(find.byType(DraggableScrollableSheet))
+        .controller!;
+    sheet.jumpTo(.96);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.text(longName)).maxLines, isNull);
+    expect(tester.widget<Text>(find.text(longAddress)).maxLines, isNull);
+    expect(tester.takeException(), isNull);
+
+    // The wrapped name is taller than the screen, so tap its first line.
+    await tester.tapAt(
+      tester.getTopLeft(find.text(longName)) + const Offset(20, 10),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Get Directions'), findsOneWidget);
+    sheet.jumpTo(.96);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.text(longRecord)).maxLines, isNull);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));
   });

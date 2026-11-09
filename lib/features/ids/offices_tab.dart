@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart' as google;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../office_finder/models/office_model.dart';
 
 /// Uses only the offices already loaded for this ID/document.
 class OfficesTab extends StatefulWidget {
@@ -48,17 +49,13 @@ class _OfficesTabState extends State<OfficesTab> {
   }
 
   google.LatLng? _point(Map<String, dynamic> office) {
-    final lat = double.tryParse('${office['latitude']}');
-    final lng = double.tryParse('${office['longitude']}');
-    if (lat == null ||
-        lng == null ||
-        !lat.isFinite ||
-        !lng.isFinite ||
-        lat.abs() > 90 ||
-        lng.abs() > 180) {
-      return null;
-    }
-    return google.LatLng(lat, lng);
+    final location = OfficeModel.usableLocation(
+      office['latitude'],
+      office['longitude'],
+    );
+    return location == null
+        ? null
+        : google.LatLng(location.latitude, location.longitude);
   }
 
   String _text(dynamic value) => value is String ? value.trim() : '';
@@ -79,37 +76,12 @@ class _OfficesTabState extends State<OfficesTab> {
     return parts.isEmpty ? 'Address not yet added.' : parts.join(', ');
   }
 
-  List<String> _hours(Map<String, dynamic> office) {
-    const days = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-    ];
-    final schedules = office['schedules'];
-    if (schedules is! List) return [];
-    return [
-      for (final schedule in schedules.whereType<Map>())
-        if (['open', 'closed'].contains(schedule['status']))
-          (() {
-            final day = int.tryParse('${schedule['day_of_week']}');
-            final label = day != null && day >= 0 && day < 7
-                ? days[day]
-                : 'Day';
-            final intervals = schedule['intervals'];
-            final hours = intervals is List
-                ? intervals
-                      .whereType<Map>()
-                      .map((row) => '${row['opens_at']}–${row['closes_at']}')
-                      .join(', ')
-                : '';
-            return '$label: ${schedule['status']}${hours.isEmpty ? '' : ' $hours'}';
-          })(),
-    ];
-  }
+  List<String> _hours(Map<String, dynamic> office) => [
+    for (final line in OfficeModel.weeklyLines(
+      OfficeModel.scheduleFrom(office['schedules']),
+    ))
+      '$line',
+  ];
 
   void _select(int index) {
     setState(() => _selected = index);
@@ -174,9 +146,9 @@ class _OfficesTabState extends State<OfficesTab> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
         key: ValueKey('linked-office-$index-${office['id']}'),
-        color: selected ? AppTheme.pageBackground : Colors.white,
+        color: selected ? const Color(0xFFEAF2FC) : Colors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(
             color: selected ? AppTheme.primaryBlue : const Color(0xFFE0EAF5),
           ),
@@ -202,7 +174,7 @@ class _OfficesTabState extends State<OfficesTab> {
                       child: Text(
                         _text(office['name']),
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           height: 1.25,
                           fontWeight: FontWeight.w700,
                           color: AppTheme.navy,
@@ -222,8 +194,8 @@ class _OfficesTabState extends State<OfficesTab> {
                   _address(office),
                   style: const TextStyle(
                     color: Color(0xFF42556C),
-                    fontSize: 13,
-                    height: 1.4,
+                    fontSize: 14,
+                    height: 1.45,
                   ),
                 ),
                 if (hours.isNotEmpty) ...[
@@ -245,7 +217,7 @@ class _OfficesTabState extends State<OfficesTab> {
                               Text(
                                 line,
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   height: 1.5,
                                   color: Color(0xFF42556C),
                                 ),
@@ -269,11 +241,12 @@ class _OfficesTabState extends State<OfficesTab> {
                           borderRadius: BorderRadius.circular(9),
                         ),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
+                          horizontal: 14,
+                          vertical: 10,
                         ),
+                        minimumSize: const Size(0, 44),
                         textStyle: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -308,7 +281,9 @@ class _OfficesTabState extends State<OfficesTab> {
           i,
     ];
     return ColoredBox(
-      color: Colors.white,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? Colors.white
+          : AppTheme.pageBackground,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final mapHeight = (constraints.maxHeight * .48).clamp(160.0, 260.0);

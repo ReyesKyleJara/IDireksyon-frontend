@@ -10,6 +10,9 @@ class RoadmapPlan {
       targetDocumentIds = List<int>.from(
         json['target_document_ids'] as List? ?? const [],
       ),
+      savedChoices = (json['saved_choices'] as List? ?? const [])
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList(),
       steps = (json['steps'] as List)
           .map(
             (row) => RoadmapPlanStep.fromJson(Map<String, dynamic>.from(row)),
@@ -33,6 +36,9 @@ class RoadmapPlan {
   final List<int> targetIds;
   final List<int> targetDocumentIds;
   final List<RoadmapPlanStep> steps;
+
+  /// Explicit choices the resident can review and change.
+  final List<Map<String, dynamic>> savedChoices;
   bool get blocked => steps.any((step) => step.blocked);
 }
 
@@ -47,6 +53,9 @@ class RoadmapPlanStep {
       ownerKey = json['owner_key'] as String?,
       remainingCount = json['remaining_count'] as int? ?? 1,
       manualPreparation = json['manual_preparation'] == true,
+      guidanceIncomplete = json['guidance_incomplete'] == true,
+      catalogNotice = json['catalog_notice'] as String?,
+      needsConfirmation = json['confirmation'] is Map,
       resolutionReady = json['resolution_ready'] == true,
       resolutionKey = json['resolution_key'] as String?,
       resolutionKind = json['kind'] as String?,
@@ -102,9 +111,31 @@ class RoadmapPlanStep {
       resolutionKind,
       message,
       processingTime,
-      ownerKey;
+      ownerKey,
+      catalogNotice;
   final List<Map<String, dynamic>> suggestions;
   bool get isUnresolved => type == 'unresolved_requirement';
+
+  List<Map<String, dynamic>> get _notes => prerequisites
+      .where(
+        (row) =>
+            row['status'] == 'manual' && row['manual_kind'] != 'confirmation',
+      )
+      .toList();
+  bool _isConditional(Map<String, dynamic> row) =>
+      row['manual_kind'] == 'conditional' ||
+      (row['manual_kind'] == null &&
+          '${row['condition']}'.startsWith('Review applicability'));
+
+  /// Requirements the app cannot check, listed without adding acquisition steps.
+  List<String> get alsoNeeded => [
+    for (final row in _notes)
+      if (!_isConditional(row)) row['name'] as String,
+  ];
+  List<String> get mayApply => [
+    for (final row in _notes)
+      if (_isConditional(row)) row['name'] as String,
+  ];
   String get identity => isUnresolved ? resolutionKey! : '$type:$id';
   bool get isInformational => guidanceMode == 'informational_only';
   bool get isManualPreparation =>
@@ -123,7 +154,9 @@ class RoadmapPlanStep {
       selected,
       alreadyOwned,
       manualPreparation,
-      resolutionReady;
+      resolutionReady,
+      guidanceIncomplete,
+      needsConfirmation;
   final List<String> issues;
   final List<Map<String, dynamic>> prerequisites;
   final Map<String, dynamic> readiness;

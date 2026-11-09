@@ -305,7 +305,7 @@ void main() {
       await show(tester);
       expect(box(tester, 550).value, isTrue);
       expect(writes, isEmpty);
-      expect(find.text('You have this'), findsNothing);
+      expect(find.text('You have this'), findsOneWidget);
       await tapItem(tester, 550);
       expect(find.text('Remove from checklist?'), findsOneWidget);
       expect(
@@ -325,7 +325,7 @@ void main() {
       await tapItem(tester, 550);
       await confirm(tester, remove: true);
       expect(box(tester, 550).value, isFalse);
-      expect(find.text('Added to Own IDs/Documents'), findsOneWidget);
+      expect(find.text('You have this'), findsOneWidget);
       expect(owned, [1]);
       expect(stored['government_id:55']![550], isFalse);
       await tester.pumpWidget(const SizedBox());

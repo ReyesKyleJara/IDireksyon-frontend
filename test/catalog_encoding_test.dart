@@ -328,7 +328,7 @@ void main() {
       expect(find.text('Offices'), findsNothing);
       expect(record.requestPaths.first['guide'], isNotEmpty);
       await tester.scrollUntilVisible(
-        find.text('Official fixture source'),
+        find.text('Sources used (1)'),
         250,
         scrollable: find
             .descendant(
@@ -337,6 +337,11 @@ void main() {
             )
             .first,
       );
+      expect(find.text('Official fixture source'), findsNothing);
+      await tester.ensureVisible(find.text('Sources used (1)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sources used (1)'));
+      await tester.pumpAndSettle();
       expect(find.text('Official fixture source'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },

@@ -16,7 +16,7 @@ Future<Map<String, dynamic>?> showSuggestedRoadmapOptions(
       builder: (context) => AlertDialog(
         title: const Text('Review updated Roadmap'),
         content: const Text(
-          'Your current Inventory and CMS requirements produce an updated Roadmap. Apply it to this journey? Existing completion history will be retained.',
+          'Your current Inventory and the latest requirements produce an updated Roadmap. Apply it to this journey? Existing completion history will be retained.',
         ),
         actions: [
           TextButton(

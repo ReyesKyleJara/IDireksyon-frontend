@@ -258,7 +258,7 @@ void main() {
       );
       expect(
         find.text(
-          'Items in Own IDs/Documents start checked unless you saved an unchecked choice. Checklist changes do not change Inventory. Conditional and issuing-office checks still apply.',
+          'Items you own show “You have this” and stay unchecked until you confirm them for this application. Checklist changes do not change Inventory. Conditional and issuing-office checks still apply.',
         ),
         findsOneWidget,
       );
@@ -711,7 +711,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Accepted ID 1'), findsOneWidget);
         expect(
-          find.text('Added to Own IDs/Documents'),
+          find.text('You have this'),
           findsNWidgets(ownedCount),
         );
         expect(find.byIcon(Icons.check_circle_rounded), findsNothing);

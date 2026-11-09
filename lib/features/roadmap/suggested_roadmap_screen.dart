@@ -39,9 +39,6 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
   String get _goalTitle => targetIds
       .map((name) => name == 'Passport ID' ? 'Philippine Passport' : name)
       .join(' + ');
-  bool get _passport =>
-      targetIds.length == 1 && _goalTitle.toLowerCase().contains('passport');
-
   bool get _usesPlan =>
       targetCatalogIds.isNotEmpty || widget.targetDocumentIds.isNotEmpty;
 
@@ -131,10 +128,8 @@ class _SuggestedRoadmapScreenState extends State<SuggestedRoadmapScreen> {
                       step: 'STEP 3 OF 3',
                       title: 'Suggested Roadmap',
                       subtitle: targetIds.length > 1
-                          ? 'Anything an item requires comes before it. Items with no link can be done in any order.'
-                          : _passport
-                          ? 'Here’s the recommended sequence for your Passport journey.'
-                          : 'Here’s the recommended sequence for your journey.',
+                          ? 'Suggested prerequisites come first. Items with no link can be done in any order.'
+                          : 'Here’s the suggested sequence for your journey.',
                     ),
                     const SizedBox(height: 16),
                     if (_usesPlan)

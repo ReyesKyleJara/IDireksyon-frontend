@@ -100,7 +100,7 @@ class _ApplicationPreparationCardState
         Text(
           'Application preparation',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: FontWeight.w700,
             color: colors.primary,
           ),
@@ -114,16 +114,16 @@ class _ApplicationPreparationCardState
                     ? 'Sign in to view your progress.'
                     : 'Preparation is unavailable for this checklist.')
               : '${summary.complete} of ${summary.total} required groups prepared',
-          style: const TextStyle(fontSize: 12),
+          style: const TextStyle(fontSize: 13),
         ),
         if (summary != null && summary.total > 0) ...[
           const SizedBox(height: 6),
           Text(
             summary.conditional
-                ? 'Conditional requirements and issuing-office checks still apply.'
-                : 'Based on your saved checklist for this application. Inventory is unchanged.',
+                ? 'Some items depend on your situation. The issuing office makes the final check.'
+                : 'Based on your saved checklist for this application.',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               height: 1.35,
               color: colors.onSurfaceVariant,
             ),
@@ -134,15 +134,15 @@ class _ApplicationPreparationCardState
     final ring = summary == null || summary.total == 0
         ? null
         : SizedBox(
-            width: 88,
-            height: 88,
+            width: 64,
+            height: 64,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 SizedBox.expand(
                   child: CircularProgressIndicator(
                     value: summary.completion,
-                    strokeWidth: 7,
+                    strokeWidth: 6,
                     strokeCap: StrokeCap.round,
                     color: AppTheme.accentGold,
                     backgroundColor: colors.outlineVariant.withValues(
@@ -153,7 +153,7 @@ class _ApplicationPreparationCardState
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(13),
+                  padding: const EdgeInsets.all(11),
                   child: FittedBox(
                     child: Text(
                       '${(summary.completion * 100).round()}%',
@@ -170,13 +170,13 @@ class _ApplicationPreparationCardState
           );
     return Container(
       key: const ValueKey('application-preparation-card'),
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colors.brightness == Brightness.dark
             ? colors.surfaceContainer
             : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: colors.outlineVariant.withValues(alpha: .4)),
       ),
       child: LayoutBuilder(

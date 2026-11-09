@@ -160,6 +160,7 @@ void main() {
 
   Future<void> tapVisible(WidgetTester tester, Finder finder) async {
     await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
     await tester.tap(finder);
     await tester.pumpAndSettle();
   }
@@ -188,7 +189,7 @@ void main() {
     (tester) async {
       final journey = await open(tester);
       expect(
-        find.textContaining('Requirement needs manual preparation'),
+        find.textContaining('yourself'),
         findsNothing,
       );
       await chooseFourth(tester);
@@ -226,7 +227,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.textContaining('Requirement needs manual preparation'),
+        find.textContaining('yourself'),
         findsNothing,
       );
     },
@@ -259,7 +260,7 @@ void main() {
       isTrue,
     );
     expect(
-      find.textContaining('Requirement needs manual preparation'),
+      find.textContaining('yourself'),
       findsOneWidget,
     );
   });

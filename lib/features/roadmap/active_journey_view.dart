@@ -18,6 +18,11 @@ class ActiveJourneyView extends StatelessWidget {
     this.onOpen,
     this.onResolve,
     this.onComplete,
+    this.onUndo,
+    this.savedChoices = const [],
+    this.onChangeChoice,
+    this.onRefresh,
+    this.onRemove,
     this.saving = false,
     this.savingStep,
   });
@@ -30,6 +35,11 @@ class ActiveJourneyView extends StatelessWidget {
   final VoidCallback? onOpen;
   final ValueChanged<RoadmapPlanStep>? onResolve;
   final ValueChanged<RoadmapPlanStep>? onComplete;
+  final ValueChanged<RoadmapPlanStep>? onUndo;
+  final List<Map<String, dynamic>> savedChoices;
+  final ValueChanged<Map<String, dynamic>>? onChangeChoice;
+  final VoidCallback? onRefresh;
+  final VoidCallback? onRemove;
   final bool saving;
 
   /// The step being saved; other steps stay disabled but keep their label.
@@ -43,18 +53,23 @@ class ActiveJourneyView extends StatelessWidget {
       !completedStepIdentities.contains(step.identity) &&
       _waitingOn(step).isEmpty;
 
+  /// The order is a suggestion, so any unfinished step can be recorded.
+  bool _canComplete(RoadmapPlanStep step) =>
+      step.isActionable && !completedStepIdentities.contains(step.identity);
+
   String? _detail(int index, int current) {
     if (steps.isEmpty) return index == current ? _currentDetail : null;
     final step = steps[index];
+    if (step.needsConfirmation) return step.message;
     if (step.isManualPreparation) {
-      return 'Requirement needs manual preparation. Prepare ${step.name} and mark this step as completed when ready.';
+      return 'Prepare ${step.name} yourself, then mark this step as completed when ready.';
     }
     if (step.isUnresolved) {
       return 'Review this requirement before continuing with your journey.';
     }
     final waiting = _waitingOn(step);
     if (waiting.isNotEmpty) {
-      return 'Complete ${waiting.map((item) => item.name).join(', ')} first.';
+      return 'Suggested after ${waiting.map((item) => item.name).join(', ')}.';
     }
     if (index == current) return _currentDetail;
     return null;
@@ -81,6 +96,63 @@ class ActiveJourneyView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (expanded && (onRefresh != null || onRemove != null))
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Your Roadmap',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Roadmap options',
+                enabled: !saving,
+                icon: const Icon(Icons.more_horiz_rounded),
+                position: PopupMenuPosition.under,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                onSelected: (action) {
+                  if (action == 'review') onRefresh?.call();
+                  if (action == 'remove') onRemove?.call();
+                },
+                itemBuilder: (context) => [
+                  if (steps.any((step) => step.catalogNotice != null) &&
+                      onRefresh != null)
+                    const PopupMenuItem(
+                      value: 'review',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.refresh_rounded),
+                        title: Text('Review updated Roadmap'),
+                      ),
+                    ),
+                  if (onRemove != null)
+                    PopupMenuItem(
+                      value: 'remove',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.delete_outline_rounded,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        title: Text(
+                          'Remove this Roadmap',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
         _JourneySummary(
           title: title,
           goals: goals,
@@ -116,9 +188,19 @@ class ActiveJourneyView extends StatelessWidget {
               saving: saving,
               savingThis: steps.isNotEmpty && savingStep == steps[i].identity,
               onComplete:
-                  steps.isNotEmpty && _isOpen(steps[i]) && onComplete != null
+                  steps.isNotEmpty &&
+                      _canComplete(steps[i]) &&
+                      onComplete != null
                   ? () => onComplete!(steps[i])
                   : null,
+              onUndo:
+                  steps.isNotEmpty &&
+                      steps[i].isActionable &&
+                      completedStepIdentities.contains(steps[i].identity) &&
+                      onUndo != null
+                  ? () => onUndo!(steps[i])
+                  : null,
+              planStep: steps.isEmpty ? null : steps[i],
               detail: _detail(i, current),
               resolveLabel:
                   steps.isNotEmpty && steps[i].resolutionKind == 'path'
@@ -145,6 +227,13 @@ class ActiveJourneyView extends StatelessWidget {
                       ),
                     ),
             ),
+          if (savedChoices.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            RoadmapSavedChoices(
+              choices: savedChoices,
+              onChange: saving ? null : onChangeChoice,
+            ),
+          ],
         ],
       ],
     );
@@ -413,6 +502,8 @@ class _ActiveStep extends StatelessWidget {
     this.detail,
     this.onTap,
     this.onComplete,
+    this.onUndo,
+    this.planStep,
     this.onResolve,
     this.resolveLabel = 'See Suggested Options',
     this.saving = false,
@@ -422,7 +513,8 @@ class _ActiveStep extends StatelessWidget {
   final String name;
   final bool completed, current, ready, last, owned;
   final String? processingTime, detail;
-  final VoidCallback? onTap, onComplete, onResolve;
+  final VoidCallback? onTap, onComplete, onUndo, onResolve;
+  final RoadmapPlanStep? planStep;
   final String resolveLabel;
   final bool saving, savingThis;
 
@@ -566,6 +658,32 @@ class _ActiveStep extends StatelessWidget {
                                   ),
                                 ),
                               ],
+                              if (planStep?.catalogNotice != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  planStep!.catalogNotice!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.4,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.onSurface,
+                                  ),
+                                ),
+                              ],
+                              if (planStep?.guidanceIncomplete == true &&
+                                  !done) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Details for this item are still incomplete.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.4,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                              if (planStep != null && !done)
+                                RoadmapRequirementNotes(step: planStep!),
                               if (onResolve != null) ...[
                                 const SizedBox(height: 10),
                                 TextButton(
@@ -598,6 +716,11 @@ class _ActiveStep extends StatelessWidget {
                                   ),
                                 ),
                               ],
+                              if (onUndo != null)
+                                TextButton(
+                                  onPressed: saving ? null : onUndo,
+                                  child: const Text('Undo'),
+                                ),
                             ],
                           ),
                         ),

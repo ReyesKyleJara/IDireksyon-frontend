@@ -612,13 +612,33 @@ class AuthService extends ChangeNotifier {
 
   Future<Map<String, dynamic>> completeJourneyStep(
     int journeyId,
+    String identity, {
+    bool acknowledgeOrder = false,
+  }) async => _journeyData(
+    await _journeyRequest('PUT', 'journeys/$journeyId/completion', {
+      'step_identity': identity,
+      if (acknowledgeOrder) 'acknowledge_order': true,
+    }),
+  );
+
+  Future<Map<String, dynamic>> undoJourneyStep(
+    int journeyId,
     String identity,
-  ) async {
-    final response = await _journeyRequest(
-      'PUT',
-      'journeys/$journeyId/completion',
-      {'step_identity': identity},
-    );
+  ) async => _journeyData(
+    await _journeyRequest('PUT', 'journeys/$journeyId/completion', {
+      'step_identity': identity,
+      'completed': false,
+    }),
+  );
+
+  Future<Map<String, dynamic>> refreshJourney(int journeyId) async =>
+      _journeyData(await _journeyRequest('PUT', 'journeys/$journeyId/refresh'));
+
+  Future<void> removeJourney(int journeyId) async {
+    await _journeyRequest('DELETE', 'journeys/$journeyId');
+  }
+
+  Map<String, dynamic> _journeyData(Map<String, dynamic> response) {
     if (response['data'] is! Map) {
       throw const AuthException('The server returned unexpected journey data.');
     }

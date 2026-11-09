@@ -178,7 +178,7 @@ void main() {
       await show(tester);
       expect(find.text('Suggested Roadmap'), findsOneWidget);
       expect(
-        find.text('Here’s the recommended sequence for your Passport journey.'),
+        find.text('Here’s the suggested sequence for your journey.'),
         findsOneWidget,
       );
       expect(find.text('2 steps to complete'), findsOneWidget);
@@ -188,12 +188,12 @@ void main() {
       );
       expect(
         find.text(
-          'Get this document first before continuing with your Passport application.',
+          'Suggested to get this document first.',
         ),
         findsOneWidget,
       );
       expect(
-        find.text('Continue here once your required documents are ready.'),
+        find.text('Suggested after the steps above.'),
         findsOneWidget,
       );
       final view = tester.widget<SuggestedJourneyView>(

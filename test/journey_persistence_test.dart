@@ -127,11 +127,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> complete(WidgetTester tester) async {
-    await tester.ensureVisible(find.text('Mark as Completed').first);
-    await tester.tap(find.text('Mark as Completed').first);
+  Future<void> openCompletionDialog(WidgetTester tester) async {
+    final button = find.widgetWithText(OutlinedButton, 'Mark as Completed').first;
+    // The header can put this below the viewport. Settle the scroll layout
+    // before hit testing so the tap cannot land on the bottom navigation.
+    await Scrollable.ensureVisible(tester.element(button), alignment: 0.5);
+    await tester.pumpAndSettle();
+    expect(button.hitTestable(), findsOneWidget);
+    await tester.tap(button);
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
+  }
+
+  Future<void> complete(WidgetTester tester) async {
+    await openCompletionDialog(tester);
     await tester.tap(
       find.descendant(
         of: find.byType(AlertDialog),
@@ -185,8 +194,7 @@ void main() {
     (tester) async {
       AuthService.instance = account();
       await open(tester);
-      await tester.tap(find.text('Mark as Completed'));
-      await tester.pumpAndSettle();
+      await openCompletionDialog(tester);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(requests.where((r) => r.method == 'PUT'), isEmpty);

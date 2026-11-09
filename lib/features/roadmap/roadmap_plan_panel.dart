@@ -7,6 +7,7 @@ import '../ids/id_details_screen.dart';
 import '../profile/manage_inventory_screen.dart';
 import 'suggested_journey_view.dart';
 import 'active_journey_view.dart';
+import 'roadmap_widgets.dart';
 import 'suggested_options_dialog.dart';
 
 /// Fresh Inventory-backed plan, shared by suggested and active journeys.
@@ -113,6 +114,11 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
     await _reload(resolution: resolution);
   }
 
+  Future<void> _changeChoice(Map<String, dynamic> choice) async {
+    if (!await confirmChangeChoice(context) || !mounted) return;
+    await _reload(resolution: {'key': choice['key'], 'reset': true});
+  }
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -147,7 +153,11 @@ class _RoadmapPlanPanelState extends State<RoadmapPlanPanel> {
             onResolve: _showOptions,
           )
         else if (widget.guidedPresentation)
-          SuggestedJourneyView(plan: _plan!, onResolve: _showOptions)
+          SuggestedJourneyView(
+            plan: _plan!,
+            onResolve: _showOptions,
+            onChangeChoice: _changeChoice,
+          )
         else
           RoadmapPlanView(plan: _plan!, onResolve: _showOptions),
       if (widget.activeJourneyTitle == null)

@@ -6,7 +6,7 @@ import 'package:idireksyon_frontend/features/office_finder/office_finder_screen.
 import 'fixtures/offices.dart';
 
 void main() {
-  testWidgets('the back arrow lines up with the title and page margin', (
+  testWidgets('back, search and location share one row at the page margin', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -22,15 +22,15 @@ void main() {
         ),
       ),
     );
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
     final arrow = find.byIcon(Icons.arrow_back_rounded);
-    final title = find.text('Office Finder');
-    final subtitle = find.text('Find government offices near you');
-    expect(tester.getTopLeft(arrow).dx, 20);
-    expect(tester.getTopLeft(title).dx, 56);
-    expect(tester.getTopLeft(find.byType(TextField)).dx, 20);
-    expect(tester.getCenter(arrow).dy, tester.getCenter(title).dy);
-    expect(tester.getTopLeft(subtitle).dx, tester.getTopLeft(title).dx);
+    final field = find.byType(TextField);
+    expect(tester.getTopLeft(find.byTooltip('Back')).dx, closeTo(12, 2));
+    expect(tester.getCenter(arrow).dy, tester.getCenter(field).dy);
+    expect(
+      tester.getTopRight(find.byTooltip('Use my current location')).dx,
+      closeTo(378, 2),
+    );
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));
   });

@@ -262,7 +262,7 @@ void main() {
       connect(empty: true);
       await show(tester);
       expect(
-        find.textContaining('Requirement needs manual preparation'),
+        find.textContaining('yourself'),
         findsOneWidget,
       );
       expect(find.text('See Suggested Options'), findsNothing);

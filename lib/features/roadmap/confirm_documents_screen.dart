@@ -256,7 +256,7 @@ class _ConfirmDocumentsScreenState extends State<ConfirmDocumentsScreen> {
               action: ElevatedButton(
                 onPressed: _loading || _error != null ? null : _continue,
                 style: roadmapPrimaryButtonStyle(context),
-                child: const Text('Save & Continue'),
+                child: const Text('Continue'),
               ),
             ),
           ],

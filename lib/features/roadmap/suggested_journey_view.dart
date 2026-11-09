@@ -7,9 +7,15 @@ import 'roadmap_widgets.dart';
 
 /// Presentation only: keeps the server's acquisition steps and their order.
 class SuggestedJourneyView extends StatelessWidget {
-  const SuggestedJourneyView({super.key, required this.plan, this.onResolve});
+  const SuggestedJourneyView({
+    super.key,
+    required this.plan,
+    this.onResolve,
+    this.onChangeChoice,
+  });
   final RoadmapPlan plan;
   final ValueChanged<RoadmapPlanStep>? onResolve;
+  final ValueChanged<Map<String, dynamic>>? onChangeChoice;
 
   bool _isGoal(RoadmapPlanStep step) => step.type == 'government_id'
       ? plan.targetIds.contains(step.id)
@@ -36,9 +42,9 @@ class SuggestedJourneyView extends StatelessWidget {
     );
     return [
       if (needs.isNotEmpty)
-        'Complete ${needs.map((item) => item.name).join(', ')} first.',
+        'Suggested after ${needs.map((item) => item.name).join(', ')}.',
       if (neededBy.isNotEmpty)
-        'Needed for ${neededBy.map((item) => item.name).join(', ')}.',
+        'Suggested before ${neededBy.map((item) => item.name).join(', ')}.',
       if (needs.isEmpty && neededBy.isEmpty)
         'No required order. You can work on this anytime.',
     ].join(' ');
@@ -70,9 +76,18 @@ class SuggestedJourneyView extends StatelessWidget {
           goals: goalNames,
           stepCount: actionableSteps.length,
         ),
+        const SizedBox(height: 10),
+        const RoadmapSuggestionNotice(),
         const SizedBox(height: 12),
         if (owned.isNotEmpty) ...[
           _OwnedTargets(names: [for (final step in owned) step.name]),
+          const SizedBox(height: 12),
+        ],
+        if (plan.savedChoices.isNotEmpty) ...[
+          RoadmapSavedChoices(
+            choices: plan.savedChoices,
+            onChange: onChangeChoice,
+          ),
           const SizedBox(height: 12),
         ],
         const SizedBox(height: 6),
@@ -132,11 +147,7 @@ class SuggestedJourneyView extends StatelessWidget {
               recordType: actionableSteps[i].type,
               processingTime: actionableSteps[i].processingTime,
               relationship: _relationship(actionableSteps[i]),
-              goalName:
-                  goals.toLowerCase().contains('passport') &&
-                      plan.targetIds.length == 1
-                  ? 'Passport'
-                  : 'next',
+              planStep: actionableSteps[i],
               isGoal: _isGoal(actionableSteps[i]),
               isLast: i == actionableSteps.length - 1,
               needsAttention: actionableSteps[i].blocked,
@@ -216,7 +227,11 @@ class JourneyResolutionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              step.isManualPreparation ? 'MANUAL PREPARATION' : 'YOUR CHOICE',
+              step.needsConfirmation
+                  ? 'PLEASE CONFIRM'
+                  : step.isManualPreparation
+                  ? 'MANUAL PREPARATION'
+                  : 'YOUR CHOICE',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
@@ -248,8 +263,8 @@ class JourneyResolutionCard extends StatelessWidget {
               ),
             const SizedBox(height: 4),
             Text(
-              step.isManualPreparation
-                  ? 'Requirement needs manual preparation. Prepare this requirement and mark its journey step as completed when ready.'
+              step.isManualPreparation && !step.needsConfirmation
+                  ? 'Prepare this requirement yourself, then mark its step as completed when ready.'
                   : step.message ?? '',
               style: TextStyle(
                 fontSize: 12,
@@ -305,8 +320,6 @@ class RoadmapGoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final passport =
-        title.toLowerCase().contains('passport') && !title.contains(' + ');
     final nameStyle = TextStyle(
       fontSize: 15.5,
       fontWeight: FontWeight.w700,
@@ -349,18 +362,6 @@ class RoadmapGoalCard extends StatelessWidget {
                       )
                   else
                     Text(title, style: nameStyle),
-                  if (passport)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: Text(
-                        'Department of Foreign Affairs',
-                        style: TextStyle(
-                          fontSize: 11,
-                          height: 1.35,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
                   const SizedBox(height: 6),
                   Text(
                     '$stepCount ${stepCount == 1 ? 'step' : 'steps'} to complete',
@@ -413,7 +414,7 @@ class SuggestedJourneyStep extends StatelessWidget {
     required this.isLast,
     this.recordId,
     this.recordType = 'government_id',
-    this.goalName = 'next',
+    this.planStep,
     this.needsAttention = false,
     this.informational = false,
     this.earlierSteps = 0,
@@ -422,7 +423,8 @@ class SuggestedJourneyStep extends StatelessWidget {
   });
   final int number, earlierSteps;
   final int? recordId;
-  final String name, recordType, goalName;
+  final String name, recordType;
+  final RoadmapPlanStep? planStep;
   final String? processingTime, relationship;
   final bool isGoal, isLast, needsAttention, informational;
 
@@ -440,9 +442,9 @@ class SuggestedJourneyStep extends StatelessWidget {
         ? 'Review the issuing institution’s instructions before continuing.'
         : isGoal
         ? (earlierSteps > 0
-              ? 'Continue here once your required documents are ready.'
+              ? 'Suggested after the steps above.'
               : 'Start preparing your application here.')
-        : 'Get this ${recordType == 'document' ? 'document' : 'ID'} first before continuing with your $goalName application.';
+        : 'Suggested to get this ${recordType == 'document' ? 'document' : 'ID'} first.';
     return _JourneyTimelineRow(
       number: number,
       isGoal: isGoal,
@@ -492,6 +494,16 @@ class SuggestedJourneyStep extends StatelessWidget {
                                 style: muted,
                               ),
                             ),
+                          if (planStep?.guidanceIncomplete == true)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                'Details for this item are still incomplete.',
+                                style: muted,
+                              ),
+                            ),
+                          if (planStep != null)
+                            RoadmapRequirementNotes(step: planStep!),
                         ],
                       ),
                     ),

@@ -315,7 +315,7 @@ void main() {
       expect(
         tester
             .widget<ElevatedButton>(
-              find.widgetWithText(ElevatedButton, 'Save & Continue'),
+              find.widgetWithText(ElevatedButton, 'Continue'),
             )
             .onPressed,
         isNull,

@@ -85,10 +85,25 @@ class _ResidentAppShellState extends State<ResidentAppShell>
       _loadError = null;
     });
     try {
-      final saved = (await _auth.getJourneys())
-          .map(IdJourney.fromJson)
-          .toList();
+      final rows = await _auth.getJourneys();
+      final saved = <IdJourney>[];
+      var unreadable = 0;
+      // One unreadable Roadmap must not hide the resident's other Roadmaps.
+      for (final row in rows) {
+        try {
+          saved.add(IdJourney.fromJson(row));
+        } on FormatException {
+          unreadable++;
+        }
+      }
       if (!mounted || generation != _generation) return;
+      if (unreadable > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('A saved Roadmap could not be loaded. Please try again.'),
+          ),
+        );
+      }
       final existing = {
         for (final item in _journeys)
           if (item.id != null) item.id!: item,

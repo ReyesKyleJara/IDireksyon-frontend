@@ -165,6 +165,21 @@ void main() {
     },
   );
 
+  testWidgets('invalid coordinates get no marker or directions', (
+    tester,
+  ) async {
+    mapBuilds = 0;
+    await show(tester, [
+      office(1, 'Placeholder branch', latitude: 0, longitude: 0),
+      office(2, 'Missing branch', latitude: null, longitude: null),
+    ]);
+    expect(mapBuilds, 0);
+    expect(find.text('Placeholder branch'), findsOneWidget);
+    expect(find.text('Missing branch'), findsOneWidget);
+    expect(find.text('Get Directions'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'only valid finite coordinate pairs receive markers and directions',
     (tester) async {
