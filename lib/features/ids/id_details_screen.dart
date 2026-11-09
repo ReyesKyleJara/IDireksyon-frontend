@@ -326,11 +326,11 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                         .colorScheme
                         .onSurfaceVariant,
                     labelStyle: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                     unselectedLabelStyle: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                     labelPadding: const EdgeInsets.symmetric(horizontal: 14),
@@ -355,23 +355,22 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
   );
 
   Widget _overview(GovernmentIdDetails record, Map<String, dynamic>? path) {
-    const accent = AppTheme.accentGold;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CatalogImage(
                 url: record.imageUrl,
-                size: record.imageUrl == null ? 40 : 72,
+                size: record.imageUrl == null ? 44 : 56,
                 fallback: Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .1),
-                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.white.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     record.recordType == 'document'
@@ -382,61 +381,52 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_has(record.issuedBy))
+              const SizedBox(width: 12),
+              if (_has(record.issuedBy))
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Issued by',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.3,
+                          color: Colors.white.withValues(alpha: .75),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
                       Text(
                         record.issuedBy!,
                         style: const TextStyle(
-                          fontSize: 12,
-                          height: 1.4,
+                          fontSize: 14,
+                          height: 1.3,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                       ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (_has(record.description))
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Tooltip(
-                message: record.description!,
-                child: Text(
-                  record.description!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: .8),
+                    ],
                   ),
                 ),
-              ),
-            ),
+            ],
+          ),
           if (!record.isInformational && record.requestPaths.length > 1)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.only(top: 12),
               child: DropdownButtonFormField<int>(
                 initialValue: path?['id'] as int?,
                 isExpanded: true,
                 dropdownColor: Colors.white,
-                style: const TextStyle(fontSize: 12, color: AppTheme.navy),
+                style: const TextStyle(fontSize: 14, color: AppTheme.navy),
                 decoration: InputDecoration(
-                  labelText: 'Application / applicant checklist',
+                  labelText: 'Application type',
                   labelStyle: const TextStyle(color: AppTheme.navy),
-                  floatingLabelStyle: const TextStyle(
-                    color: AppTheme.accentGold,
-                  ),
+                  floatingLabelStyle: const TextStyle(color: AppTheme.navy),
                   isDense: true,
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 items: record.requestPaths
@@ -454,75 +444,44 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                 onChanged: (value) => setState(() => _pathId = value),
               ),
             ),
-          if (_has(record.processingTime) || _has(record.processingTimeNote))
-            Container(
-              key: const ValueKey('detail-processing-summary'),
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withValues(alpha: .12)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.schedule_rounded, size: 17, color: accent),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Processing Time',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: accent,
-                          ),
-                        ),
-                        if (_has(record.processingTime))
-                          Padding(
-                            padding: const EdgeInsets.only(top: 3),
-                            child: Text(
-                              record.processingTime!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                height: 1.35,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        if (_has(record.processingTimeNote))
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              record.processingTimeNote!,
-                              style: TextStyle(
-                                fontSize: 11,
-                                height: 1.35,
-                                color: Colors.white.withValues(alpha: .8),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
   }
 
   List<Widget> _information(GovernmentIdDetails record) {
-    final facts = <String, dynamic>{
-      'Issuing Agency': record.issuedBy,
-      'About / Description': record.description,
+    final general = record.generalDetails;
+    final keyFacts = <Widget>[
+      if (_has(general.processingTime) || _has(general.processingTimeNote))
+        _KeyFact(
+          icon: Icons.schedule_outlined,
+          label: 'Processing Time',
+          value: _has(general.processingTime) ? general.processingTime : null,
+          note: _has(general.processingTimeNote)
+              ? general.processingTimeNote
+              : null,
+        ),
+      if (_has(record.validity))
+        _KeyFact(
+          icon: Icons.event_available_outlined,
+          label: 'Validity',
+          value: record.validity,
+        ),
+      if (_has(record.research['validity_note']))
+        _KeyFact(
+          icon: Icons.history_outlined,
+          label: 'Validity / recency',
+          value: '${record.research['validity_note']}',
+        ),
+    ];
+    final about = <String, dynamic>{
       'Purpose': record.purpose,
-      'Target Group / Qualification': record.targetGroup,
-    };
+      "Who it's for": record.targetGroup,
+    }..removeWhere((_, value) => !_has(value));
+    final sources = _maps(record.research['sources']);
+    final hasOfficialLink =
+        _has(record.officialLink) &&
+        CatalogOfficialLink.isSafe(record.officialLink!);
     return [
       if (record.isInformational)
         _card('Informational Record', [
@@ -530,42 +489,85 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
             'IDireksyon provides reference information for this credential but does not currently provide step-by-step acquisition guidance.',
           ),
         ]),
-      if (_has(record.raw['eligibility']) ||
-          _has(record.validity) ||
-          _has(record.research['validity_note']))
+      if (keyFacts.isNotEmpty)
         _card('Key information', [
-          for (final fact in <String, dynamic>{
-            'Eligibility': record.raw['eligibility'],
-            'Validity': record.validity,
-            'Validity / recency': record.research['validity_note'],
-          }.entries)
-            if (_has(fact.value))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      fact.key,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    SelectableText('${fact.value}'),
-                  ],
-                ),
-              ),
+          for (var index = 0; index < keyFacts.length; index++) ...[
+            if (index > 0) const _SoftDivider(),
+            keyFacts[index],
+          ],
         ]),
-      for (final entry in facts.entries)
-        if (_has(entry.value))
-          _card(entry.key, [SelectableText(_label('${entry.value}'))]),
-      if (_has(record.officialLink))
-        CatalogOfficialLink(url: record.officialLink!),
-      for (final source in _maps(record.research['sources']))
-        _card('${source['title']}', [
-          CatalogOfficialLink(url: '${source['url']}'),
-          Text('Checked: ${source['checked_on'] ?? 'Not recorded'}'),
-          if (_has(source['scope'])) Text('Supports: ${source['scope']}'),
-          if (_has(source['section']))
-            Text('Page / section: ${source['section']}'),
+      if (_has(record.raw['eligibility']))
+        _card('Eligibility', [
+          _EligibilityList(value: '${record.raw['eligibility']}'),
+        ]),
+      if (_has(record.description) || about.isNotEmpty)
+        _card('About', [
+          if (_has(record.description))
+            SelectableText(_label(record.description!)),
+          for (final entry in about.entries) ...[
+            const SizedBox(height: 12),
+            Text(
+              entry.key,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 2),
+            SelectableText(_label('${entry.value}')),
+          ],
+        ]),
+      if (hasOfficialLink || sources.isNotEmpty)
+        _card('Official links', [
+          if (hasOfficialLink)
+            CatalogOfficialLink(
+              url: record.officialLink!,
+              label: 'Visit official website',
+            ),
+          if (sources.isNotEmpty)
+            Builder(
+              builder: (context) {
+                final muted = TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                );
+                return ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  expandedAlignment: Alignment.centerLeft,
+                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                  title: Text(
+                    'Sources used (${sources.length})',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  children: [
+                    for (final source in sources) ...[
+                      Text(
+                        _has(source['title'])
+                            ? '${source['title']}'
+                            : 'Official source',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        'Checked: ${source['checked_on'] ?? 'Not recorded'}',
+                        style: muted,
+                      ),
+                      if (_has(source['scope']))
+                        Text('Supports: ${source['scope']}', style: muted),
+                      if (_has(source['section']))
+                        Text(
+                          'Page / section: ${source['section']}',
+                          style: muted,
+                        ),
+                      CatalogOfficialLink(url: '${source['url']}'),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
+                );
+              },
+            ),
         ]),
     ];
   }
@@ -728,17 +730,21 @@ mixin CatalogDetailContent {
     [
       if (_has(step['short_description'])) Text('${step['short_description']}'),
       for (final block in _maps(step['blocks'])) ...[
+        const SizedBox(height: 10),
         if (_has(block['section_title']))
-          Text(
-            '${block['section_title']}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              '${block['section_title']}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ..._block(block, path),
       ],
     ],
     leading: Container(
-      width: 26,
-      height: 26,
+      width: 28,
+      height: 28,
       decoration: const BoxDecoration(
         color: AppTheme.primaryBlue,
         shape: BoxShape.circle,
@@ -816,7 +822,7 @@ mixin CatalogDetailContent {
     padding: const EdgeInsets.only(top: 6, bottom: 12),
     child: Text(
       title,
-      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
     ),
   );
   String _label(String value) =>
@@ -841,26 +847,26 @@ mixin CatalogDetailContent {
                 : Colors.white,
             surfaceTintColor: Colors.transparent,
             elevation: 0,
-            margin: const EdgeInsets.only(bottom: 10),
+            margin: const EdgeInsets.only(bottom: 12),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(14),
               side: BorderSide(
                 color: colors.outlineVariant.withValues(alpha: .4),
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               child: DefaultTextStyle.merge(
                 style: TextStyle(
-                  fontSize: 13,
-                  height: 1.4,
+                  fontSize: 14,
+                  height: 1.5,
                   color: colors.onSurface,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         if (leading != null) ...[
                           leading,
@@ -870,8 +876,8 @@ mixin CatalogDetailContent {
                           child: Text(
                             title,
                             style: TextStyle(
-                              fontSize: 14,
-                              height: 1.4,
+                              fontSize: 15,
+                              height: 1.35,
                               fontWeight: FontWeight.w700,
                               color: colors.brightness == Brightness.dark
                                   ? colors.primary
@@ -881,7 +887,7 @@ mixin CatalogDetailContent {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     ...children,
                   ],
                 ),
@@ -890,8 +896,10 @@ mixin CatalogDetailContent {
           );
         },
       );
-  Widget _list(List<Widget> children) =>
-      ListView(padding: const EdgeInsets.all(16), children: children);
+  Widget _list(List<Widget> children) => ListView(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+    children: children,
+  );
 }
 
 class SpecialCaseGuideScreen extends StatelessWidget with CatalogDetailContent {
@@ -977,43 +985,227 @@ class SpecialCaseGuideScreen extends StatelessWidget with CatalogDetailContent {
 }
 
 class CatalogOfficialLink extends StatelessWidget {
-  const CatalogOfficialLink({super.key, required this.url, this.label});
+  const CatalogOfficialLink({
+    super.key,
+    required this.url,
+    this.label,
+    this.inline = false,
+  });
   final String url;
   final String? label;
+
+  /// Inline links sit inside a sentence, so they stay plain text buttons.
+  final bool inline;
+
+  static bool isSafe(String url) {
+    final uri = Uri.tryParse(url);
+    return uri != null &&
+        ['https', 'http'].contains(uri.scheme) &&
+        uri.host.isNotEmpty &&
+        uri.userInfo.isEmpty;
+  }
+
+  Future<void> _open(BuildContext context, Uri uri) async {
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open this official link.')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open this official link.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final uri = Uri.tryParse(url);
-    if (uri == null ||
-        !['https', 'http'].contains(uri.scheme) ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty) {
-      return const SizedBox.shrink();
+    if (!isSafe(url)) return const SizedBox.shrink();
+    final uri = Uri.parse(url);
+    if (inline) {
+      return TextButton(
+        onPressed: () => _open(context, uri),
+        child: Text(label ?? url),
+      );
     }
-    return TextButton(
-      onPressed: () async {
-        try {
-          final opened = await launchUrl(
-            uri,
-            mode: LaunchMode.externalApplication,
-          );
-          if (!opened && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Could not open this official link.'),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () => _open(context, uri),
+        iconAlignment: IconAlignment.end,
+        style: TextButton.styleFrom(
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+        label: Text(label ?? uri.host),
+      ),
+    );
+  }
+}
+
+/// One headline fact, such as processing time, with an icon and optional note.
+class _KeyFact extends StatelessWidget {
+  const _KeyFact({
+    required this.icon,
+    required this.label,
+    this.value,
+    this.note,
+  });
+  final IconData icon;
+  final String label;
+  final String? value, note;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: .09),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 20, color: colors.primary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: colors.onSurfaceVariant,
+                ),
               ),
-            );
-          }
-        } catch (_) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Could not open this official link.'),
-              ),
-            );
-          }
-        }
-      },
-      child: Text(label ?? url),
+              if (value != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: SelectableText(
+                    value!,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ),
+              if (note != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: SelectableText(
+                    note!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.45,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SoftDivider extends StatelessWidget {
+  const _SoftDivider();
+
+  @override
+  Widget build(BuildContext context) => Divider(
+    height: 24,
+    thickness: 1,
+    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .4),
+  );
+}
+
+/// Shows saved eligibility text line by line: "Age: 18+" becomes a label and
+/// value, and any other line becomes a bullet. The wording is never changed.
+class _EligibilityList extends StatelessWidget {
+  const _EligibilityList({required this.value});
+  final String value;
+
+  static final _labelled = RegExp(r'^([^:]{2,24}):\s+(.+)$');
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final lines = value
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+    if (lines.length < 2) return SelectableText(value.trim());
+    final stacked = MediaQuery.textScalerOf(context).scale(14) > 20;
+    final labelStyle = TextStyle(
+      fontSize: 13,
+      height: 1.5,
+      fontWeight: FontWeight.w600,
+      color: colors.onSurfaceVariant,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var index = 0; index < lines.length; index++)
+          Padding(
+            padding: EdgeInsets.only(top: index == 0 ? 0 : 8),
+            child: Builder(
+              builder: (context) {
+                final match = _labelled.firstMatch(lines[index]);
+                if (match == null) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, right: 10),
+                        child: Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: colors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: SelectableText(lines[index])),
+                    ],
+                  );
+                }
+                final label = Text(match[1]!, style: labelStyle);
+                final detail = SelectableText(match[2]!);
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [label, detail],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(width: 92, child: label),
+                    const SizedBox(width: 8),
+                    Expanded(child: detail),
+                  ],
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 }
@@ -1035,6 +1227,7 @@ class CatalogRichText extends StatelessWidget {
         return CatalogOfficialLink(
           url: '${(link['attrs'] as Map?)?['href']}',
           label: '${node['text'] ?? ''}',
+          inline: true,
         );
       }
       return Text(

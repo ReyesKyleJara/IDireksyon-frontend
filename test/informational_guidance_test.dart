@@ -68,8 +68,14 @@ void main() {
       ]) {
         expect(find.text(label), findsNothing);
       }
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('detail-brand-header')),
+          matching: find.text('Issuing institution'),
+        ),
+        findsOneWidget,
+      );
       for (final fact in [
-        'Issuing institution',
         'Factual reference description',
         'Licensed professionals',
         'Three years',

@@ -32,7 +32,7 @@ class _FeesTabState extends State<FeesTab> {
       child: OutlinedButton(
         style: OutlinedButton.styleFrom(
           foregroundColor: _blue,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           backgroundColor: chosen
               ? _blue.withValues(alpha: .07)
               : colors.brightness == Brightness.dark
@@ -68,7 +68,7 @@ class _FeesTabState extends State<FeesTab> {
                     Text(
                       option.displayAmount,
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: _blue,
                       ),
@@ -126,49 +126,28 @@ class _FeesTabState extends State<FeesTab> {
       physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
       padding: widget.embedded
           ? EdgeInsets.zero
-          : const EdgeInsets.fromLTRB(18, 12, 18, 24),
+          : const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.payments_outlined, color: _blue, size: 22),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Total Estimated Cost',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: _blue,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'See the applicable fee breakdown below.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.4,
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+        if (!widget.embedded) ...[
+          Text(
+            'Cost breakdown',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: colors.onSurface,
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Cost Overview',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: _blue,
           ),
-        ),
-        const SizedBox(height: 9),
+          const SizedBox(height: 4),
+          Text(
+            'Fees that may apply to this application.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.45,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (record == null) const Text('Fee information is unavailable.'),
         if (record != null && record.fees.isEmpty)
           Text(record.legacyFee ?? 'Fee information has not been added yet.'),
@@ -179,59 +158,93 @@ class _FeesTabState extends State<FeesTab> {
                 final fee = record.fees[feeIndex];
                 final choice = selected[feeIndex];
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
+                  margin: const EdgeInsets.only(bottom: 12),
                   elevation: 0,
                   color: colors.brightness == Brightness.dark
                       ? colors.surfaceContainer
                       : Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     side: BorderSide(
                       color: colors.outlineVariant.withValues(alpha: .5),
                     ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          fee.label,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: _blue,
-                          ),
-                        ),
-                        if (fee.isOptional)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'Optional fee',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colors.onSurfaceVariant,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    fee.label,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      height: 1.35,
+                                      fontWeight: FontWeight.w700,
+                                      color: _blue,
+                                    ),
+                                  ),
+                                  if (fee.isOptional)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        'Optional fee',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
-                          ),
+                            if (fee.type != 'options') ...[
+                              const SizedBox(width: 12),
+                              Flexible(
+                                flex: 2,
+                                child: Text(
+                                  fee.displayAmount,
+                                  textAlign: TextAlign.end,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    height: 1.3,
+                                    fontWeight: FontWeight.w700,
+                                    color: _blue,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                         if (fee.notes != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 5),
                             child: Text(
                               fee.notes!,
                               style: TextStyle(
-                                fontSize: 12,
-                                height: 1.4,
+                                fontSize: 13,
+                                height: 1.45,
                                 color: colors.onSurfaceVariant,
                               ),
                             ),
                           ),
                         if (fee.type == 'options') ...[
                           const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 9),
+                            padding: EdgeInsets.only(top: 12, bottom: 10),
                             child: Text(
                               'Choose one processing option',
-                              style: TextStyle(fontSize: 12),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           LayoutBuilder(
@@ -264,29 +277,18 @@ class _FeesTabState extends State<FeesTab> {
                               );
                             },
                           ),
-                          const SizedBox(height: 9),
+                          const SizedBox(height: 10),
                           Text(
                             choice != null && choice < fee.options.length
                                 ? 'Selected option: ${fee.options[choice].label} — ${fee.options[choice].displayAmount}'
                                 : 'Select one option to see its applicable fee.',
                             style: TextStyle(
-                              fontSize: 12,
-                              height: 1.4,
+                              fontSize: 13,
+                              height: 1.45,
                               color: colors.onSurfaceVariant,
                             ),
                           ),
-                        ] else
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              fee.displayAmount,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: _blue,
-                              ),
-                            ),
-                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -295,16 +297,16 @@ class _FeesTabState extends State<FeesTab> {
             ),
         Container(
           margin: const EdgeInsets.only(top: 2),
-          padding: const EdgeInsets.all(11),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: _blue.withValues(alpha: .045),
-            borderRadius: BorderRadius.circular(10),
+            color: _blue.withValues(alpha: .06),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded, color: _blue, size: 17),
-              const SizedBox(width: 8),
+              Icon(Icons.info_outline_rounded, color: _blue, size: 18),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,7 +314,7 @@ class _FeesTabState extends State<FeesTab> {
                     Text(
                       'Important Notes',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: _blue,
                       ),
@@ -322,7 +324,7 @@ class _FeesTabState extends State<FeesTab> {
                       'Fees may change. Verify current fees with the issuing agency.',
                       style: TextStyle(
                         fontSize: 12,
-                        height: 1.4,
+                        height: 1.45,
                         color: colors.onSurfaceVariant,
                       ),
                     ),

@@ -141,23 +141,18 @@ void main() {
           expect(find.text('Information'), findsNothing);
           final overview = find.byKey(const ValueKey('detail-overview-scroll'));
           expect(tester.getSize(overview).height, lessThanOrEqualTo(850 * .28));
-          await tester.scrollUntilVisible(
-            find.text(record.processingTimeNote!),
-            80,
-            scrollable: find.descendant(
-              of: overview,
-              matching: find.byType(Scrollable),
-            ),
-          );
-          expect(find.text(record.processingTime!), findsOneWidget);
-          expect(find.text(record.processingTimeNote!), findsOneWidget);
           final overviewContent = find
               .descendant(
                 of: find.byType(ListView).first,
                 matching: find.byType(Scrollable),
               )
               .first;
-          for (final value in [record.validity!, record.purpose!]) {
+          for (final value in [
+            record.processingTime!,
+            record.processingTimeNote!,
+            record.validity!,
+            record.purpose!,
+          ]) {
             await tester.scrollUntilVisible(
               find.text(value),
               160,
