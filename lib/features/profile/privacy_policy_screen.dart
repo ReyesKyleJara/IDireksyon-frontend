@@ -45,9 +45,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   lead: 'IDs and documents you own',
                 ),
                 LegalItem(
-                  'your target IDs, journey plan, choices, completed steps, '
-                  'and the requirements you mark as prepared.',
-                  lead: 'Roadmap and journey progress',
+                  'your selected target IDs, saved roadmap progress, '
+                  'completed steps, choices you make, and requirements you '
+                  'mark as prepared.',
+                  lead: 'Roadmap progress',
                 ),
               ]),
               LegalParagraph(
@@ -101,7 +102,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             body: [
               LegalParagraph(
                 'We use this information to run your account, save your '
-                'inventory and journey progress, and show guidance based on '
+                'inventory and roadmap progress, and show guidance based on '
                 'what you enter. We also use your email address to send '
                 'sign-up verification codes and password reset links.',
               ),

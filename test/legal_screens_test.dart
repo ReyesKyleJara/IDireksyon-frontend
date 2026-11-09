@@ -41,6 +41,9 @@ void main() {
       'not an official government app',
       'GeoBytes',
       'birth date',
+      'Roadmap progress',
+      'saved roadmap progress',
+      'inventory and roadmap progress',
       'does not ask for their ID numbers',
       'Office Finder',
       'Your location is not saved',
@@ -57,6 +60,7 @@ void main() {
     ]) {
       expect(shows(text), isTrue, reason: text);
     }
+    expect(shows('journey'), isFalse);
     expect(tester.takeException(), isNull);
   });
 
