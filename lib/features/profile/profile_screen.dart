@@ -179,24 +179,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _loggingOut = true);
 
+    // Clearing the session makes the shell rebuild its tabs, which can dispose
+    // this page before this method finishes. Navigation has to happen anyway,
+    // so it cannot depend on this page's context.
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     String? message;
 
     try {
-      await AuthService.instance.logout();
-    } on AuthException {
-      message =
-          'Logged out on this device. Could not confirm logout with the server.';
+      await AuthService.instance.logoutWithoutWaiting();
+    } on AuthException catch (error) {
+      // Only local cleanup can fail here; the server call is best effort.
+      message = error.message;
     }
 
-    if (!mounted) return;
+    if (!navigator.mounted) return;
 
-    Navigator.of(context).pushNamedAndRemoveUntil(
+    navigator.pushNamedAndRemoveUntil(
       '/login',
       (_) => false,
     );
 
     if (message != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(message),
         ),

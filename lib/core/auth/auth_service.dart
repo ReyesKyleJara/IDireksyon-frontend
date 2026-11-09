@@ -246,6 +246,16 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Signs out of this device without waiting for the network. The server is
+  /// told in the background; if that fails, the resident stays signed out.
+  Future<void> logoutWithoutWaiting() async {
+    final session = token;
+    await _clearSession();
+    if (session != null) {
+      _post('logout', {}, sessionToken: session).ignore();
+    }
+  }
+
   // Deletion failures must leave the resident signed in.
   Future<void> deleteAccount({required String password}) async {
     final session = token;
