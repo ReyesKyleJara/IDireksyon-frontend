@@ -10,6 +10,7 @@ import '../office_finder/models/office_model.dart';
 import 'requirements_tab.dart';
 import 'fees_tab.dart';
 import 'offices_tab.dart';
+import 'catalog_source_card.dart';
 import 'inventory_readiness_card.dart';
 
 /// General catalog details with optional, read-only request-method information.
@@ -515,61 +516,20 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
             SelectableText(_label('${entry.value}')),
           ],
         ]),
-      if (hasOfficialLink || sources.isNotEmpty)
+      if (hasOfficialLink)
         _card('Official links', [
-          if (hasOfficialLink)
-            CatalogOfficialLink(
-              url: record.officialLink!,
-              label: 'Visit official website',
-            ),
-          if (sources.isNotEmpty)
-            Builder(
-              builder: (context) {
-                final muted = TextStyle(
-                  fontSize: 12,
-                  height: 1.4,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                );
-                return ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  shape: const Border(),
-                  collapsedShape: const Border(),
-                  expandedAlignment: Alignment.centerLeft,
-                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                  title: Text(
-                    'Sources used (${sources.length})',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  children: [
-                    for (final source in sources) ...[
-                      Text(
-                        _has(source['title'])
-                            ? '${source['title']}'
-                            : 'Official source',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        'Checked: ${source['checked_on'] ?? 'Not recorded'}',
-                        style: muted,
-                      ),
-                      if (_has(source['scope']))
-                        Text('Supports: ${source['scope']}', style: muted),
-                      if (_has(source['section']))
-                        Text(
-                          'Page / section: ${source['section']}',
-                          style: muted,
-                        ),
-                      CatalogOfficialLink(url: '${source['url']}'),
-                      const SizedBox(height: 8),
-                    ],
-                  ],
-                );
-              },
-            ),
+          CatalogOfficialLink(
+            url: record.officialLink!,
+            label: 'Visit official website',
+          ),
         ]),
+      // Public website references only; never agency confirmation.
+      for (final source in sources)
+        CatalogSourceCard(
+          source: source,
+          recordName: record.name,
+          agencyName: record.issuedBy,
+        ),
     ];
   }
 }
@@ -937,21 +897,15 @@ class SpecialCaseGuideScreen extends StatelessWidget with CatalogDetailContent {
           ]),
         if (_has(guide['notes']))
           _card('Important Notes', [SelectableText('${guide['notes']}')]),
-        if (sources.isNotEmpty)
-          _card('Official Sources', [
-            for (final source in sources) ...[
-              Text(
-                '${source['title']}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              CatalogOfficialLink(url: '${source['url']}'),
-              Text('Checked: ${source['checked_on'] ?? 'Not recorded'}'),
-              if (_has(source['scope'])) Text('${source['scope']}'),
-              if (_has(source['section']))
-                Text('Page / section: ${source['section']}'),
-              const SizedBox(height: 8),
-            ],
-          ]),
+        if (sources.isNotEmpty) ...[
+          _sectionTitle('Public references'),
+          for (final source in sources)
+            CatalogSourceCard(
+              source: source,
+              recordName: '${guide['title']}',
+              agencyName: parent.issuedBy,
+            ),
+        ],
         TextButton.icon(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back),

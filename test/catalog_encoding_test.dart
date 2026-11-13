@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:idireksyon_frontend/models/government_id.dart';
 import 'package:idireksyon_frontend/services/api_service.dart';
+import 'package:idireksyon_frontend/features/ids/catalog_source_card.dart';
 import 'package:idireksyon_frontend/features/ids/id_details_screen.dart';
 
 Map<String, dynamic> encodedDocument({
@@ -117,6 +118,11 @@ Map<String, dynamic> encodedDocument({
   ],
 };
 
+Iterable<Element> outsideSourceCards(Finder finder) => finder.evaluate().where(
+  (element) =>
+      element.findAncestorWidgetOfExactType<CatalogSourceCard>() == null,
+);
+
 void main() {
   for (final transaction in [
     'copy',
@@ -146,7 +152,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text(record.name), findsOneWidget);
+      // The page header shows the name once; source cards repeat it by design.
+      expect(outsideSourceCards(find.text(record.name)), hasLength(1));
       if (record.isInformational) {
         expect(find.text('Informational Record'), findsOneWidget);
         expect(find.text('Guide'), findsNothing);
@@ -280,7 +287,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text(name), findsOneWidget);
+        expect(outsideSourceCards(find.text(name)), hasLength(1));
         if (mode) {
           expect(find.text('Informational Record'), findsOneWidget);
           expect(find.text('Guide'), findsNothing);
@@ -327,8 +334,9 @@ void main() {
       expect(find.text('Guide'), findsNothing);
       expect(find.text('Offices'), findsNothing);
       expect(record.requestPaths.first['guide'], isNotEmpty);
+      // Public references are always visible, not hidden in a collapsed list.
       await tester.scrollUntilVisible(
-        find.text('Sources used (1)'),
+        find.text('Official fixture source'),
         250,
         scrollable: find
             .descendant(
@@ -337,12 +345,11 @@ void main() {
             )
             .first,
       );
-      expect(find.text('Official fixture source'), findsNothing);
-      await tester.ensureVisible(find.text('Sources used (1)'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Sources used (1)'));
-      await tester.pumpAndSettle();
       expect(find.text('Official fixture source'), findsOneWidget);
+      expect(find.byType(CatalogSourceCard), findsOneWidget);
+      expect(find.text('Public reference'), findsOneWidget);
+      expect(find.text('Checked on 29 Oct 2026'), findsOneWidget);
+      expect(find.textContaining('Sources used'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

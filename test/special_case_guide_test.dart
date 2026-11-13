@@ -56,7 +56,7 @@ void main() {
       expect(find.text('Normal copy step'), findsNothing);
       expect(find.text('Fixture case-only evidence'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('Official Sources'),
+        find.text('Public references'),
         500,
         scrollable: find
             .descendant(
@@ -196,7 +196,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('Official Sources'),
+        find.text('Public references'),
         500,
         scrollable: find
             .descendant(
