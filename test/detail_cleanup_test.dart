@@ -105,7 +105,7 @@ void main() {
       tester,
     ) async {
       await showDetail(tester, detail(type));
-      await tester.tap(find.text('Estimated Cost'));
+      await tester.tap(find.text('Cost'));
       await tester.pumpAndSettle();
       expect(find.text('General fee'), findsOneWidget);
       expect(find.text('Method delivery fee'), findsNothing);
@@ -273,7 +273,7 @@ void main() {
     });
     expect(find.byType(TabBar), findsNothing);
     for (final label in [
-      'Estimated Cost',
+      'Cost',
       'Offices',
       'Guide',
       'Ways to Request',

@@ -249,7 +249,7 @@ void main() {
       await tester.tap(find.text('Online retrieval'));
       await tester.pumpAndSettle();
       expect(find.text('Outlet fee'), findsNothing);
-      expect(find.text('Fulfillment: download'), findsOneWidget);
+      expect(find.text('How you receive it: download'), findsOneWidget);
       expect(find.text('Open official request portal'), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();

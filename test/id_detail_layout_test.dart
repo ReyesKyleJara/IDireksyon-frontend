@@ -108,17 +108,20 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
+          // The hero paints a gradient behind a transparent app bar.
           expect(
             tester.widget<AppBar>(find.byType(AppBar)).backgroundColor,
-            AppTheme.navy,
+            Colors.transparent,
           );
           expect(
-            tester
-                .widget<ColoredBox>(
-                  find.byKey(const ValueKey('detail-brand-header')),
-                )
-                .color,
-            AppTheme.navy,
+            (tester
+                        .widget<DecoratedBox>(
+                          find.byKey(const ValueKey('detail-brand-header')),
+                        )
+                        .decoration
+                    as BoxDecoration)
+                .gradient,
+            isNotNull,
           );
           expect(find.text('Validity: No expiration'), findsNothing);
           expect(find.text('Typical use: Identity verification'), findsNothing);
@@ -130,17 +133,33 @@ void main() {
             findsOneWidget,
           );
           final tabs = tester.widget<TabBar>(find.byType(TabBar));
-          expect(tabs.indicator, isNull);
-          expect(tabs.indicatorColor, AppTheme.accentGold);
+          // Pill tabs: the selected section is a filled capsule.
+          expect(
+            (tabs.indicator! as BoxDecoration).borderRadius,
+            BorderRadius.circular(999),
+          );
+          expect(tabs.indicatorSize, TabBarIndicatorSize.tab);
+          // The record name sits in the hero, above the rounded content sheet.
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('detail-brand-header')),
+              matching: find.byKey(const ValueKey('compact-id-title')),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('detail-sheet-edge')),
+            findsOneWidget,
+          );
           expect(tabs.tabs.cast<Tab>().map((t) => t.text), [
             'Overview',
             'Requirements',
-            'Estimated Cost',
+            'Cost',
             'Guide',
           ]);
           expect(find.text('Information'), findsNothing);
           final overview = find.byKey(const ValueKey('detail-overview-scroll'));
-          expect(tester.getSize(overview).height, lessThanOrEqualTo(850 * .28));
+          expect(tester.getSize(overview).height, lessThanOrEqualTo(850 * .46));
           final overviewContent = find
               .descendant(
                 of: find.byType(ListView).first,

@@ -60,7 +60,7 @@ void main() {
       expect(find.byType(FeesTab), findsNothing);
       for (final label in [
         'Requirements',
-        'Estimated Cost',
+        'Cost',
         'Offices',
         'Guide',
         'Preview Guide',
@@ -75,11 +75,15 @@ void main() {
         ),
         findsOneWidget,
       );
-      for (final fact in [
-        'Factual reference description',
-        'Licensed professionals',
-        'Three years',
-      ]) {
+      // The description is the About text in the hero, under the issuer.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('detail-brand-header')),
+          matching: find.text('Factual reference description'),
+        ),
+        findsOneWidget,
+      );
+      for (final fact in ['Licensed professionals', 'Three years']) {
         final content = find.descendant(
           of: find.byType(ListView),
           matching: find.text(fact),
@@ -140,7 +144,7 @@ void main() {
           mode == 'informational_only' ? findsOneWidget : findsNothing,
         );
         if (mode == 'guided') {
-          for (final label in ['Requirements', 'Estimated Cost', 'Overview']) {
+          for (final label in ['Requirements', 'Cost', 'Overview']) {
             expect(find.text(label), findsOneWidget);
           }
         }

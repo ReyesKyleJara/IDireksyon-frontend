@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as google;
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/api_config.dart';
 import '../../models/government_id.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/catalog_image.dart';
@@ -12,6 +14,7 @@ import 'fees_tab.dart';
 import 'offices_tab.dart';
 import 'agency_verification_card.dart';
 import 'catalog_source_card.dart';
+import 'review_dates_note.dart';
 import 'inventory_readiness_card.dart';
 
 /// General catalog details with optional, read-only request-method information.
@@ -20,6 +23,9 @@ class IdDetailsScreen extends StatefulWidget {
   final int? governmentId;
   final Future<GovernmentIdDetails> Function(int)? loadDetail;
   final Widget Function(google.GoogleMap)? officesMapBuilder;
+
+  /// Opens the phone's share sheet; replaceable in tests.
+  final Future<void> Function(String text, String subject)? shareRecord;
   const IdDetailsScreen({
     super.key,
     required this.idName,
@@ -27,6 +33,7 @@ class IdDetailsScreen extends StatefulWidget {
     this.recordType = 'government_id',
     this.loadDetail,
     this.officesMapBuilder,
+    this.shareRecord,
   });
   @override
   State<IdDetailsScreen> createState() => _IdDetailsScreenState();
@@ -49,6 +56,29 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
   void initState() {
     super.initState();
     _detail = _load();
+  }
+
+  /// Shares a link to the record's public web preview. Only public catalog
+  /// information is behind the link; nothing about the resident is sent.
+  Future<void> _share(GovernmentIdDetails record) async {
+    final link = ApiConfig.shareUrl(
+      recordType: record.recordType,
+      id: record.id,
+    );
+    final text =
+        '${record.name}: requirements, fees and steps on IDireksyon\n$link';
+    final share =
+        widget.shareRecord ??
+        (String text, String subject) =>
+            SharePlus.instance.share(ShareParams(text: text, subject: subject));
+    try {
+      await share(text, record.name);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open sharing on this device.')),
+      );
+    }
   }
 
   @override
@@ -138,7 +168,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         if (!hidden.contains('fees') &&
             (general.fees.isNotEmpty || _has(general.legacyFee))) {
           sections.add((
-            'Estimated Cost',
+            'Cost',
             FeesTab(
               key: ValueKey(('general-fees', record.id)),
               record: general,
@@ -275,74 +305,122 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         length: sections.length,
         initialIndex: 0,
         child: Scaffold(
+          // Only the back arrow lives here; the name is in the hero below.
+          // The hero's gradient and texture continue behind the back arrow.
+          extendBodyBehindAppBar: true,
           appBar: AppBar(
-            backgroundColor: AppTheme.navy,
+            backgroundColor: Colors.transparent,
             foregroundColor: Colors.white,
             elevation: 0,
             scrolledUnderElevation: 0,
-            toolbarHeight: MediaQuery.textScalerOf(context).scale(20) > 28
-                ? 88
-                : 60,
-            title: Tooltip(
-              message: record.name,
-              child: Text(
-                record.name,
-                key: const ValueKey('compact-id-title'),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 20,
-                  height: 1.15,
-                  fontWeight: FontWeight.w800,
-                ),
+            toolbarHeight: 48,
+            actions: [
+              IconButton(
+                key: const ValueKey('share-record'),
+                tooltip: 'Share',
+                icon: const Icon(Icons.share_outlined),
+                onPressed: () => _share(record),
               ),
-            ),
+              const SizedBox(width: 4),
+            ],
           ),
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ColoredBox(
+              DecoratedBox(
                 key: const ValueKey('detail-brand-header'),
-                color: AppTheme.navy,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.sizeOf(context).height * .28,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppTheme.royalBlue,
+                      AppTheme.primaryBlue,
+                      AppTheme.navy,
+                    ],
+                    stops: [0, .55, 1],
                   ),
-                  child: SingleChildScrollView(
-                    key: const ValueKey('detail-overview-scroll'),
-                    child: _overview(general, path),
-                  ),
+                ),
+                child: Stack(
+                  children: [
+                    // Soft glows give the hero depth without any image asset.
+                    const Positioned.fill(
+                      child: ClipRect(
+                        child: CustomPaint(painter: _HeroTexture()),
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Room for the status bar and the transparent app bar.
+                        Builder(
+                          builder: (context) => SizedBox(
+                            height: MediaQuery.paddingOf(context).top,
+                          ),
+                        ),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.sizeOf(context).height * .46,
+                          ),
+                          child: SingleChildScrollView(
+                            key: const ValueKey('detail-overview-scroll'),
+                            child: _overview(general, path),
+                          ),
+                        ),
+                        // Rounded top edge of the content sheet over the hero.
+                        Container(
+                          key: const ValueKey('detail-sheet-edge'),
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: sections.length > 1
+                                ? _sheetColor(context)
+                                : Theme.of(context).scaffoldBackgroundColor,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(24),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               if (sections.length > 1)
                 Material(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Theme.of(context).colorScheme.surface
-                      : Colors.white,
-                  child: TabBar(
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    dividerColor: Theme.of(context).colorScheme.outlineVariant
-                        .withValues(alpha: .45),
-                    labelColor: Theme.of(context).colorScheme.primary,
-                    unselectedLabelColor: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant,
-                    labelStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                  color: _sheetColor(context),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: TabBar(
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      dividerColor: Colors.transparent,
+                      // Pill tabs: the selected section is a filled capsule.
+                      indicator: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.primary
+                            : AppTheme.navy,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      splashBorderRadius: BorderRadius.circular(999),
+                      labelColor: Theme.of(context).colorScheme.onPrimary,
+                      unselectedLabelColor: Theme.of(context)
+                          .colorScheme
+                          .onSurface,
+                      labelStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                      tabs: sections
+                          .map((section) => Tab(height: 34, text: section.$1))
+                          .toList(),
                     ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-                    indicatorSize: TabBarIndicatorSize.label,
-                    indicatorColor: AppTheme.accentGold,
-                    indicatorWeight: 3,
-                    tabs: sections
-                        .map((section) => Tab(text: section.$1))
-                        .toList(),
                   ),
                 ),
               Expanded(
@@ -357,62 +435,172 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
     },
   );
 
+  /// The whole About text, for descriptions longer than the hero's 3 lines.
+  void _showAbout(GovernmentIdDetails record) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .7,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'About ${record.name}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    height: 1.3,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SelectableText(
+                  record.description!.trim(),
+                  style: const TextStyle(fontSize: 14, height: 1.55),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _sheetColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? Theme.of(context).colorScheme.surface
+      : Colors.white;
+
+  /// Width and height of the ID picture in the hero. Change this to resize it.
+  static const double _heroImageSize = 120;
+
+  /// How much height the picture takes up in the layout (about the height of
+  /// the name plus "Issued by"). Keeping it fixed stops a bigger picture from
+  /// adding empty space above About.
+  static const double _heroImageSlot = 84;
+
   Widget _overview(GovernmentIdDetails record, Map<String, dynamic>? path) {
+    final quiet = TextStyle(
+      fontSize: 12,
+      height: 1.3,
+      color: Colors.white.withValues(alpha: .75),
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CatalogImage(
-                url: record.imageUrl,
-                size: record.imageUrl == null ? 44 : 56,
-                fallback: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    record.recordType == 'document'
-                        ? Icons.description_outlined
-                        : Icons.badge_outlined,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              if (_has(record.issuedBy))
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Issued by',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.3,
-                          color: Colors.white.withValues(alpha: .75),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Tooltip(
+                      message: record.name,
+                      child: Text(
+                        record.name,
+                        key: const ValueKey('compact-id-title'),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                    ),
+                    if (_has(record.issuedBy)) ...[
+                      const SizedBox(height: 14),
+                      Text('Issued by', style: quiet),
+                      const SizedBox(height: 3),
                       Text(
                         record.issuedBy!,
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           height: 1.3,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                       ),
                     ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+              // The picture is a square with the card drawn in its middle, so
+              // only [_heroImageSlot] of its height takes up room. The rest
+              // (usually transparent) spills over without pushing About down.
+              // To resize the picture, change [_heroImageSize] only.
+              SizedBox(
+                width: record.imageUrl == null ? 70 : _heroImageSize,
+                height: record.imageUrl == null ? 70 : _heroImageSlot,
+                child: OverflowBox(
+                  minHeight: 0,
+                  maxHeight: double.infinity,
+                  child: CatalogImage(
+                    url: record.imageUrl,
+                    size: record.imageUrl == null ? 70 : _heroImageSize,
+                    radius: 12,
+                    fallback: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        record.recordType == 'document'
+                            ? Icons.description_outlined
+                            : Icons.badge_outlined,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
                   ),
                 ),
+              ),
             ],
           ),
+          // About: short and quiet under the agency; tap to read all of it.
+          if (_has(record.description)) ...[
+            const SizedBox(height: 16),
+            Semantics(
+              button: true,
+              label: 'About ${record.name}. Tap to read more.',
+              child: InkWell(
+                key: const ValueKey('hero-about'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _showAbout(record),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('About', style: quiet),
+                    const SizedBox(height: 3),
+                    Text(
+                      record.description!.trim(),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.5,
+                        color: Colors.white.withValues(alpha: .92),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           if (!record.isInformational && record.requestPaths.length > 1)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -493,30 +681,26 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           ),
         ]),
       if (keyFacts.isNotEmpty)
-        _card('Key information', [
+        _card('', [
           for (var index = 0; index < keyFacts.length; index++) ...[
             if (index > 0) const _SoftDivider(),
             keyFacts[index],
           ],
         ]),
       if (_has(record.raw['eligibility']))
-        _card('Eligibility', [
-          _EligibilityList(value: '${record.raw['eligibility']}'),
-        ]),
-      if (_has(record.description) || about.isNotEmpty)
-        _card('About', [
-          if (_has(record.description))
-            SelectableText(_label(record.description!)),
-          for (final entry in about.entries) ...[
-            const SizedBox(height: 12),
-            Text(
-              entry.key,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+        _card(
+          'Eligibility',
+          [_EligibilityList(value: '${record.raw['eligibility']}')],
+          leading: Builder(
+            builder: (context) => Icon(
+              Icons.groups_rounded,
+              size: 22,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.primary
+                  : AppTheme.primaryBlue,
             ),
-            const SizedBox(height: 2),
-            SelectableText(_label('${entry.value}')),
-          ],
-        ]),
+          ),
+        ),
       if (hasOfficialLink)
         _card('Official links', [
           CatalogOfficialLink(
@@ -534,8 +718,66 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       // Direct agency confirmations, kept separate and below public references.
       for (final confirmation in record.agencyConfirmations)
         AgencyVerificationCard(confirmation: confirmation),
+      // The description is in the hero; other background details stay here.
+      if (about.isNotEmpty)
+        _card('More details', small: true, [
+          for (final (index, entry) in about.entries.indexed) ...[
+            if (index > 0) const SizedBox(height: 12),
+            Text(
+              entry.key,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 2),
+            SelectableText(_label('${entry.value}')),
+          ],
+        ]),
+      // When the information last changed, and when the team last checked it.
+      if (record.reviewDates case final dates?) ReviewDatesNote(dates: dates),
     ];
   }
+}
+
+/// Soft glows over the hero gradient: depth without hard shapes or assets.
+class _HeroTexture extends CustomPainter {
+  const _HeroTexture();
+
+  void _glow(
+    Canvas canvas,
+    Size size,
+    Offset center,
+    double radius,
+    Color color,
+  ) {
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = RadialGradient(colors: [color, color.withValues(alpha: 0)])
+            .createShader(rect),
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // A lighter blue glow from the top right, a deeper one from the bottom left.
+    _glow(
+      canvas,
+      size,
+      Offset(size.width * 1.05, -size.height * .1),
+      size.width * .95,
+      const Color(0xFF4F8DF7).withValues(alpha: .42),
+    );
+    _glow(
+      canvas,
+      size,
+      Offset(-size.width * .1, size.height * 1.1),
+      size.width * .8,
+      const Color(0xFF071F45).withValues(alpha: .55),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// Optional reference page. Opening it never selects a method or writes progress.
@@ -592,15 +834,18 @@ class RequestMethodScreen extends StatelessWidget with CatalogDetailContent {
           _card('Estimated Cost', [FeesTab(record: scoped, embedded: true)]),
         if (_has(method['processing']))
           _card('Processing time', [Text('${method['processing']}')]),
-        _card('Request information', [
-          Text(
-            'Appointment: ${_label('${method['appointment'] ?? 'unknown'}')}',
-          ),
-          if ((method['fulfillment'] as List? ?? []).isNotEmpty)
-            Text(
-              'Fulfillment: ${(method['fulfillment'] as List).map((value) => _label('$value')).join(', ')}',
-            ),
-        ]),
+        // Only what is known: "unknown" values are left out, and the card is
+        // hidden when nothing is left.
+        if (_known(method['appointment']) ||
+            (method['fulfillment'] as List? ?? []).isNotEmpty)
+          _card('Request information', [
+            if (_known(method['appointment']))
+              Text('Appointment: ${_label('${method['appointment']}')}'),
+            if ((method['fulfillment'] as List? ?? []).isNotEmpty)
+              Text(
+                'How you receive it: ${(method['fulfillment'] as List).map((value) => _label('$value')).join(', ')}',
+              ),
+          ]),
         if (!hidden.contains('offices'))
           for (final office in _maps(method['offices'])) _office(office),
         if (!hidden.contains('troubleshooting'))
@@ -630,12 +875,14 @@ mixin CatalogDetailContent {
       [
         if (_has(office['address'])) SelectableText('${office['address']}'),
         if (_has(office['service_notes'])) Text('${office['service_notes']}'),
+        // Office services with an unknown status are not shown.
         for (final service
             in (office['services'] is Map
                     ? Map<String, dynamic>.from(office['services'])
                     : <String, dynamic>{})
-                .entries)
-          Text('${_label(service.key)}: ${service.value}'),
+                .entries
+                .where((service) => _known(service.value)))
+          Text('${_label(service.key)}: ${_label('${service.value}')}'),
         for (final line in OfficeModel.weeklyLines(
           OfficeModel.scheduleFrom(office['schedules']),
         ))
@@ -767,8 +1014,21 @@ mixin CatalogDetailContent {
       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
     ),
   );
+
+  /// False for empty values and the CMS placeholders "unknown" / "not specified".
+  bool _known(dynamic value) =>
+      value is String &&
+      value.trim().isNotEmpty &&
+      !const {'unknown', 'not_specified'}.contains(value.trim().toLowerCase());
+
   String _label(String value) =>
       const {
+        'new_application_status': 'New applications',
+        'renewal_status': 'Renewals',
+        'replacement_status': 'Replacements',
+        'pickup': 'Pickup',
+        'delivery': 'Delivery',
+        'email': 'Email',
         'national': 'National',
         'general_public': 'General Public',
         'profession_based': 'Profession-Based',
@@ -779,65 +1039,72 @@ mixin CatalogDetailContent {
         'not_required': 'Not required',
       }[value] ??
       value.replaceAll('_', ' ');
-  Widget _card(String title, List<Widget> children, {Widget? leading}) =>
-      Builder(
-        builder: (context) {
-          final colors = Theme.of(context).colorScheme;
-          return Card(
-            color: colors.brightness == Brightness.dark
-                ? colors.surfaceContainer
-                : Colors.white,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(
-                color: colors.outlineVariant.withValues(alpha: .4),
-              ),
+
+  /// A content card. An empty [title] draws no heading; [small] is the quieter
+  /// style used for secondary text such as About.
+  Widget _card(
+    String title,
+    List<Widget> children, {
+    Widget? leading,
+    bool small = false,
+  }) => Builder(
+    builder: (context) {
+      final colors = Theme.of(context).colorScheme;
+      return Card(
+        color: colors.brightness == Brightness.dark
+            ? colors.surfaceContainer
+            : Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: const EdgeInsets.only(bottom: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: colors.outlineVariant.withValues(alpha: .4)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: DefaultTextStyle.merge(
+            style: TextStyle(
+              fontSize: small ? 13 : 14,
+              height: 1.5,
+              color: small ? colors.onSurfaceVariant : colors.onSurface,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: DefaultTextStyle.merge(
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: colors.onSurface,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (leading != null) ...[
-                          leading,
-                          const SizedBox(width: 10),
-                        ],
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 15,
-                              height: 1.35,
-                              fontWeight: FontWeight.w700,
-                              color: colors.brightness == Brightness.dark
-                                  ? colors.primary
-                                  : AppTheme.primaryBlue,
-                            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title.isNotEmpty) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (leading != null) ...[
+                        leading,
+                        const SizedBox(width: 10),
+                      ],
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: small ? 13 : 16,
+                            height: 1.35,
+                            fontWeight: FontWeight.w700,
+                            color: colors.brightness == Brightness.dark
+                                ? colors.primary
+                                : AppTheme.primaryBlue,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    ...children,
-                  ],
-                ),
-              ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: small ? 6 : 12),
+                ],
+                ...children,
+              ],
             ),
-          );
-        },
+          ),
+        ),
       );
+    },
+  );
   Widget _list(List<Widget> children) => ListView(
     padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
     children: children,

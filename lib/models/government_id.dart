@@ -1,7 +1,9 @@
 import '../core/api_config.dart';
 import 'agency_confirmation.dart';
+import 'review_dates.dart';
 
 export 'agency_confirmation.dart' show AgencyConfirmation;
+export 'review_dates.dart' show ReviewDates;
 
 // Read-only API models. Conditions and qualifications are displayed, not evaluated.
 String? _text(dynamic value) =>
@@ -82,6 +84,9 @@ class GovernmentIdDetails {
   /// Current direct agency confirmations; empty for older or unconfirmed responses.
   List<AgencyConfirmation> get agencyConfirmations =>
       AgencyConfirmation.listFrom(raw['agency_verification']);
+
+  /// Last updated / last reviewed by the IDireksyon team; null for older responses.
+  ReviewDates? get reviewDates => ReviewDates.tryParse(raw['review_dates']);
   GovernmentIdDetails forPath(Map<String, dynamic> path) =>
       GovernmentIdDetails.fromJson({
         ...raw,
