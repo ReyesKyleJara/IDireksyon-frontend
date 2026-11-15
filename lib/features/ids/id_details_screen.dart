@@ -10,6 +10,7 @@ import '../office_finder/models/office_model.dart';
 import 'requirements_tab.dart';
 import 'fees_tab.dart';
 import 'offices_tab.dart';
+import 'agency_verification_card.dart';
 import 'catalog_source_card.dart';
 import 'inventory_readiness_card.dart';
 
@@ -530,6 +531,9 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           recordName: record.name,
           agencyName: record.issuedBy,
         ),
+      // Direct agency confirmations, kept separate and below public references.
+      for (final confirmation in record.agencyConfirmations)
+        AgencyVerificationCard(confirmation: confirmation),
     ];
   }
 }

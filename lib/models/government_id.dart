@@ -1,4 +1,7 @@
 import '../core/api_config.dart';
+import 'agency_confirmation.dart';
+
+export 'agency_confirmation.dart' show AgencyConfirmation;
 
 // Read-only API models. Conditions and qualifications are displayed, not evaluated.
 String? _text(dynamic value) =>
@@ -63,6 +66,7 @@ class GovernmentIdDetails {
       .whereType<Map>()
       .map((row) => Map<String, dynamic>.from(row))
       .toList();
+
   /// The square picture set in the Admin Panel, when there is one.
   String? get imageUrl {
     final path = _text(raw['image_url']);
@@ -74,6 +78,10 @@ class GovernmentIdDetails {
   Map<String, dynamic> get research => raw['research_metadata'] is Map
       ? Map<String, dynamic>.from(raw['research_metadata'])
       : {};
+
+  /// Current direct agency confirmations; empty for older or unconfirmed responses.
+  List<AgencyConfirmation> get agencyConfirmations =>
+      AgencyConfirmation.listFrom(raw['agency_verification']);
   GovernmentIdDetails forPath(Map<String, dynamic> path) =>
       GovernmentIdDetails.fromJson({
         ...raw,
