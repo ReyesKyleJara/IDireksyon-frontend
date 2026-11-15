@@ -943,25 +943,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     Set<int> selected,
   ) {
     // The intro, search and options share one scroll view, so large text
-    // can never squeeze the option list off a small screen.
+    // can never squeeze the option list off a small screen. Only the
+    // question stays pinned, so residents always know what they're answering.
     return CustomScrollView(
       physics:
           const BouncingScrollPhysics(),
       slivers: [
-        SliverPadding(
-          padding:
-              const EdgeInsets.fromLTRB(
-            20,
-            16,
-            20,
-            8,
-          ),
-          sliver: SliverList.list(
-            children: [
-              Text(
+        PinnedHeaderSliver(
+          child: ColoredBox(
+            color: AppTheme.pageBackground,
+            child: Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                12,
+              ),
+              // Capped so a pinned heading can't crowd out the options
+              // on small screens with very large text.
+              child: Text(
                 _documentsStep
                     ? 'Which documents do you currently have?'
                     : 'Which government IDs do you already have?',
+                textScaler: MediaQuery.textScalerOf(context)
+                    .clamp(maxScaleFactor: 1.5),
                 style: const TextStyle(
                   fontFamily:
                       'Bricolage Grotesque',
@@ -972,9 +978,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   color: Colors.black,
                 ),
               ),
+            ),
+          ),
+        ),
 
-              const SizedBox(height: 12),
-
+        SliverPadding(
+          padding:
+              const EdgeInsets.fromLTRB(
+            20,
+            0,
+            20,
+            8,
+          ),
+          sliver: SliverList.list(
+            children: [
               const Text(
                 'Select all that apply. If none, you can skip this step.',
                 style: TextStyle(
