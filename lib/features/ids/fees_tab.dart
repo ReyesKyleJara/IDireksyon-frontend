@@ -3,132 +3,76 @@ import 'package:flutter/material.dart';
 import '../../models/government_id.dart';
 import '../../core/theme/app_theme.dart';
 
-class FeesTab extends StatefulWidget {
+class FeesTab extends StatelessWidget {
   final GovernmentIdDetails? record;
   final bool embedded;
   const FeesTab({super.key, required this.record, this.embedded = false});
 
-  @override
-  State<FeesTab> createState() => _FeesTabState();
-}
-
-class _FeesTabState extends State<FeesTab> {
-  final Map<int, int> selected = {};
-
-  @override
-  void didUpdateWidget(covariant FeesTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.record?.id != widget.record?.id) selected.clear();
-  }
-
-  Color get _blue => Theme.of(context).brightness == Brightness.dark
+  Color _blue(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
       ? const Color(0xFFA8CCFA)
       : AppTheme.primaryBlue;
 
-  Widget optionCard(CatalogFee option, int feeIndex, int index, bool chosen) {
+  Widget optionDetails(BuildContext context, CatalogFee option) {
     final colors = Theme.of(context).colorScheme;
-    return Semantics(
-      selected: chosen,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: _blue,
-          padding: const EdgeInsets.all(14),
-          backgroundColor: chosen
-              ? _blue.withValues(alpha: .07)
-              : colors.brightness == Brightness.dark
-              ? colors.surfaceContainer
-              : Colors.white,
-          side: BorderSide(
-            color: chosen
-                ? _blue.withValues(alpha: .6)
-                : colors.outlineVariant.withValues(alpha: .55),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-        onPressed: () => setState(() => selected[feeIndex] = index),
-        child: SizedBox(
-          width: double.infinity,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Icon(
-                  chosen ? Icons.radio_button_checked : Icons.radio_button_off,
-                  size: 19,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 40,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                option.displayAmount,
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: _blue(context),
                 ),
               ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      option.displayAmount,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _blue,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      option.label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: colors.onSurface,
-                      ),
-                    ),
-                    if (option.description != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          option.description!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.4,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    if (option.notes != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          option.notes!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.4,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                  ],
+            ),
+          ),
+          Text(
+            option.label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: colors.onSurface,
+            ),
+          ),
+          for (final detail in [option.description, option.notes])
+            if (detail != null && detail.trim().isNotEmpty)
+              Text(
+                detail,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final record = widget.record;
+    final record = this.record;
     final colors = Theme.of(context).colorScheme;
     return ListView(
-      shrinkWrap: widget.embedded,
-      primary: widget.embedded ? false : null,
-      physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
-      padding: widget.embedded
+      shrinkWrap: embedded,
+      primary: embedded ? false : null,
+      physics: embedded ? const NeverScrollableScrollPhysics() : null,
+      padding: embedded
           ? EdgeInsets.zero
           : const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        if (!widget.embedded) ...[
+        if (!embedded) ...[
           Text(
             'Cost breakdown',
             style: TextStyle(
@@ -156,7 +100,6 @@ class _FeesTabState extends State<FeesTab> {
             Builder(
               builder: (context) {
                 final fee = record.fees[feeIndex];
-                final choice = selected[feeIndex];
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   elevation: 0,
@@ -189,7 +132,7 @@ class _FeesTabState extends State<FeesTab> {
                                       fontSize: 15,
                                       height: 1.35,
                                       fontWeight: FontWeight.w700,
-                                      color: _blue,
+                                      color: _blue(context),
                                     ),
                                   ),
                                   if (fee.isOptional)
@@ -217,7 +160,7 @@ class _FeesTabState extends State<FeesTab> {
                                     fontSize: 16,
                                     height: 1.3,
                                     fontWeight: FontWeight.w700,
-                                    color: _blue,
+                                    color: _blue(context),
                                   ),
                                 ),
                               ),
@@ -228,7 +171,10 @@ class _FeesTabState extends State<FeesTab> {
                           Padding(
                             padding: const EdgeInsets.only(top: 5),
                             child: Text(
-                              fee.notes!,
+                              fee.notes!.replaceAll(
+                                'Choose one processing option. ',
+                                '',
+                              ),
                               style: TextStyle(
                                 fontSize: 13,
                                 height: 1.45,
@@ -236,59 +182,55 @@ class _FeesTabState extends State<FeesTab> {
                               ),
                             ),
                           ),
-                        if (fee.type == 'options') ...[
-                          const Padding(
-                            padding: EdgeInsets.only(top: 12, bottom: 10),
-                            child: Text(
-                              'Choose one processing option',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
+                        if (fee.type == 'options')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final sideBySide =
+                                    constraints.maxWidth >= 280 &&
+                                    MediaQuery.textScalerOf(context).scale(1) <=
+                                        1.3;
+                                final options = <Widget>[];
+                                for (final option in fee.options) {
+                                  if (options.isNotEmpty) {
+                                    options.add(
+                                      sideBySide
+                                          ? VerticalDivider(
+                                              width: 1,
+                                              color: colors.outlineVariant,
+                                            )
+                                          : Divider(
+                                              color: colors.outlineVariant,
+                                            ),
+                                    );
+                                  }
+                                  final details = optionDetails(
+                                    context,
+                                    option,
+                                  );
+                                  options.add(
+                                    sideBySide
+                                        ? Expanded(child: details)
+                                        : details,
+                                  );
+                                }
+                                return sideBySide
+                                    ? IntrinsicHeight(
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: options,
+                                        ),
+                                      )
+                                    : Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: options,
+                                      );
+                              },
                             ),
                           ),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final wide =
-                                  constraints.maxWidth >= 520 &&
-                                  MediaQuery.textScalerOf(context).scale(1) <=
-                                      1.3;
-                              return Wrap(
-                                spacing: 12,
-                                runSpacing: 12,
-                                children: [
-                                  for (
-                                    var index = 0;
-                                    index < fee.options.length;
-                                    index++
-                                  )
-                                    SizedBox(
-                                      width: wide
-                                          ? (constraints.maxWidth - 12) / 2
-                                          : constraints.maxWidth,
-                                      child: optionCard(
-                                        fee.options[index],
-                                        feeIndex,
-                                        index,
-                                        choice == index,
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            choice != null && choice < fee.options.length
-                                ? 'Selected option: ${fee.options[choice].label} — ${fee.options[choice].displayAmount}'
-                                : 'Select one option to see its applicable fee.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              height: 1.45,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -299,13 +241,13 @@ class _FeesTabState extends State<FeesTab> {
           margin: const EdgeInsets.only(top: 2),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: _blue.withValues(alpha: .06),
+            color: _blue(context).withValues(alpha: .06),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded, color: _blue, size: 18),
+              Icon(Icons.info_outline_rounded, color: _blue(context), size: 18),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -316,7 +258,7 @@ class _FeesTabState extends State<FeesTab> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: _blue,
+                        color: _blue(context),
                       ),
                     ),
                     const SizedBox(height: 3),

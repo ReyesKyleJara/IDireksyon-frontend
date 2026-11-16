@@ -46,9 +46,9 @@ void main() {
     final stored = jsonEncode(source);
     await tester.pumpWidget(card(source));
 
-    expect(find.text('Philippine Passport'), findsOneWidget);
-    expect(find.text('Department of Foreign Affairs'), findsOneWidget);
-    expect(find.text('Public reference'), findsOneWidget);
+    expect(find.text('Philippine Passport'), findsNothing);
+    expect(find.text('Department of Foreign Affairs'), findsNothing);
+    expect(find.text('Sources'), findsOneWidget);
     expect(find.text('DFA – Passport General Information'), findsOneWidget);
     expect(find.text('View DFA webpage'), findsOneWidget);
     expect(find.byIcon(Icons.open_in_new_rounded), findsOneWidget);
@@ -122,7 +122,7 @@ void main() {
       expect(linkButtons, findsNothing, reason: url);
       expect(find.text('View DFA webpage'), findsNothing, reason: url);
       // The rest of the reference stays readable.
-      expect(find.text('Public reference'), findsOneWidget, reason: url);
+      expect(find.text('Sources'), findsOneWidget, reason: url);
     }
   });
 
@@ -158,7 +158,7 @@ void main() {
     expect(find.text('PSA civil registration'), findsOneWidget);
     expect(find.text('View source webpage'), findsOneWidget);
     expect(find.text('Checked date not recorded'), findsOneWidget);
-    expect(find.text('Public reference'), findsOneWidget);
+    expect(find.text('Sources'), findsOneWidget);
   });
 
   testWidgets('uses the IDireksyon light and dark theme colours', (
@@ -166,7 +166,7 @@ void main() {
   ) async {
     await tester.pumpWidget(card(passportSource()));
     expect(
-      tester.widget<Text>(find.text('Public reference')).style?.color,
+      tester.widget<Text>(find.text('Sources')).style?.color,
       AppTheme.primaryBlue,
     );
 
@@ -179,7 +179,7 @@ void main() {
     await tester.pumpWidget(card(passportSource(), theme: dark));
     await tester.pumpAndSettle();
     expect(
-      tester.widget<Text>(find.text('Public reference')).style?.color,
+      tester.widget<Text>(find.text('Sources')).style?.color,
       dark.colorScheme.primary,
     );
     expect(

@@ -115,46 +115,17 @@ class CatalogSourceCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        recordName,
-                        style: TextStyle(
-                          fontSize: 15,
-                          height: 1.35,
-                          fontWeight: FontWeight.w700,
-                          color: colors.onSurface,
-                        ),
-                      ),
-                      if (_filled(agencyName))
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            agencyName!.trim(),
-                            style: TextStyle(fontSize: 13, color: muted),
-                          ),
-                        ),
-                    ],
+                Text(
+                  'Sources',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: accent,
                   ),
                 ),
               ],
             ),
-            Divider(
-              height: 22,
-              color: colors.outlineVariant.withValues(alpha: .5),
-            ),
-            Text(
-              'Public reference',
-              style: TextStyle(
-                fontSize: 12,
-                letterSpacing: .2,
-                fontWeight: FontWeight.w700,
-                color: accent,
-              ),
-            ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
             Text(
               displayTitle(title),
               style: TextStyle(

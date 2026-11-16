@@ -7,9 +7,10 @@ import '../../models/review_dates.dart';
 /// "Reviewed" means the IDireksyon team checked the record against its public
 /// sources. It never says or implies that an agency reviewed or confirmed it.
 class ReviewDatesNote extends StatelessWidget {
-  const ReviewDatesNote({super.key, required this.dates});
+  const ReviewDatesNote({super.key, required this.dates, this.compact = false});
 
   final ReviewDates dates;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +22,20 @@ class ReviewDatesNote extends StatelessWidget {
     );
     final updated = dates.lastUpdated;
     final reviewed = dates.lastReviewed;
+    if (compact) {
+      final showReview =
+          reviewed != null && (updated == null || !reviewed.isBefore(updated));
+      final latest = showReview ? reviewed : updated;
+      if (latest == null) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+        child: Text(
+          '${showReview ? 'Last reviewed by the IDireksyon team' : 'Last updated'}: '
+          '${ReviewDates.label(latest)}',
+          style: style.copyWith(fontSize: 12),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
       child: Row(

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:idireksyon_frontend/features/ids/catalog_source_card.dart';
 import 'package:idireksyon_frontend/features/ids/id_details_screen.dart';
 import 'package:idireksyon_frontend/features/ids/review_dates_note.dart';
 import 'package:idireksyon_frontend/models/government_id.dart';
@@ -63,6 +62,33 @@ void main() {
   });
 
   group('ReviewDatesNote', () {
+    testWidgets('compact note picks the latest available date', (tester) async {
+      for (final reviewedIsLatest in [false, true]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ReviewDatesNote(
+                compact: true,
+                dates: ReviewDates(
+                  lastUpdated: DateTime(2026, 11, reviewedIsLatest ? 5 : 7),
+                  lastReviewed: DateTime(2026, 11, reviewedIsLatest ? 7 : 5),
+                ),
+              ),
+            ),
+          ),
+        );
+        expect(
+          find.text(
+            reviewedIsLatest
+                ? 'Last reviewed by the IDireksyon team: 7 Nov 2026'
+                : 'Last updated: 7 Nov 2026',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('5 Nov 2026'), findsNothing);
+      }
+    });
+
     testWidgets('shows both dates and when the record changed after review', (
       tester,
     ) async {
@@ -115,9 +141,7 @@ void main() {
     });
   });
 
-  testWidgets('appears on the Overview below the public reference card', (
-    tester,
-  ) async {
+  testWidgets('shows only the compact date on the Overview', (tester) async {
     final record = details({
       'review_dates': {
         'last_updated_at': '2026-11-07T00:00:00.000000Z',
@@ -135,14 +159,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byType(ReviewDatesNote),
-      300,
-      scrollable: find.byType(Scrollable).last,
-    );
+    expect(find.byType(ReviewDatesNote), findsOneWidget);
     expect(
-      tester.getTopLeft(find.byType(ReviewDatesNote)).dy,
-      greaterThan(tester.getTopLeft(find.byType(CatalogSourceCard)).dy),
+      tester.widget<ReviewDatesNote>(find.byType(ReviewDatesNote)).compact,
+      isTrue,
     );
+    expect(find.text('Last updated: 7 Nov 2026'), findsOneWidget);
   });
 }

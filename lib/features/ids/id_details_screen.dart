@@ -11,6 +11,7 @@ import '../../services/api_service.dart';
 import '../office_finder/models/office_model.dart';
 import 'requirements_tab.dart';
 import 'fees_tab.dart';
+import 'guide_steps.dart';
 import 'offices_tab.dart';
 import 'agency_verification_card.dart';
 import 'catalog_source_card.dart';
@@ -215,11 +216,14 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       if (guide.isNotEmpty) {
         sections.add((
           'Guide',
-          _list([
-            _sectionTitle('Application Guide'),
-            for (var index = 0; index < guide.length; index++)
-              _guide(guide[index], index, path!),
-          ]),
+          // Numbered accordion steps; linked blocks show this path's real data.
+          GuideSteps(
+            key: ValueKey(('guide', record.id, path?['id'])),
+            steps: guide,
+            path: path!,
+            tabIndex: (label) =>
+                sections.indexWhere((section) => section.$1 == label),
+          ),
         ));
       }
       if (methods.isNotEmpty) {
@@ -425,7 +429,17 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                 ),
               Expanded(
                 child: TabBarView(
-                  children: sections.map((section) => section.$2).toList(),
+                  children: sections.map((section) {
+                    final dates = record.reviewDates;
+                    if (dates == null) return section.$2;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ReviewDatesNote(dates: dates, compact: true),
+                        Expanded(child: section.$2),
+                      ],
+                    );
+                  }).toList(),
                 ),
               ),
             ],
@@ -731,8 +745,6 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
             SelectableText(_label('${entry.value}')),
           ],
         ]),
-      // When the information last changed, and when the team last checked it.
-      if (record.reviewDates case final dates?) ReviewDatesNote(dates: dates),
     ];
   }
 }
@@ -1206,6 +1218,12 @@ class CatalogOfficialLink extends StatelessWidget {
         ['https', 'http'].contains(uri.scheme) &&
         uri.host.isNotEmpty &&
         uri.userInfo.isEmpty;
+  }
+
+  /// Opens a safe official link outside the app; unsafe links are ignored.
+  static Future<void> open(BuildContext context, String url) async {
+    if (!isSafe(url)) return;
+    await const CatalogOfficialLink(url: '')._open(context, Uri.parse(url));
   }
 
   Future<void> _open(BuildContext context, Uri uri) async {

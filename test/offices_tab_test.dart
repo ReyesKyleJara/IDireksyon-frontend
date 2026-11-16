@@ -90,6 +90,10 @@ void main() {
   testWidgets(
     'search appears at four offices and hidden search never filters small lists',
     (tester) async {
+      // Tall screen: offices without a map location have a taller card.
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final offices = [
         for (var i = 1; i <= 4; i++)
           office(i, 'Office $i', latitude: null, longitude: null),
@@ -323,4 +327,57 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'offices without a map location show a notice and a Google Maps search, never directions',
+    (tester) async {
+      Uri? opened;
+      await show(
+        tester,
+        [office(1, 'Fixture Hall', latitude: null, longitude: null)],
+        launch: (uri) async {
+          opened = uri;
+          return true;
+        },
+      );
+      expect(find.byKey(const ValueKey('offices-no-map')), findsOneWidget);
+      // The heading never implies these are the only offices that exist.
+      expect(find.text('Offices near Santa Maria'), findsOneWidget);
+      expect(find.textContaining('1 listed so far'), findsOneWidget);
+      expect(find.text('1 office'), findsNothing);
+      expect(find.text('Map not available yet'), findsOneWidget);
+      expect(find.text('Get Directions'), findsNothing);
+      await tester.tap(find.text('Search on Google Maps'));
+      await tester.pumpAndSettle();
+      expect(opened!.path, '/maps/search/');
+      expect(opened!.queryParameters['query'], contains('Fixture Hall'));
+    },
+  );
+
+  testWidgets('follows dark mode instead of staying light', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+          body: OfficesTab(
+            offices: [office(1, 'Fixture Hall')],
+            recordType: 'government_id',
+            mapBuilder: testMap,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final background = tester.widget<ColoredBox>(
+      find
+          .descendant(
+            of: find.byType(OfficesTab),
+            matching: find.byType(ColoredBox),
+          )
+          .first,
+    );
+    expect(background.color, AppTheme.darkTheme.scaffoldBackgroundColor);
+    expect(background.color, isNot(Colors.white));
+    expect(map.style, isNotNull);
+  });
 }

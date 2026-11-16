@@ -26,6 +26,23 @@ class OfficesTab extends StatefulWidget {
   State<OfficesTab> createState() => _OfficesTabState();
 }
 
+/// Google Maps styling for dark mode (same blues as the app's dark theme).
+const _darkMapStyle = '''
+[
+  {"elementType":"geometry","stylers":[{"color":"#1c2b3d"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#b4bdc9"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#111b28"}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#2c4058"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#22344a"}]},
+  {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#1d3a3a"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#2c4058"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#172536"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3a5578"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#24344a"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0b1624"}]}
+]
+''';
+
 class _OfficesTabState extends State<OfficesTab> {
   final _search = TextEditingController();
   google.GoogleMapController? _map;
@@ -137,20 +154,78 @@ class _OfficesTabState extends State<OfficesTab> {
     }
   }
 
+  /// For offices without a saved map location: a Google Maps search by name
+  /// and address. It is labelled a search, never directions.
+  Future<void> _searchOnMaps(Map<String, dynamic> office) async {
+    final uri = Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': [
+        _text(office['name']),
+        _address(office),
+      ].where((part) => part.isNotEmpty).join(', '),
+    });
+    try {
+      final opened =
+          await (widget.launchDirections?.call(uri) ??
+              launchUrl(uri, mode: LaunchMode.externalApplication));
+      if (opened || !mounted) return;
+    } catch (_) {
+      if (!mounted) return;
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open Google Maps. Please try again.'),
+        ),
+      );
+    }
+  }
+
+  /// Rounded square behind an icon, as on the Overview's key facts.
+  Widget _tile(BuildContext context, IconData icon, {bool strong = false}) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    final accent = dark ? colors.primary : AppTheme.primaryBlue;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: strong
+            ? accent
+            : (dark ? colors.surfaceContainerHigh : const Color(0xFFE9EEF5)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        icon,
+        size: 22,
+        color: strong ? (dark ? AppTheme.navy : Colors.white) : accent,
+      ),
+    );
+  }
+
   Widget _office(int index) {
     final office = widget.offices[index];
     final point = _point(office);
     final hours = _hours(office);
     final selected = _selected == index;
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    final accent = dark ? colors.primary : AppTheme.primaryBlue;
+    final muted = colors.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
         key: ValueKey('linked-office-$index-${office['id']}'),
-        color: selected ? const Color(0xFFEAF2FC) : Colors.white,
+        color: selected
+            ? (dark ? colors.surfaceContainerHigh : const Color(0xFFEAF2FC))
+            : (dark ? colors.surfaceContainer : Colors.white),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: selected ? AppTheme.primaryBlue : const Color(0xFFE0EAF5),
+            color: selected
+                ? accent
+                : colors.outlineVariant.withValues(alpha: .4),
+            width: selected ? 1.5 : 1,
           ),
         ),
         clipBehavior: Clip.antiAlias,
@@ -164,97 +239,134 @@ class _OfficesTabState extends State<OfficesTab> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.location_on_outlined,
-                      color: AppTheme.primaryBlue,
-                      size: 22,
+                    _tile(
+                      context,
+                      selected
+                          ? Icons.location_on_rounded
+                          : Icons.location_on_outlined,
+                      strong: selected,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        _text(office['name']),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.25,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.navy,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _text(office['name']),
+                            style: TextStyle(
+                              fontSize: 16,
+                              height: 1.25,
+                              fontWeight: FontWeight.w700,
+                              color: colors.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _address(office),
+                            style: TextStyle(
+                              color: muted,
+                              fontSize: 13.5,
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    if (selected)
-                      const Icon(
-                        Icons.check_circle,
-                        color: AppTheme.primaryBlue,
-                        size: 18,
-                      ),
+                    if (selected) ...[
+                      const SizedBox(width: 8),
+                      Icon(Icons.check_circle, color: accent, size: 20),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  _address(office),
-                  style: const TextStyle(
-                    color: Color(0xFF42556C),
-                    fontSize: 14,
-                    height: 1.45,
-                  ),
-                ),
                 if (hours.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.schedule_outlined,
-                        size: 16,
-                        color: AppTheme.primaryBlue,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (final line in hours)
-                              Text(
-                                line,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  height: 1.5,
-                                  color: Color(0xFF42556C),
-                                ),
-                              ),
-                          ],
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    decoration: BoxDecoration(
+                      color: dark
+                          ? colors.surfaceContainerHighest.withValues(alpha: .5)
+                          : AppTheme.pageBackground,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.schedule_outlined,
+                            size: 16,
+                            color: accent,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (final line in hours)
+                                Text(
+                                  line,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    height: 1.5,
+                                    color: colors.onSurface,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-                if (point != null) ...[
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: OutlinedButton.icon(
+                const SizedBox(height: 12),
+                if (point != null)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
                       onPressed: () => _directions(point),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.royalBlue,
-                        side: const BorderSide(color: AppTheme.royalBlue),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: dark ? colors.primary : AppTheme.navy,
+                        foregroundColor: dark ? AppTheme.navy : Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        minimumSize: const Size(0, 44),
+                        minimumSize: const Size(0, 46),
                         textStyle: const TextStyle(
-                          fontSize: 13,
+                          fontFamily: 'Google Sans',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      icon: const Icon(Icons.directions_rounded, size: 18),
+                      label: const Text('Get Directions'),
+                    ),
+                  )
+                else
+                  // No saved map location: offer a search, never directions.
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _searchOnMaps(office),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: accent,
+                        side: BorderSide(color: accent.withValues(alpha: .6)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        minimumSize: const Size(0, 46),
+                        textStyle: const TextStyle(
+                          fontFamily: 'Google Sans',
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      icon: const Icon(Icons.directions_outlined, size: 17),
-                      label: const Text('Get Directions'),
+                      icon: const Icon(Icons.search_rounded, size: 18),
+                      label: const Text('Search on Google Maps'),
                     ),
                   ),
-                ],
               ],
             ),
           ),
@@ -280,10 +392,14 @@ class _OfficesTabState extends State<OfficesTab> {
             .contains(query))
           i,
     ];
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
+    final accent = dark ? colors.primary : AppTheme.primaryBlue;
+    final cardColor = dark ? colors.surfaceContainer : Colors.white;
+    final border = colors.outlineVariant.withValues(alpha: .4);
     return ColoredBox(
-      color: Theme.of(context).brightness == Brightness.dark
-          ? Colors.white
-          : AppTheme.pageBackground,
+      // Follows the app theme: dark in dark mode, like the other tabs.
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final mapHeight = (constraints.maxHeight * .48).clamp(160.0, 260.0);
@@ -295,73 +411,107 @@ class _OfficesTabState extends State<OfficesTab> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: AppTheme.pageBackground,
+                    color: cardColor,
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: border),
                   ),
-                  child: Text(
-                    widget.recordType == 'document'
-                        ? 'No offices have been added for this document yet.'
-                        : 'No offices have been added for this ID yet.',
-                    style: const TextStyle(color: AppTheme.navy),
+                  child: Row(
+                    children: [
+                      _tile(context, Icons.location_off_outlined),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.recordType == 'document'
+                              ? 'No offices have been added for this document yet.'
+                              : 'No offices have been added for this ID yet.',
+                          style: TextStyle(color: colors.onSurface),
+                        ),
+                      ),
+                    ],
                   ),
                 )
               else ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Offices near Santa Maria',
+                        style: TextStyle(
+                          fontSize: 18,
+                          height: 1.3,
+                          fontWeight: FontWeight.w700,
+                          color: colors.onSurface,
+                        ),
+                      ),
+                      // The list is what the team has added so far, not every
+                      // branch that exists.
+                      Text(
+                        '${widget.offices.length} listed so far. Other '
+                        'branches may also serve you.'
+                        '${located.isNotEmpty ? ' Tap an office to see it on the map.' : ''}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.45,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 if (showSearch) ...[
                   TextField(
                     controller: _search,
                     onChanged: (_) => setState(() {}),
-                    style: const TextStyle(fontSize: 14, color: AppTheme.navy),
+                    style: TextStyle(fontSize: 14, color: colors.onSurface),
                     decoration: InputDecoration(
                       hintText: 'Search offices',
-                      hintStyle: const TextStyle(color: Color(0xFF6D8098)),
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        color: AppTheme.primaryBlue,
-                        size: 21,
-                      ),
+                      hintStyle: TextStyle(color: colors.onSurfaceVariant),
+                      prefixIcon: Icon(Icons.search, color: accent, size: 21),
                       suffixIcon: query.isEmpty
                           ? null
                           : IconButton(
                               tooltip: 'Clear office search',
-                              icon: const Icon(
-                                Icons.close,
-                                size: 18,
-                                color: AppTheme.primaryBlue,
-                              ),
+                              icon: Icon(Icons.close, size: 18, color: accent),
                               onPressed: () {
                                 _search.clear();
                                 setState(() {});
                               },
                             ),
                       filled: true,
-                      fillColor: AppTheme.pageBackground,
+                      fillColor: cardColor,
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 14,
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFE0EAF5)),
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: border),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: AppTheme.primaryBlue,
-                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: accent),
                       ),
                     ),
                   ),
                   const SizedBox(height: 14),
                 ],
                 if (located.isNotEmpty) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
                     child: SizedBox(
                       height: mapHeight,
                       child: Builder(
                         builder: (_) {
                           final map = google.GoogleMap(
+                            // A dark map in dark mode, so it does not glare.
+                            style: dark ? _darkMapStyle : null,
                             initialCameraPosition: google.CameraPosition(
                               target: located.values.first,
                               zoom: 13,
@@ -417,13 +567,57 @@ class _OfficesTabState extends State<OfficesTab> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                ] else ...[
+                  // No office has a saved map location yet.
+                  Container(
+                    key: const ValueKey('offices-no-map'),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: border),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _tile(context, Icons.map_outlined),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Map not available yet',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: colors.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'These offices do not have a map location yet. '
+                                'You can still search for them on Google Maps.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  height: 1.45,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                 ],
                 if (visible.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
                       'No offices match your search.',
-                      style: TextStyle(color: AppTheme.navy),
+                      style: TextStyle(color: colors.onSurface),
                     ),
                   )
                 else
