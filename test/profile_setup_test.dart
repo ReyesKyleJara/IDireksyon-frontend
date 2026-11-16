@@ -207,6 +207,27 @@ void main() {
     );
   });
 
+  testWidgets('question stays pinned while scrolling the options', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 460);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(app(const ProfileSetupScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+
+    const question = 'Which government IDs do you already have?';
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    // The search box scrolled away, but the question is still on screen.
+    expect(find.text('Search government IDs...').hitTestable(), findsNothing);
+    expect(find.text(question).hitTestable(), findsOneWidget);
+  });
+
   testWidgets('small screens with large text scroll without overflow', (
     tester,
   ) async {
