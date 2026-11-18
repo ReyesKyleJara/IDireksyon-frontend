@@ -96,7 +96,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Requirement met'), findsNothing);
+      expect(find.text('Prepared'), findsNothing);
       expect(find.textContaining('% complete'), findsNothing);
       expect(find.textContaining('% inventory readiness'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -143,7 +143,7 @@ void main() {
         find.text('Could not load Inventory availability. Retry'),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Requirement met'), findsNothing);
+      expect(find.text('Prepared'), findsNothing);
       expect(calls, 2);
     },
   );
@@ -244,9 +244,7 @@ void main() {
       expect(find.text('Adult • First-Time Application'), findsNothing);
       expect(find.text('Adult • Renewal'), findsNothing);
       expect(find.byType(DropdownButtonFormField<int>), findsNothing);
-      final helper = find.text(
-        'Choose the requirements you have prepared for this application.',
-      );
+      final helper = find.text('Tick each item when it’s ready to bring.');
       expect(helper, findsOneWidget);
       expect(
         tester.getTopLeft(helper).dy,
@@ -256,11 +254,10 @@ void main() {
         find.byKey(const ValueKey('readiness-explanation')),
         findsOneWidget,
       );
+      expect(find.text('About this checklist'), findsOneWidget);
       expect(
-        find.text(
-          'Items you own show “You have this” and stay unchecked until you confirm them for this application. Checklist changes do not change Inventory. Conditional and issuing-office checks still apply.',
-        ),
-        findsOneWidget,
+        find.textContaining('Your inventory is saved separately.'),
+        findsNothing,
       );
       expect(
         tester
@@ -341,7 +338,7 @@ void main() {
         ],
       ),
     );
-    expect(find.text('Only if: When the name differs'), findsOneWidget);
+    expect(find.text('When the name differs'), findsOneWidget);
     expect(find.text('Option 1'), findsOneWidget);
     expect(find.text('OR'), findsOneWidget);
     expect(find.text('Option 2'), findsOneWidget);
@@ -577,7 +574,7 @@ void main() {
       expect(find.text('Provide all listed items'), findsOneWidget);
       expect(find.text('Birth Certificate'), findsOneWidget);
       expect(find.text('Application Form'), findsOneWidget);
-      expect(find.byType(ExpansionTile), findsNothing);
+      expect(find.byType(ExpansionTile), findsOneWidget);
       expect(find.text('Choose 2 accepted items'), findsNothing);
     },
   );
@@ -704,16 +701,13 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Not yet complete'), findsOneWidget);
+        expect(find.text('To prepare'), findsOneWidget);
 
         expect(find.text('Accepted ID 1'), findsNothing);
         await tester.tap(find.text('View 3 accepted items'));
         await tester.pumpAndSettle();
         expect(find.text('Accepted ID 1'), findsOneWidget);
-        expect(
-          find.text('You have this'),
-          findsNWidgets(ownedCount),
-        );
+        expect(find.text('In your inventory'), findsNWidgets(ownedCount));
         expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
         expect(find.textContaining('% inventory readiness'), findsNothing);
         expect(find.textContaining('% complete'), findsNothing);
@@ -755,8 +749,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Not yet complete'), findsOneWidget);
-      expect(find.text('Requirement met'), findsNothing);
+      expect(
+        find.text(reason == 'conditional' ? 'If needed' : 'To prepare'),
+        findsOneWidget,
+      );
+      expect(find.text('Prepared'), findsNothing);
       expect(find.byIcon(Icons.help_outline_rounded), findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -783,7 +780,7 @@ void main() {
       );
       expect(find.text('Sign in to save your checklist.'), findsOneWidget);
       expect(find.textContaining('required items ready'), findsNothing);
-      expect(find.text('Requirement met'), findsNothing);
+      expect(find.text('Prepared'), findsNothing);
     },
   );
 }

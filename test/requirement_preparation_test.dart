@@ -246,7 +246,7 @@ void main() {
     'confirmation and Cancel preserve readiness; confirming autosaves and reloads without Inventory writes',
     (tester) async {
       await show(tester);
-      expect(find.text('You have this'), findsNothing);
+      expect(find.text('In your inventory'), findsNothing);
       expect(box(tester, 550).value, isFalse);
       await tapItem(tester, 550);
       expect(find.text('Confirm requirement'), findsOneWidget);
@@ -266,7 +266,7 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(box(tester, 550).value, isFalse);
-      expect(find.text('Not yet complete'), findsOneWidget);
+      expect(find.text('To prepare'), findsOneWidget);
       await tapItem(tester, 550);
       await confirm(tester);
       expect(box(tester, 550).value, isTrue);
@@ -305,7 +305,7 @@ void main() {
       await show(tester);
       expect(box(tester, 550).value, isTrue);
       expect(writes, isEmpty);
-      expect(find.text('You have this'), findsOneWidget);
+      expect(find.text('In your inventory'), findsOneWidget);
       await tapItem(tester, 550);
       expect(find.text('Remove from checklist?'), findsOneWidget);
       expect(
@@ -325,7 +325,7 @@ void main() {
       await tapItem(tester, 550);
       await confirm(tester, remove: true);
       expect(box(tester, 550).value, isFalse);
-      expect(find.text('You have this'), findsOneWidget);
+      expect(find.text('In your inventory'), findsOneWidget);
       expect(owned, [1]);
       expect(stored['government_id:55']![550], isFalse);
       await tester.pumpWidget(const SizedBox());
@@ -349,11 +349,13 @@ void main() {
             .color,
         AppTheme.accentGold,
       );
-      expect(find.text('0 of 1 required groups prepared'), findsNWidgets(2));
+      expect(find.text('0 of 1 required groups prepared'), findsOneWidget);
+      expect(find.text('0 of 1 requirements prepared'), findsOneWidget);
       await tapItem(tester, 551);
       await confirm(tester);
-      expect(find.text('Requirement met'), findsOneWidget);
-      expect(find.text('1 of 1 required groups prepared'), findsNWidgets(2));
+      expect(find.text('Prepared'), findsOneWidget);
+      expect(find.text('1 of 1 required groups prepared'), findsOneWidget);
+      expect(find.text('1 of 1 requirements prepared'), findsOneWidget);
       expect(stored['government_id:55']![551], isTrue);
       expect(find.text('100%'), findsOneWidget);
       expect(
@@ -367,7 +369,7 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await show(tester);
       expect(box(tester, 551).value, isTrue);
-      expect(find.text('Requirement met'), findsOneWidget);
+      expect(find.text('Prepared'), findsOneWidget);
     },
   );
 
@@ -401,7 +403,7 @@ void main() {
       pending!.complete(http.Response('{}', 503));
       await tester.pumpAndSettle();
       expect(box(tester, 551).value, isFalse);
-      expect(find.text('Not yet complete'), findsOneWidget);
+      expect(find.text('To prepare'), findsOneWidget);
       expect(
         find.text(
           'Could not save your checklist. Your previous selection was restored. Please try again.',

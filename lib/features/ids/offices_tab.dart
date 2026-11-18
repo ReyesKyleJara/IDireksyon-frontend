@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../office_finder/models/office_model.dart';
+import 'barangay_offices.dart';
 
 /// Uses only the offices already loaded for this ID/document.
 class OfficesTab extends StatefulWidget {
@@ -15,10 +16,23 @@ class OfficesTab extends StatefulWidget {
     required this.recordType,
     this.mapBuilder,
     this.launchDirections,
+    this.barangayRecord = false,
+    this.residentBarangayId,
+    this.residentBarangayName,
+    this.onSetBarangay,
   });
 
+  /// For Barangay-level records, already narrowed by [BarangayOffices].
   final List<Map<String, dynamic>> offices;
   final String recordType;
+
+  /// A Barangay-level record: offices are matched to the resident's barangay.
+  final bool barangayRecord;
+  final int? residentBarangayId;
+  final String? residentBarangayName;
+
+  /// Opens Account Details, for residents with no saved barangay.
+  final VoidCallback? onSetBarangay;
   final Widget Function(google.GoogleMap)? mapBuilder;
   final Future<bool> Function(Uri)? launchDirections;
 
@@ -260,6 +274,32 @@ class _OfficesTabState extends State<OfficesTab> {
                               color: colors.onSurface,
                             ),
                           ),
+                          if (widget.barangayRecord &&
+                              BarangayOffices.isResidentBarangay(
+                                office,
+                                widget.residentBarangayId,
+                              )) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              key: ValueKey('your-barangay-${office['id']}'),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: .12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'Your Barangay',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: accent,
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 4),
                           Text(
                             _address(office),
@@ -375,6 +415,67 @@ class _OfficesTabState extends State<OfficesTab> {
     );
   }
 
+  String _residentBarangay() {
+    final name = widget.residentBarangayName?.trim() ?? '';
+    return name.isEmpty ? 'your barangay' : 'Barangay $name';
+  }
+
+  /// Shown on Barangay-level records when the resident has no saved barangay.
+  Widget _barangayNotice(BuildContext context, Color cardColor, Color border) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      key: const ValueKey('offices-set-barangay'),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _tile(context, Icons.home_work_outlined),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add your barangay',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'This is handled by each barangay. Save your barangay in '
+                  'Account Details to see the office for you.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                if (widget.onSetBarangay != null)
+                  TextButton(
+                    onPressed: widget.onSetBarangay,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text('Go to Account Details'),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final located = <int, google.LatLng>{
@@ -397,6 +498,8 @@ class _OfficesTabState extends State<OfficesTab> {
     final accent = dark ? colors.primary : AppTheme.primaryBlue;
     final cardColor = dark ? colors.surfaceContainer : Colors.white;
     final border = colors.outlineVariant.withValues(alpha: .4);
+    final needsBarangay =
+        widget.barangayRecord && widget.residentBarangayId == null;
     return ColoredBox(
       // Follows the app theme: dark in dark mode, like the other tabs.
       color: Theme.of(context).scaffoldBackgroundColor,
@@ -407,7 +510,10 @@ class _OfficesTabState extends State<OfficesTab> {
             key: const PageStorageKey('record-offices-scroll'),
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
-              if (widget.offices.isEmpty)
+              if (needsBarangay) _barangayNotice(context, cardColor, border),
+              if (widget.offices.isEmpty && needsBarangay)
+                const SizedBox.shrink()
+              else if (widget.offices.isEmpty)
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -421,7 +527,10 @@ class _OfficesTabState extends State<OfficesTab> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          widget.recordType == 'document'
+                          widget.barangayRecord
+                              ? 'The office for ${_residentBarangay()} has not '
+                                    'been added for this ${widget.recordType == 'document' ? 'document' : 'ID'} yet.'
+                              : widget.recordType == 'document'
                               ? 'No offices have been added for this document yet.'
                               : 'No offices have been added for this ID yet.',
                           style: TextStyle(color: colors.onSurface),
@@ -448,8 +557,8 @@ class _OfficesTabState extends State<OfficesTab> {
                       // The list is what the team has added so far, not every
                       // branch that exists.
                       Text(
-                        '${widget.offices.length} listed so far. Other '
-                        'branches may also serve you.'
+                        '${widget.offices.length} listed so far.'
+                        '${widget.barangayRecord ? '' : ' Other branches may also serve you.'}'
                         '${located.isNotEmpty ? ' Tap an office to see it on the map.' : ''}',
                         style: TextStyle(
                           fontSize: 13,

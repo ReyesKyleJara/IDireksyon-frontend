@@ -282,4 +282,57 @@ void main() {
       expect(find.text(label), findsNothing);
     }
   });
+  testWidgets(
+    'blank rows and inapplicable requirements create no tabs or preparation card',
+    (tester) async {
+      await showDetail(tester, {
+        'id': 88,
+        'name': 'Empty document',
+        'record_type': 'document',
+        'requirements': 'Not applicable',
+        'requirement_sets': [
+          {
+            'id': 1,
+            'groups': [
+              {
+                'ways': [
+                  {'items': []},
+                ],
+              },
+            ],
+          },
+        ],
+        'fees': [
+          {'type': 'options', 'options': []},
+        ],
+        'offices': [{}],
+        'request_paths': [
+          {
+            'id': 1,
+            'is_request_method': false,
+            'guide': [
+              {
+                'blocks': [{}],
+              },
+            ],
+          },
+        ],
+      });
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.text('Application preparation'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('application-preparation-card')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets('a record without a general checklist hides preparation', (
+    tester,
+  ) async {
+    await showDetail(tester, detail('document'));
+    expect(find.text('Application preparation'), findsNothing);
+    expect(find.text('Ways to Request'), findsOneWidget);
+    expect(find.text('Validity'), findsOneWidget);
+  });
 }

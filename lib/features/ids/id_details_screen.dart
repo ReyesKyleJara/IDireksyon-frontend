@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_config.dart';
+import '../../core/auth/auth_service.dart';
 import '../../models/government_id.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/catalog_image.dart';
@@ -13,6 +14,8 @@ import 'requirements_tab.dart';
 import 'fees_tab.dart';
 import 'guide_steps.dart';
 import 'offices_tab.dart';
+import 'barangay_offices.dart';
+import '../profile/account_details_screen.dart';
 import 'agency_verification_card.dart';
 import 'catalog_source_card.dart';
 import 'review_dates_note.dart';
@@ -153,11 +156,26 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                       _has(item['title']) || _has(item['assistance_title']),
                 )
                 .toList();
+      final checklist = selected.requirementSets.firstOrNull;
+      final hasRequirements = checklist == null
+          ? _has(selected.requirements)
+          : checklist.groups.any(
+              (group) => group.ways.any((way) => way.items.isNotEmpty),
+            );
+      final canTrackPreparation =
+          checklist?.groups.any(
+            (group) =>
+                group.conditionType == 'always' &&
+                group.ways.any(
+                  (way) =>
+                      way.requiredCount > 0 &&
+                      way.items.any((item) => item.id != null),
+                ),
+          ) ??
+          false;
       final sections = <(String, Widget)>[];
       if (!record.isInformational) {
-        if (!hidden.contains('requirements') &&
-            (selected.requirementSets.any((set) => set.groups.isNotEmpty) ||
-                selected.requirements != null)) {
+        if (!hidden.contains('requirements') && hasRequirements) {
           sections.add((
             'Requirements',
             RequirementsTab(
@@ -167,24 +185,15 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           ));
         }
         if (!hidden.contains('fees') &&
-            (general.fees.isNotEmpty || _has(general.legacyFee))) {
+            (general.fees.any(
+                  (fee) => fee.type != 'options' || fee.options.isNotEmpty,
+                ) ||
+                (general.fees.isEmpty && _has(general.legacyFee)))) {
           sections.add((
             'Cost',
             FeesTab(
               key: ValueKey(('general-fees', record.id)),
               record: general,
-            ),
-          ));
-        }
-        final offices = record.offices;
-        if (!hidden.contains('offices') && offices.isNotEmpty) {
-          sections.add((
-            'Offices',
-            OfficesTab(
-              key: ValueKey(('offices', record.recordType, record.id)),
-              offices: offices,
-              recordType: record.recordType,
-              mapBuilder: widget.officesMapBuilder,
             ),
           ));
         }
@@ -196,7 +205,12 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                   (step) =>
                       _has(step['title']) ||
                       _has(step['short_description']) ||
-                      _maps(step['blocks']).isNotEmpty,
+                      _maps(step['blocks']).any(
+                        (block) =>
+                            _has(block['section_title']) ||
+                            (block['content'] is Map &&
+                                (block['content'] as Map).isNotEmpty),
+                      ),
                 )
                 .toList();
       final methods = record.requestMethods
@@ -227,26 +241,54 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
         ));
       }
       if (methods.isNotEmpty) {
+        final methodGroups = <String, List<Map<String, dynamic>>>{
+          'Face-to-face': [],
+          'Online requests': [],
+          'Other ways to request': [],
+        };
+        for (final method in methods) {
+          final channel = '${method['channel'] ?? ''}'.trim().toLowerCase();
+          final group = switch (channel) {
+            'outlet' ||
+            'in_person' ||
+            'in-person' ||
+            'in person' ||
+            'physical' => 'Face-to-face',
+            'online' || 'web' || 'website' || 'portal' => 'Online requests',
+            _ => 'Other ways to request',
+          };
+          methodGroups[group]!.add(method);
+        }
         sections.add((
           'Ways to Request',
           _list([
-            _card('Request options', [
-              const Text(
-                'Explore the available ways to request this item. No selection is required.',
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Text(
+                'Tap a card for details. Use the website icon to open its portal.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.45,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
-              for (final method in methods)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('${method['label']}'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          RequestMethodScreen(record: record, method: method),
+            ),
+            for (final group in methodGroups.entries)
+              if (group.value.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 12),
+                  child: Text(
+                    group.key,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),
-            ]),
+                for (final method in group.value)
+                  _RequestMethodCard(record: record, method: method),
+              ],
           ]),
         ));
       }
@@ -288,17 +330,62 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           ]),
         ));
       }
-      sections.insert(0, (
-        'Overview',
-        _list([
-          if (!record.isInformational && !hidden.contains('requirements'))
-            ApplicationPreparationCard(
-              key: ValueKey((record.recordType, record.id, path?['id'])),
-              record: selected,
+      if (!record.isInformational) {
+        final offices = record.offices
+            .where((office) => _has(office['name']))
+            .toList();
+        // Barangay-level records always get the tab, so a resident whose
+        // barangay office is missing sees why instead of no tab at all.
+        final barangayRecord = BarangayOffices.appliesTo(record.level);
+        if (!hidden.contains('offices') &&
+            (offices.isNotEmpty || barangayRecord)) {
+          sections.add((
+            'Offices',
+            // Rebuilds when the resident saves a barangay in Account Details.
+            ListenableBuilder(
+              listenable: AuthService.instance,
+              builder: (context, _) {
+                final user = AuthService.instance.user;
+                final residentBarangayId = BarangayOffices.residentBarangayId(
+                  user,
+                );
+                return OfficesTab(
+                  key: ValueKey(('offices', record.recordType, record.id)),
+                  offices: BarangayOffices.applicable(
+                    offices,
+                    level: record.level,
+                    residentBarangayId: residentBarangayId,
+                  ),
+                  recordType: record.recordType,
+                  mapBuilder: widget.officesMapBuilder,
+                  barangayRecord: barangayRecord,
+                  residentBarangayId: residentBarangayId,
+                  residentBarangayName: user?['barangay_name'] as String?,
+                  onSetBarangay: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AccountDetailsScreen(),
+                    ),
+                  ),
+                );
+              },
             ),
-          ..._information(record),
-        ]),
-      ));
+          ));
+        }
+      }
+      final overview = <Widget>[
+        if (!record.isInformational &&
+            !hidden.contains('requirements') &&
+            canTrackPreparation)
+          ApplicationPreparationCard(
+            key: ValueKey((record.recordType, record.id, path?['id'])),
+            record: selected,
+          ),
+        ..._information(record),
+      ];
+      if (overview.isNotEmpty || sections.isEmpty) {
+        sections.insert(0, ('Overview', _list(overview)));
+      }
+      final showTabs = sections.length > 1 || sections.single.$1 != 'Overview';
       return DefaultTabController(
         key: ValueKey((
           record.recordType,
@@ -376,7 +463,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                           key: const ValueKey('detail-sheet-edge'),
                           height: 20,
                           decoration: BoxDecoration(
-                            color: sections.length > 1
+                            color: showTabs
                                 ? _sheetColor(context)
                                 : Theme.of(context).scaffoldBackgroundColor,
                             borderRadius: const BorderRadius.vertical(
@@ -389,7 +476,7 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
                   ],
                 ),
               ),
-              if (sections.length > 1)
+              if (showTabs)
                 Material(
                   color: _sheetColor(context),
                   child: Padding(
@@ -792,30 +879,205 @@ class _HeroTexture extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Optional reference page. Opening it never selects a method or writes progress.
-class RequestMethodScreen extends StatelessWidget with CatalogDetailContent {
+/// A request method opens inline while its portal link opens the saved website.
+class _RequestMethodCard extends StatelessWidget with CatalogDetailContent {
+  _RequestMethodCard({required this.record, required this.method});
+
+  final GovernmentIdDetails record;
+  final Map<String, dynamic> method;
+
+  final PageStorageBucket _detailsStorage = PageStorageBucket();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final label = '${method['label']}';
+    final channel = '${method['channel'] ?? ''}'.trim().toLowerCase();
+    final summary = _has(method['applicability'])
+        ? '${method['applicability']}'
+        : switch (channel) {
+            'outlet' ||
+            'in_person' ||
+            'in-person' ||
+            'in person' ||
+            'physical' =>
+              'Submit your request in person at this service location.',
+            'online' ||
+            'web' ||
+            'website' ||
+            'portal' => 'Submit your request online through this website.',
+            _ => 'View the requirements and steps for this request method.',
+          };
+    final portal = '${method['portal_url'] ?? ''}';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: colors.brightness == Brightness.dark ? 0 : 1,
+      shadowColor: Colors.black.withValues(alpha: .08),
+      color: colors.brightness == Brightness.dark
+          ? colors.surfaceContainer
+          : Colors.white,
+      surfaceTintColor: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: colors.primary.withValues(alpha: .28)),
+      ),
+      child: ExpansionTile(
+        key: PageStorageKey((
+          'request-method',
+          record.recordType,
+          record.id,
+          method['id'],
+          label,
+        )),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        iconColor: colors.primary,
+        collapsedIconColor: colors.onSurfaceVariant,
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurface,
+                ),
+              ),
+            ),
+            if (CatalogOfficialLink.isSafe(portal))
+              IconButton(
+                tooltip: 'Open $label website',
+                onPressed: () => CatalogOfficialLink.open(context, portal),
+                icon: Icon(
+                  Icons.open_in_new_rounded,
+                  size: 20,
+                  color: colors.primary,
+                ),
+              ),
+          ],
+        ),
+        subtitle: Text(
+          summary,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        children: [
+          Divider(color: colors.outlineVariant.withValues(alpha: .5)),
+          PageStorage(
+            bucket: _detailsStorage,
+            child: _RequestMethodDetails(record: record, method: method),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Optional reference page for other entry points to a request method.
+class RequestMethodScreen extends StatelessWidget {
   const RequestMethodScreen({
     super.key,
     required this.record,
     required this.method,
   });
+
   final GovernmentIdDetails record;
   final Map<String, dynamic> method;
 
   @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text('${method['label']}')),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      child: _RequestMethodDetails(record: record, method: method),
+    ),
+  );
+}
+
+class _RequestMethodDetails extends StatelessWidget with CatalogDetailContent {
+  const _RequestMethodDetails({required this.record, required this.method});
+
+  final GovernmentIdDetails record;
+  final Map<String, dynamic> method;
+
+  @override
+  Widget _card(
+    String title,
+    List<Widget> children, {
+    Widget? leading,
+    bool small = false,
+  }) => Builder(
+    builder: (context) => Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).colorScheme.surfaceContainerHigh
+            : AppTheme.pageBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant
+              .withValues(alpha: .45),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (leading != null) ...[leading, const SizedBox(width: 8)],
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...children,
+        ],
+      ),
+    ),
+  );
+
+  bool _hasContent(dynamic value) {
+    if (value is String) return _has(value);
+    if (value is Map) {
+      return _has(value['text']) || _hasContent(value['content']);
+    }
+    if (value is List) return value.any(_hasContent);
+    return false;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final method = {
+      ...this.method,
+      'offices': _applicableOffices(record, this.method['offices']),
+    };
     final hidden = List<String>.from(
       record.research['hidden_sections'] as List? ?? [],
     );
     final scoped = record.forPath(method);
     final guide = _maps(method['guide']);
-    return Scaffold(
-      appBar: AppBar(title: Text('${method['label']}')),
-      body: _list([
-        const Text(
-          'Information only. You do not need to select or save a request method.',
-        ),
-        const SizedBox(height: 12),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         if (_has(method['provider']))
           _card('Provider', [Text('${method['provider']}')]),
         if (_has(method['applicability']))
@@ -826,11 +1088,11 @@ class RequestMethodScreen extends StatelessWidget with CatalogDetailContent {
             label: 'Open official request portal',
           ),
         if (!hidden.contains('guide')) ...[
-          if (_has(method['preparation']))
+          if (_hasContent(method['preparation']))
             _card('Before you request', [
               CatalogRichText(value: method['preparation']),
             ]),
-          if (_has(method['application_guide_text']))
+          if (_hasContent(method['application_guide_text']))
             _card('Instructions', [
               CatalogRichText(value: method['application_guide_text']),
             ]),
@@ -848,9 +1110,12 @@ class RequestMethodScreen extends StatelessWidget with CatalogDetailContent {
           _card('Processing time', [Text('${method['processing']}')]),
         // Only what is known: "unknown" values are left out, and the card is
         // hidden when nothing is left.
-        if (_known(method['appointment']) ||
+        if (_known(method['channel']) ||
+            _known(method['appointment']) ||
             (method['fulfillment'] as List? ?? []).isNotEmpty)
           _card('Request information', [
+            if (_known(method['channel']))
+              Text('Request via: ${_label('${method['channel']}')}'),
             if (_known(method['appointment']))
               Text('Appointment: ${_label('${method['appointment']}')}'),
             if ((method['fulfillment'] as List? ?? []).isNotEmpty)
@@ -866,17 +1131,26 @@ class RequestMethodScreen extends StatelessWidget with CatalogDetailContent {
               Text('${note['body']}'),
               if (_has(note['url'])) CatalogOfficialLink(url: '${note['url']}'),
             ]),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Back to ${record.name}'),
-        ),
-      ]),
+      ],
     );
   }
 }
 
 /// Shared CMS content rendering for normal channels and voluntary assistance.
 mixin CatalogDetailContent {
+  /// On Barangay-level records, only the resident's own barangay office and
+  /// shared offices (see [BarangayOffices]); other records are unchanged.
+  List<Map<String, dynamic>> _applicableOffices(
+    GovernmentIdDetails record,
+    dynamic offices,
+  ) => BarangayOffices.applicable(
+    _maps(offices),
+    level: record.level,
+    residentBarangayId: BarangayOffices.residentBarangayId(
+      AuthService.instance.user,
+    ),
+  );
+
   Widget _office(Map<String, dynamic> office) {
     final location = OfficeModel.usableLocation(
       office['latitude'],
@@ -1035,6 +1309,10 @@ mixin CatalogDetailContent {
 
   String _label(String value) =>
       const {
+        'outlet': 'Face-to-face',
+        'online': 'Online',
+        'partner': 'Service partner',
+        'hybrid': 'Online and in person',
         'new_application_status': 'New applications',
         'renewal_status': 'Renewals',
         'replacement_status': 'Replacements',
@@ -1135,9 +1413,9 @@ class SpecialCaseGuideScreen extends StatelessWidget with CatalogDetailContent {
   Widget build(BuildContext context) {
     final scoped = parent.forPath(guide);
     final steps = _maps(guide['steps']);
-    final offices = _maps(guide['offices']);
+    final offices = _applicableOffices(parent, guide['offices']);
     final sources = _maps(guide['sources']);
-    final reference = {...guide, 'label': guide['title']};
+    final reference = {...guide, 'label': guide['title'], 'offices': offices};
     return Scaffold(
       appBar: AppBar(title: Text('${guide['title']}')),
       body: _list([

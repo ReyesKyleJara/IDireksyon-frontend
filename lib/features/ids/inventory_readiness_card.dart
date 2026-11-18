@@ -60,7 +60,21 @@ class _ApplicationPreparationCardState
       _preparation = null;
       _loading = _token != null;
     });
-    if (_token == null) return;
+    final trackable =
+        record.requirementSets.firstOrNull?.groups.any(
+          (group) =>
+              group.conditionType == 'always' &&
+              group.ways.any(
+                (way) =>
+                    way.requiredCount > 0 &&
+                    way.items.any((item) => item.id != null),
+              ),
+        ) ??
+        false;
+    if (_token == null || !trackable) {
+      setState(() => _loading = false);
+      return;
+    }
     try {
       final data = await _auth.getRequirementPreparation(
         record.recordType,
@@ -90,6 +104,18 @@ class _ApplicationPreparationCardState
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final set = widget.record.requirementSets.firstOrNull;
+    final trackable =
+        set?.groups.any(
+          (group) =>
+              group.conditionType == 'always' &&
+              group.ways.any(
+                (way) =>
+                    way.requiredCount > 0 &&
+                    way.items.any((item) => item.id != null),
+              ),
+        ) ??
+        false;
+    if (!trackable) return const SizedBox.shrink();
     final preparation = _preparation;
     final summary = preparation == null || set == null
         ? null

@@ -244,14 +244,18 @@ void main() {
       expect(find.text('Saved formatted instruction'), findsOneWidget);
       await tester.ensureVisible(find.text('Outlet fee'));
       expect(find.text('Outlet fee'), findsOneWidget);
-      await tester.pageBack();
+      // Methods expand inline; tapping the title again collapses it.
+      await tester.ensureVisible(find.text('Outlet copy'));
+      await tester.tap(find.text('Outlet copy'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Online retrieval'));
       await tester.tap(find.text('Online retrieval'));
       await tester.pumpAndSettle();
       expect(find.text('Outlet fee'), findsNothing);
       expect(find.text('How you receive it: download'), findsOneWidget);
       expect(find.text('Open official request portal'), findsOneWidget);
-      await tester.pageBack();
+      await tester.ensureVisible(find.text('Online retrieval'));
+      await tester.tap(find.text('Online retrieval'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Offices'));
       await tester.tap(find.text('Offices'));
@@ -347,7 +351,7 @@ void main() {
       );
       expect(find.text('Official fixture source'), findsOneWidget);
       expect(find.byType(CatalogSourceCard), findsOneWidget);
-      expect(find.text('Public reference'), findsOneWidget);
+      expect(find.text('Sources'), findsOneWidget);
       expect(find.text('Checked on 29 Oct 2026'), findsOneWidget);
       expect(find.textContaining('Sources used'), findsNothing);
       expect(tester.takeException(), isNull);

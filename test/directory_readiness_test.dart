@@ -215,8 +215,8 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(requests, hasLength(4));
-      // Overview preparation no longer fetches Inventory; Directory keeps its cached score.
-      expect(inventoryCalls, 1);
+      // Requirements opens directly when Overview is empty and loads its inventory indicators.
+      expect(inventoryCalls, 2);
       expect(tester.takeException(), isNull);
     },
   );

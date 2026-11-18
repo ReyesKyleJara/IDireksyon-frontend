@@ -144,9 +144,12 @@ void main() {
           mode == 'informational_only' ? findsOneWidget : findsNothing,
         );
         if (mode == 'guided') {
-          for (final label in ['Requirements', 'Cost', 'Overview']) {
+          for (final label in ['Cost', 'Overview']) {
             expect(find.text(label), findsOneWidget);
           }
+          // The fixture's saved checklist has no groups, so there is no
+          // Requirements tab (the legacy text shows only without a checklist).
+          expect(find.text('Requirements'), findsNothing);
         }
       }
     },

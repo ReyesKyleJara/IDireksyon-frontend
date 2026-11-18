@@ -38,9 +38,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('In Person'));
       await tester.pumpAndSettle();
-      expect(find.byType(RequestMethodScreen), findsOneWidget);
+      expect(find.byType(RequestMethodScreen), findsNothing);
       expect(find.text('Normal copy step'), findsOneWidget);
-      await tester.pageBack();
+      await tester.ensureVisible(find.text('In Person'));
+      await tester.tap(find.text('In Person'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Special Cases'));
       await tester.tap(find.text('Special Cases'));
@@ -91,11 +92,10 @@ void main() {
       expect(find.byType(SpecialCaseGuideScreen), findsNothing);
       await tester.tap(find.text('Ways to Request'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Online'));
       await tester.tap(find.text('Online'));
       await tester.pumpAndSettle();
       expect(find.text('Normal copy step'), findsNothing);
-      await tester.pageBack();
-      await tester.pumpAndSettle();
       await tester.tap(find.text('Special Cases'));
       await tester.pumpAndSettle();
       expect(find.text('Learn about delayed registration'), findsOneWidget);

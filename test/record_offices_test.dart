@@ -106,9 +106,7 @@ void main() {
         await tester.ensureVisible(find.text('Online'));
         await tester.tap(find.text('Online'));
         await tester.pumpAndSettle();
-        expect(find.byType(RequestMethodScreen), findsOneWidget);
-        await tester.pageBack();
-        await tester.pumpAndSettle();
+        expect(find.byType(RequestMethodScreen), findsNothing);
         await tester.tap(find.text('Offices'));
         await tester.pumpAndSettle();
         expect(find.text('$name main office'), findsOneWidget);

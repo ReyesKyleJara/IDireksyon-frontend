@@ -304,6 +304,15 @@ class _RequirementsTabState extends State<RequirementsTab> {
     }
     final selected = sets.first;
     final preparation = _preparation;
+    final summary = preparation == null
+        ? null
+        : preparationSummary(selected, preparation);
+    final required = selected.groups.where(
+      (group) => group.conditionType == 'always',
+    );
+    final conditional = selected.groups.where(
+      (group) => group.conditionType != 'always',
+    );
     final canSave =
         preparation != null &&
         !_saving &&
@@ -313,12 +322,17 @@ class _RequirementsTabState extends State<RequirementsTab> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
         Text(
-          'Choose the requirements you have prepared for this application.',
+          'Your checklist',
           style: TextStyle(
-            fontSize: 13,
-            height: 1.45,
-            color: colors.onSurfaceVariant,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: colors.onSurface,
           ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Tick each item when it’s ready to bring.',
+          style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
         ),
         if (_loading)
           const Padding(
@@ -346,18 +360,31 @@ class _RequirementsTabState extends State<RequirementsTab> {
               style: TextStyle(fontSize: 12),
             ),
           ),
-        if (preparation != null && selected.groups.isNotEmpty)
+        if (summary != null && summary.total > 0)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              _saving
-                  ? 'Saving…'
-                  : '${preparationSummary(selected, preparation).complete} of ${preparationSummary(selected, preparation).total} required groups prepared',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: _accent(context),
-              ),
+            padding: const EdgeInsets.only(top: 14, bottom: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _saving
+                      ? 'Saving…'
+                      : '${summary.complete} of ${summary.total} requirements prepared',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _accent(context),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: summary.complete / summary.total,
+                  minHeight: 5,
+                  borderRadius: BorderRadius.circular(8),
+                  color: _accent(context),
+                  backgroundColor: colors.outlineVariant.withValues(alpha: .35),
+                ),
+              ],
             ),
           ),
         if (selected.groups.isEmpty)
@@ -367,7 +394,7 @@ class _RequirementsTabState extends State<RequirementsTab> {
               'Requirements for this application are not available yet.',
             ),
           ),
-        for (final group in selected.groups)
+        for (final group in required)
           _RequirementSection(
             key: ValueKey((selected.id, group.id)),
             group: group,
@@ -375,35 +402,53 @@ class _RequirementsTabState extends State<RequirementsTab> {
             inventory: _inventory,
             onToggle: canSave ? _toggle : null,
           ),
-        Container(
-          key: const ValueKey('readiness-explanation'),
-          margin: const EdgeInsets.only(top: 16),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _accent(context).withValues(alpha: .06),
-            borderRadius: BorderRadius.circular(12),
+        if (conditional.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text(
+            'If applicable',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: colors.onSurface,
+            ),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                size: 18,
-                color: _accent(context),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Items you own show “You have this” and stay unchecked until you confirm them for this application. Checklist changes do not change Inventory. Conditional and issuing-office checks still apply.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.45,
-                    color: colors.onSurfaceVariant,
-                  ),
+          const SizedBox(height: 4),
+          Text(
+            'Check whether these apply to you.',
+            style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+          ),
+          for (final group in conditional)
+            _RequirementSection(
+              key: ValueKey((selected.id, group.id)),
+              group: group,
+              preparation: preparation,
+              inventory: _inventory,
+              onToggle: canSave ? _toggle : null,
+            ),
+        ],
+        const SizedBox(height: 12),
+        ExpansionTile(
+          key: const ValueKey('readiness-explanation'),
+          tilePadding: EdgeInsets.zero,
+          shape: const Border(),
+          collapsedShape: const Border(),
+          title: Text(
+            'About this checklist',
+            style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                '“In your inventory” means you already own the item. Tick it when it’s prepared for this application. Your inventory is saved separately. The issuing office checks your documents.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.45,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
@@ -440,10 +485,12 @@ class _RequirementSection extends StatelessWidget {
     final met = preparation != null && progress == 1;
     final count = best == null ? 0 : (progress * best.requiredCount).round();
     final status = met
-        ? 'Requirement met'
+        ? 'Prepared'
         : count > 0
         ? '$count of ${best!.requiredCount} prepared'
-        : 'Not yet complete';
+        : group.conditionType != 'always'
+        ? 'If needed'
+        : 'To prepare';
     final statusColor = met
         ? (colors.brightness == Brightness.dark
               ? const Color(0xFF81C784)
@@ -476,7 +523,7 @@ class _RequirementSection extends StatelessWidget {
                 color: _accent(context),
               ),
             ),
-          if (checklist)
+          if (checklist && (!single || met))
             Padding(
               padding: EdgeInsets.only(top: single ? 0 : 4, bottom: 6),
               child: Row(
@@ -506,8 +553,8 @@ class _RequirementSection extends StatelessWidget {
           if (group.conditionType != 'always')
             Text(
               group.condition == null
-                  ? 'Check when this condition applies.'
-                  : 'Only if: ${group.condition}',
+                  ? 'Ask the issuing office whether this applies to you.'
+                  : group.condition!,
               style: TextStyle(
                 fontSize: 13,
                 height: 1.45,
@@ -516,7 +563,7 @@ class _RequirementSection extends StatelessWidget {
             ),
           if (group.ways.length > 1)
             Text(
-              'Meet one of these alternatives, not all of them.',
+              'Complete any one option.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.45,
@@ -589,6 +636,13 @@ class _WayView extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final choice = way.items.length > 1 && way.requiredCount < way.items.length;
+    final preparedNames = [
+      for (final item in way.items)
+        if (preparation?.owns(item) == true) item.name,
+    ];
+    final availableCount = way.items
+        .where((item) => inventory?.owns(item) == true)
+        .length;
     final items = [
       for (final item in way.items)
         _ItemView(
@@ -647,6 +701,23 @@ class _WayView extends StatelessWidget {
                 color: _accent(context),
               ),
             ),
+            subtitle: preparedNames.isNotEmpty
+                ? Text(
+                    'Prepared: ${preparedNames.join(', ')}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  )
+                : availableCount > 0
+                ? Text(
+                    '$availableCount in your inventory',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  )
+                : null,
             children: items,
           )
         else
@@ -721,18 +792,36 @@ class _ItemView extends StatelessWidget {
                   ),
                 ),
                 if (owned)
-                  const Text(
-                    'You have this',
+                  Text(
+                    'In your inventory',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF2E7D32),
+                      color: colors.brightness == Brightness.dark
+                          ? const Color(0xFF81C784)
+                          : AppTheme.completedGreen,
                       height: 1.3,
                     ),
                   ),
                 if (item.quantity != null)
                   Text('Quantity: ${item.quantity}', style: style),
                 if (item.submission != null)
-                  Text(item.submission!, style: style),
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerHighest.withValues(
+                        alpha: .5,
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      item.submission!,
+                      style: style.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 if (item.instructions != null)
                   Text(item.instructions!, style: style),
                 if (linked)
