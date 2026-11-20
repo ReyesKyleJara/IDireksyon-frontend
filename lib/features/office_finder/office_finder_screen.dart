@@ -9,6 +9,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart' as google;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/auth/auth_service.dart';
+import '../ids/barangay_offices.dart';
 import 'map_services.dart';
 import 'models/office_model.dart';
 import 'office_map_pins.dart';
@@ -119,8 +121,47 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
         return first.compareTo(second);
       });
     }
+    // The resident's own barangay hall comes first; everything else keeps the
+    // order chosen above. Other barangays' halls are still listed.
+    final own = offices.where(_isOwnBarangay).toList();
+    if (own.isNotEmpty) {
+      offices.removeWhere(_isOwnBarangay);
+      offices.insertAll(0, own);
+    }
     return offices;
   }
+
+  bool _isOwnBarangay(OfficeModel office) {
+    final resident = BarangayOffices.residentBarangayId(
+      AuthService.instance.user,
+    );
+    return resident != null && office.barangayId == resident;
+  }
+
+  /// A saved or changed barangay in Account Details updates the list.
+  void _authChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Widget _yourBarangay(OfficeModel office, ColorScheme colors) => Padding(
+    padding: const EdgeInsets.only(top: 4),
+    child: Container(
+      key: ValueKey('finder-your-barangay-${office.id}'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        'Your Barangay',
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: colors.primary,
+        ),
+      ),
+    ),
+  );
 
   Future<void> _loadOffices() async {
     try {
@@ -156,6 +197,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     super.initState();
     _services = widget.services ?? OfficeMapServices();
     _selected = widget.initialOffice;
+    AuthService.instance.addListener(_authChanged);
     _loadPins();
     _loadOffices();
   }
@@ -171,6 +213,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
 
   @override
   void dispose() {
+    AuthService.instance.removeListener(_authChanged);
     _search.dispose();
     _sheet.dispose();
     _extent.dispose();
@@ -1137,6 +1180,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                       height: 1.3,
                     ),
                   ),
+                  if (_isOwnBarangay(office)) _yourBarangay(office, colors),
                   const SizedBox(height: 2),
                   Text(
                     office.address,
@@ -1225,6 +1269,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                if (_isOwnBarangay(office)) _yourBarangay(office, colors),
                 if (facts.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(

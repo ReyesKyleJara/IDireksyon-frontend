@@ -18,6 +18,10 @@ class OfficeModel {
   final double? latitude;
   final double? longitude;
 
+  /// The one barangay this office serves, when the CMS marks it
+  /// barangay-specific (a barangay hall). Null for shared or unclassified offices.
+  final int? barangayId;
+
   const OfficeModel({
     required this.id,
     required this.name,
@@ -28,6 +32,7 @@ class OfficeModel {
     this.schedule = const {},
     this.latitude,
     this.longitude,
+    this.barangayId,
   });
 
   /// The coordinates, when they can be shown on a map. Anything else means no
@@ -102,7 +107,11 @@ class OfficeModel {
   factory OfficeModel.fromJson(Map<String, dynamic> json) {
     final agency = json['agency'];
     final location = usableLocation(json['latitude'], json['longitude']);
+    final barangay = json['barangay'];
     return OfficeModel(
+      barangayId: json['coverage'] == 'barangay' && barangay is Map
+          ? int.tryParse('${barangay['id']}')
+          : null,
       id: '${json['id']}',
       name: _text(json['name']),
       agency: agency is Map ? _text(agency['acronym']) : '',
