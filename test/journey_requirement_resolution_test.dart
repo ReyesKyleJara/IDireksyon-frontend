@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:idireksyon_frontend/core/auth/auth_service.dart';
+import 'package:idireksyon_frontend/core/widgets/catalog_image.dart';
 import 'package:idireksyon_frontend/features/roadmap/roadmap_plan_panel.dart';
 import 'package:idireksyon_frontend/features/roadmap/suggested_journey_view.dart';
 import 'package:idireksyon_frontend/models/roadmap_plan.dart';
@@ -178,14 +179,13 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Add Accepted document to Journey?'), findsOneWidget);
         expect(
-          find.text(
-            'IDireksyon will add this before your target and recalculate your roadmap.',
+          find.textContaining(
+            'IDireksyon will add Accepted document before your',
           ),
           findsOneWidget,
         );
         expect(requests, hasLength(1));
-        await tester.ensureVisible(find.text('Add to Journey'));
-        await tester.tap(find.text('Add to Journey'));
+        await tester.tap(find.text('Add and Recalculate'));
         await tester.pumpAndSettle();
         expect(requests.last['resolution'], {
           'key': 'government_id:1:set:3:group:12',
@@ -229,6 +229,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
+    // Cancel keeps the resident on the options page to choose again.
+    expect(find.text('Add to Journey'), findsWidgets);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
     expect(requests, hasLength(1));
     expect(saved, isFalse);
     expect(find.text('Valid ID / Supporting ID'), findsOneWidget);
@@ -245,8 +249,7 @@ void main() {
       await tester.tap(find.text('Use This Checklist'));
       await tester.pumpAndSettle();
       expect(find.text('Use Adult first-time requirements?'), findsOneWidget);
-      await tester.ensureVisible(find.text('Use This Checklist'));
-      await tester.tap(find.text('Use This Checklist'));
+      await tester.tap(find.text('Use and Recalculate'));
       await tester.pumpAndSettle();
       expect(requests.last['resolution'], {
         'key': 'government_id:1:path',
@@ -261,10 +264,7 @@ void main() {
     (tester) async {
       connect(empty: true);
       await show(tester);
-      expect(
-        find.textContaining('yourself'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('yourself'), findsOneWidget);
       expect(find.text('See Suggested Options'), findsNothing);
       expect(find.text('Add to Journey'), findsNothing);
       expect(requests, hasLength(1));
@@ -281,8 +281,7 @@ void main() {
       await tester.ensureVisible(find.text('Add to Journey'));
       await tester.tap(find.text('Add to Journey'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Add to Journey'));
-      await tester.tap(find.text('Add to Journey'));
+      await tester.tap(find.text('Add and Recalculate'));
       await tester.pumpAndSettle();
       expect(saved, isFalse);
       expect(find.text('This option is no longer available.'), findsOneWidget);
@@ -339,6 +338,7 @@ void main() {
             'name': 'Shared proof',
             'way_id': 8,
             'in_journey': true,
+            'image_url': '/catalog-images/proof.png',
             'processing_time': '3 working days',
           },
           {
@@ -362,11 +362,18 @@ void main() {
       await show(tester);
       await tester.tap(find.text('See Suggested Options'));
       await tester.pumpAndSettle();
-      final dialog = find.byType(Dialog);
+      final dialog = find.byKey(const ValueKey('roadmap-options-scroll'));
+      expect(find.byType(Dialog), findsNothing);
       expect(
         find.descendant(
           of: dialog,
-          matching: find.text('Choose one accepted option'),
+          matching: find.text('Suggested Options for Target'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'You still need an accepted option before continuing your Target journey.',
         ),
         findsOneWidget,
       );
@@ -374,17 +381,10 @@ void main() {
         find.descendant(of: dialog, matching: find.text('REQUIREMENT')),
         findsNothing,
       );
-      expect(
-        find.descendant(
-          of: dialog,
-          matching: find.text('Valid ID / Supporting ID'),
-        ),
-        findsOneWidget,
+      final pictured = tester.widget<CatalogImage>(
+        find.byType(CatalogImage).first,
       );
-      expect(
-        find.descendant(of: dialog, matching: find.text('For Target')),
-        findsOneWidget,
-      );
+      expect(pictured.url, endsWith('/catalog-images/proof.png'));
       expect(find.text('Already in your Roadmap'), findsOneWidget);
       final scroll = find.descendant(
         of: find.byKey(const ValueKey('roadmap-options-scroll')),
@@ -404,7 +404,7 @@ void main() {
       expect(find.text('Varies'), findsNothing);
       expect(find.text('2 weeks'), findsNothing);
       expect(find.text('Not in Inventory'), findsNothing);
-      await tester.tap(find.byTooltip('Close'));
+      await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
       expect(requests, hasLength(1));
     },
@@ -479,8 +479,13 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Not applicable'), findsNothing);
-      expect(tester.getSize(find.byType(Dialog)).width, lessThanOrEqualTo(320));
-      expect(find.byTooltip('Close').hitTestable(), findsOneWidget);
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('roadmap-options-scroll')))
+            .width,
+        lessThanOrEqualTo(320),
+      );
+      expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -505,7 +510,10 @@ void main() {
       await show(tester);
       await tester.tap(find.text('See Suggested Options'));
       await tester.pumpAndSettle();
-      expect(find.text('Choose 2 accepted options'), findsOneWidget);
+      expect(
+        find.textContaining('You still need 2 accepted documents'),
+        findsOneWidget,
+      );
       final scroll = find.descendant(
         of: find.byKey(const ValueKey('roadmap-options-scroll')),
         matching: find.byType(Scrollable),
@@ -560,7 +568,8 @@ void main() {
     await tester.tap(find.text('See Suggested Options'));
     await tester.pumpAndSettle();
     expect(find.text('Recommended for your Roadmap'), findsNothing);
-    expect(find.text('Recommended'), findsOneWidget);
+    // Each shortlisted card carries its own badge.
+    expect(find.text('Recommended'), findsNWidgets(3));
     expect(find.text('Accepted option 0'), findsOneWidget);
     expect(find.text('Accepted option 2'), findsOneWidget);
     expect(find.text('Accepted option 3'), findsNothing);
@@ -613,7 +622,7 @@ void main() {
       await tester.tap(find.text('Add to Journey').last);
       await tester.pumpAndSettle();
       expect(find.text('Add Alternative document to Journey?'), findsOneWidget);
-      await tester.tap(find.text('Add to Journey'));
+      await tester.tap(find.text('Add and Recalculate'));
       await tester.pumpAndSettle();
       expect(requests.last['resolution'], {
         'key': 'government_id:1:set:3:group:12',

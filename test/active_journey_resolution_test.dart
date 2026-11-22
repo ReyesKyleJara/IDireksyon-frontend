@@ -167,7 +167,7 @@ void main() {
 
   Future<void> chooseFourth(WidgetTester tester) async {
     await tapVisible(tester, find.text('See Suggested Options'));
-    expect(find.text('Recommended'), findsOneWidget);
+    expect(find.text('Recommended'), findsNWidgets(3));
     expect(find.textContaining('No additional ID required'), findsNWidgets(3));
     expect(find.text('Accepted document 4'), findsNothing);
     await tapVisible(tester, find.text('View other accepted options'));
@@ -188,12 +188,9 @@ void main() {
     'Active Journey shows the ranked chooser and saves the actual fourth acquisition',
     (tester) async {
       final journey = await open(tester);
-      expect(
-        find.textContaining('yourself'),
-        findsNothing,
-      );
+      expect(find.textContaining('yourself'), findsNothing);
       await chooseFourth(tester);
-      await tapVisible(tester, find.text('Add to Journey'));
+      await tapVisible(tester, find.text('Add and Recalculate'));
       expect(requests.where((r) => r.method == 'PUT'), hasLength(1));
       expect(
         journey.confirmedPlan!.steps.any((step) => step.isUnresolved),
@@ -221,15 +218,14 @@ void main() {
       await chooseFourth(tester);
       expect(requests.where((r) => r.method == 'GET'), hasLength(1));
       await tapVisible(tester, find.text('Cancel'));
+      // Still on the options page; Back returns to the journey.
+      await tapVisible(tester, find.byTooltip('Back'));
       expect(requests.where((r) => r.method == 'PUT'), isEmpty);
       expect(
         find.text('Proof of Identity / Supporting Document'),
         findsOneWidget,
       );
-      expect(
-        find.textContaining('yourself'),
-        findsNothing,
-      );
+      expect(find.textContaining('yourself'), findsNothing);
     },
   );
 
@@ -239,7 +235,7 @@ void main() {
     final journey = await open(tester);
     fail = true;
     await chooseFourth(tester);
-    await tapVisible(tester, find.text('Add to Journey'));
+    await tapVisible(tester, find.text('Add and Recalculate'));
     expect(find.text('This option is no longer available.'), findsOneWidget);
     expect(
       journey.confirmedPlan!.steps.any((step) => step.isUnresolved),
@@ -259,10 +255,7 @@ void main() {
           .isManualPreparation,
       isTrue,
     );
-    expect(
-      find.textContaining('yourself'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('yourself'), findsOneWidget);
   });
 
   test(
