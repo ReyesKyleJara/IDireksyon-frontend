@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/page_header.dart';
+import '../../models/government_id.dart';
 import '../ids/id_details_screen.dart';
 import '../roadmap/roadmap_widgets.dart';
 
@@ -611,9 +612,10 @@ class _InventoryOption {
       throw const FormatException('Invalid inventory item.');
     }
 
+    final acronym = json['acronym'];
     return _InventoryOption(
       id: id,
-      name: name,
+      name: GovernmentIdDetails.formatName(name, acronym is String ? acronym : null),
       owned: json['owned'] == true,
       type: type,
     );

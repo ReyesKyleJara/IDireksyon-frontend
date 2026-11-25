@@ -376,6 +376,7 @@ class _IdsScreenState extends State<IdsScreen> {
   }
 
   String _shortName(GovernmentIdDetails record) {
+    if (record.acronym != null) return record.name;
     final name = record.name.toLowerCase();
     if (name.contains('national id')) return 'National ID';
     if (name.contains('passport')) return 'Passport';

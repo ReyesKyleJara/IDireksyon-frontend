@@ -8,6 +8,31 @@ import 'package:idireksyon_frontend/features/ids/id_details_screen.dart';
 import 'package:idireksyon_frontend/models/government_id.dart';
 
 void main() {
+  testWidgets('Directory finds catalog records by their optional acronym', (
+    tester,
+  ) async {
+    final record = GovernmentIdDetails.fromJson({
+      'id': 1,
+      'name': 'Alien Certificate of Registration Identity Card',
+      'acronym': 'ACR I-Card',
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: IdsScreen(loadIds: () async => [record])),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'acr i-card');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Alien Certificate of Registration Identity Card (ACR I-Card)'),
+      findsOneWidget,
+    );
+    expect(record.officialName, 'Alien Certificate of Registration Identity Card');
+    expect(GovernmentIdDetails.formatName(record.name, record.acronym), record.name);
+  });
+
   for (final dark in [false, true]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('Directory fits narrow screen: dark=$dark, scale=$scale', (

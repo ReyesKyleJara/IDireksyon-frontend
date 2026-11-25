@@ -101,7 +101,20 @@ class GovernmentIdDetails {
   final String guidanceMode;
   final String? level, category, acquisitionType, targetGroup, officialLink;
   bool get isInformational => guidanceMode == 'informational_only';
-  final String name;
+  final String officialName;
+  final String? acronym;
+  String get name => formatName(officialName, acronym);
+
+  static String formatName(String name, String? acronym) {
+    final abbreviation = acronym?.trim();
+    if (abbreviation == null || abbreviation.isEmpty) return name;
+    final suffix = ' ($abbreviation)';
+    if (name.trimRight().toLowerCase().endsWith(suffix.toLowerCase())) {
+      return name;
+    }
+    return '$name$suffix';
+  }
+
   final String? issuedBy, description, purpose, validity, requirements;
   final List<RequirementSet> requirementSets;
   final List<CatalogFee> fees;
@@ -111,7 +124,8 @@ class GovernmentIdDetails {
   GovernmentIdDetails.fromJson(Map<String, dynamic> json)
     : raw = Map<String, dynamic>.unmodifiable(json),
       id = _integer(json['id']) ?? (throw const FormatException('Missing ID')),
-      name = _text(json['name']) ?? 'Government ID',
+      officialName = _text(json['name']) ?? 'Government ID',
+      acronym = _text(json['acronym']),
       includeInSmartSequencing = json['include_in_smart_sequencing'] != false,
       applicationAvailability =
           _text(json['application_availability']) ?? 'available',
