@@ -479,6 +479,8 @@ void main() {
     );
     expect(find.text('No matching offices'), findsNothing);
     services.failing = false;
+    // Lets the panel finish rising to fit the message before tapping.
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Try again'));
     await tester.pumpAndSettle();
     expect(find.text('DFA Malolos'), findsOneWidget);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../core/widgets/app_motion.dart';
 import '../../core/widgets/frosted.dart';
 
@@ -10,6 +12,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/theme/app_theme.dart';
 import '../ids/barangay_offices.dart';
 import 'map_services.dart';
 import 'models/office_model.dart';
@@ -27,15 +30,16 @@ class OfficeFinderScreen extends StatefulWidget {
     this.services,
     this.mapBuilder,
     this.launchDirections,
-    this.showRoadEstimates = false,
+    this.showRoadEstimates,
   });
   final OfficeModel? initialOffice;
   final OfficeMapServices? services;
   final Widget Function(google.GoogleMap)? mapBuilder;
   final Future<bool> Function(Uri)? launchDirections;
 
-  /// Off for closed testing: road estimates make billable Routes API calls.
-  final bool showRoadEstimates;
+  /// Null follows the server's switch (`meta.travel_times` on `GET /offices`),
+  /// because travel estimates make billable Routes API calls. Tests set it.
+  final bool? showRoadEstimates;
 
   @override
   State<OfficeFinderScreen> createState() => _OfficeFinderScreenState();
@@ -63,6 +67,11 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   static const _listRestShare = .36;
   static const _controlsHeight = 132.0;
 
+  /// From this width the panel floats on the left, beside the map, instead of
+  /// covering its bottom. Tablets in landscape and desktop browsers.
+  static const _wideFrom = 840.0;
+  static const _sideWidth = 420.0;
+
   google.GoogleMapController? _map;
   final _sheet = DraggableScrollableController();
   final _search = TextEditingController();
@@ -82,6 +91,14 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   String? _roadError;
   bool _roadLoading = false;
   int _roadVersion = 0;
+
+  /// Google had no route for this mode. Shown as a calm note, with no retry.
+  String? _roadMissing;
+  Timer? _roadTimer;
+
+  /// A short pause before asking, so quickly tapping through offices or
+  /// modes only costs a call for the one the resident stops on.
+  static const _roadPause = Duration(milliseconds: 350);
 
   // Measured from the content, so the panel is only ever as tall as it needs.
   double _peekHeight = 88;
@@ -173,6 +190,8 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
         _officesError = null;
       });
       if (_selected == null) _fit(_located(_offices));
+      // The switch arrives with the list, after an office may be open.
+      if (_road == null && !_roadLoading) _scheduleRoad();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -200,6 +219,21 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     AuthService.instance.addListener(_authChanged);
     _loadPins();
     _loadOffices();
+    _quietLocate();
+  }
+
+  bool get _travelOn => widget.showRoadEstimates ?? _services.travelTimes;
+
+  /// Uses the location only if permission was already given; never prompts.
+  Future<void> _quietLocate() async {
+    final point = await _services.locateIfAllowed();
+    if (!mounted || point == null || _position != null) return;
+    setState(() => _position = point);
+    if (_selected == null) {
+      _fitNearest();
+    } else {
+      _scheduleRoad();
+    }
   }
 
   Future<void> _loadPins() async {
@@ -214,6 +248,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   @override
   void dispose() {
     AuthService.instance.removeListener(_authChanged);
+    _roadTimer?.cancel();
     _search.dispose();
     _sheet.dispose();
     _extent.dispose();
@@ -257,9 +292,9 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
 
   static String _durationLabel(int seconds) {
     final minutes = (seconds / 60).ceil().clamp(1, 1 << 31);
-    if (minutes < 60) return 'About $minutes min';
+    if (minutes < 60) return '$minutes min';
     final rest = minutes % 60;
-    return 'About ${minutes ~/ 60} hr${rest == 0 ? '' : ' $rest min'}';
+    return '${minutes ~/ 60} hr${rest == 0 ? '' : ' $rest min'}';
   }
 
   // Panel ---------------------------------------------------------------------
@@ -380,8 +415,10 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   /// Forgets the estimate and ignores any reply still on its way.
   void _clearRoad() {
     _roadVersion++;
+    _roadTimer?.cancel();
     _road = null;
     _roadError = null;
+    _roadMissing = null;
     _roadLoading = false;
   }
 
@@ -394,6 +431,53 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     _showPanelTop();
     _goTo(_SheetStop.mid);
     _fit([?_point(office)]);
+    _scheduleRoad();
+  }
+
+  /// Asks for the travel estimate once the location is already known. Without
+  /// it, the card offers a button, so location is never requested unasked.
+  void _scheduleRoad() {
+    final office = _selected;
+    final origin = _position;
+    if (!_travelOn || office == null || origin == null) return;
+    if (_point(office) == null) return;
+    setState(() {
+      _clearRoad();
+      _roadLoading = true;
+    });
+    final version = _roadVersion;
+    _roadTimer = Timer(_roadPause, () => _fetchRoad(office, origin, version));
+  }
+
+  Future<void> _fetchRoad(
+    OfficeModel office,
+    LatLng origin,
+    int version,
+  ) async {
+    try {
+      final road = await _services.roadEstimate(office.id, origin);
+      if (!mounted || version != _roadVersion) return;
+      setState(() {
+        _road = road;
+        _roadLoading = false;
+      });
+      // Frames the whole drive, so the line is seen from start to office.
+      if (road.path.length > 1) _fit(road.path);
+    } on TravelUnavailable catch (missing) {
+      if (!mounted || version != _roadVersion) return;
+      setState(() {
+        _roadLoading = false;
+        _roadMissing = missing.message;
+      });
+    } catch (error) {
+      if (!mounted || version != _roadVersion) return;
+      setState(() {
+        _roadLoading = false;
+        _roadError = error is StateError
+            ? error.message.toString()
+            : 'Travel time is unavailable right now. Please try again.';
+      });
+    }
   }
 
   void _closeDetails() {
@@ -468,6 +552,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
         _fit(_located(selected == null ? offices : [selected]));
       },
       onTap: (_) => FocusScope.of(context).unfocus(),
+      polylines: _routeLines(selected),
       markers: {
         for (final office in {...offices, ?selected})
           if (_point(office) case final point?)
@@ -506,6 +591,39 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     return widget.mapBuilder?.call(map) ?? map;
   }
 
+  /// The driving route as a blue line with a white edge, like Google Maps,
+  /// so it stays readable over roads of any colour.
+  Set<google.Polyline> _routeLines(OfficeModel? selected) {
+    final path = _road?.path ?? const <LatLng>[];
+    if (selected == null || path.length < 2) return const {};
+    final points = [for (final point in path) _googlePoint(point)];
+    return {
+      google.Polyline(
+        polylineId: const google.PolylineId('route-edge'),
+        points: points,
+        color: Colors.white,
+        width: 9,
+        zIndex: 1,
+        jointType: google.JointType.round,
+        startCap: google.Cap.roundCap,
+        endCap: google.Cap.roundCap,
+      ),
+      google.Polyline(
+        polylineId: const google.PolylineId('route'),
+        points: points,
+        color: _routeBlue,
+        width: 6,
+        zIndex: 2,
+        jointType: google.JointType.round,
+        startCap: google.Cap.roundCap,
+        endCap: google.Cap.roundCap,
+      ),
+    };
+  }
+
+  /// Brighter than the app's primary blue, so the line stands out on the map.
+  static const _routeBlue = Color(0xFF1E66D0);
+
   Future<void> _locate() async {
     if (_busy) return;
     setState(() {
@@ -520,7 +638,11 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
         _sort = _OfficeSort.nearest;
       });
       FocusScope.of(context).unfocus();
-      _fitNearest();
+      if (_selected == null) {
+        _fitNearest();
+      } else if (_road == null) {
+        _scheduleRoad();
+      }
     } catch (error) {
       _showError(error, 'Could not find your location. Please try again.');
     } finally {
@@ -528,7 +650,6 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     }
   }
 
-  /// Google Maps uses the device's location, so none is requested or sent here.
   Future<void> _directions() async {
     final office = _selected;
     final destination = office == null ? null : _point(office);
@@ -537,10 +658,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
       _openingMaps = true;
       _message = null;
     });
-    final uri = Uri.https('www.google.com', '/maps/dir/', {
-      'api': '1',
-      'destination': '${destination.latitude},${destination.longitude}',
-    });
+    final uri = googleMapsDirections(destination, _position);
     var opened = false;
     try {
       opened =
@@ -558,34 +676,31 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     });
   }
 
-  /// Runs only from the button, so location is never sent without a tap.
+  /// The card's button: asks for location if needed, then the estimate.
   Future<void> _showRoadDistance() async {
     final office = _selected;
-    if (office == null || _point(office) == null || _roadLoading) return;
-    final version = ++_roadVersion;
+    if (office == null || _point(office) == null) return;
     setState(() {
+      _clearRoad();
       _roadLoading = true;
-      _roadError = null;
     });
+    final version = _roadVersion;
+    LatLng origin;
     try {
-      final origin = await _services.locate();
-      if (!mounted || version != _roadVersion) return;
-      setState(() => _position = origin);
-      final road = await _services.roadEstimate(office.id, origin);
-      if (!mounted || version != _roadVersion) return;
-      setState(() {
-        _road = road;
-        _roadLoading = false;
-      });
+      origin = _position ?? await _services.locate();
     } catch (error) {
       if (!mounted || version != _roadVersion) return;
       setState(() {
         _roadLoading = false;
         _roadError = error is StateError
             ? error.message.toString()
-            : 'Road distance is unavailable right now. Please try again.';
+            : 'Could not find your location. Please try again.';
       });
+      return;
     }
+    if (!mounted || version != _roadVersion) return;
+    setState(() => _position = origin);
+    await _fetchRoad(office, origin, version);
   }
 
   void _showError(Object error, String fallback) {
@@ -627,75 +742,84 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
 
   // Floating search bar -------------------------------------------------------
 
-  Widget _roundButton({
+  /// Soft shadow for things that float over the map.
+  List<BoxShadow> get _floatShadow => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: _dark ? .3 : .12),
+      blurRadius: 16,
+      offset: const Offset(0, 4),
+    ),
+  ];
+
+  Widget _barButton({
     required ColorScheme colors,
     required String tooltip,
     required VoidCallback? onPressed,
     required Widget icon,
     bool active = false,
-  }) => Material(
-    color: active ? colors.primaryContainer : _surface(colors),
-    shape: const CircleBorder(),
-    elevation: 2,
-    shadowColor: Colors.black38,
+  }) => Padding(
+    padding: const EdgeInsets.all(4),
     child: IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
-      color: colors.primary,
+      style: IconButton.styleFrom(
+        backgroundColor: active ? colors.primary : Colors.transparent,
+        foregroundColor: active ? colors.onPrimary : colors.primary,
+      ),
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 46, height: 46),
+      constraints: const BoxConstraints.tightFor(width: 42, height: 42),
       icon: icon,
     ),
   );
 
-  Widget _searchField(ColorScheme colors) => Material(
-    color: _surface(colors),
-    borderRadius: BorderRadius.circular(23),
-    elevation: 2,
-    shadowColor: Colors.black38,
-    child: TextField(
-      controller: _search,
-      textInputAction: TextInputAction.search,
-      onChanged: (_) => _filterChanged(),
-      onSubmitted: (_) => _submitSearch(),
-      style: const TextStyle(fontSize: 15),
-      decoration: InputDecoration(
-        hintText: 'Search offices',
-        isDense: true,
-        border: InputBorder.none,
-        prefixIcon: Icon(Icons.search_rounded, size: 21, color: colors.primary),
-        prefixIconConstraints: const BoxConstraints(
-          minWidth: 42,
-          minHeight: 46,
-        ),
-        suffixIcon: _search.text.isNotEmpty
-            ? IconButton(
-                tooltip: 'Clear search',
-                onPressed: () {
-                  _search.clear();
-                  _filterChanged();
-                },
-                icon: const Icon(Icons.cancel_rounded, size: 18),
-              )
-            : null,
-        contentPadding: const EdgeInsets.symmetric(vertical: 13),
+  Widget _searchField(ColorScheme colors) => TextField(
+    controller: _search,
+    textInputAction: TextInputAction.search,
+    onChanged: (_) => _filterChanged(),
+    onSubmitted: (_) => _submitSearch(),
+    style: const TextStyle(fontSize: 15),
+    decoration: InputDecoration(
+      hintText: 'Search offices',
+      isDense: true,
+      border: InputBorder.none,
+      filled: false,
+      prefixIcon: Icon(
+        Icons.search_rounded,
+        size: 20,
+        color: colors.onSurfaceVariant,
       ),
+      prefixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 46),
+      suffixIcon: _search.text.isNotEmpty
+          ? IconButton(
+              tooltip: 'Clear search',
+              onPressed: () {
+                _search.clear();
+                _filterChanged();
+              },
+              icon: const Icon(Icons.cancel_rounded, size: 18),
+            )
+          : null,
+      contentPadding: const EdgeInsets.symmetric(vertical: 13),
     ),
   );
 
   Widget _messageBanner(ColorScheme colors) => Padding(
     padding: const EdgeInsets.only(top: 8),
-    child: Material(
-      color: _surface(colors),
-      borderRadius: BorderRadius.circular(14),
-      elevation: 2,
-      shadowColor: Colors.black38,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: _surface(colors),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border(colors)),
+        boxShadow: _floatShadow,
+      ),
       child: Row(
         children: [
           const SizedBox(width: 14),
+          Icon(Icons.info_outline_rounded, size: 18, color: colors.primary),
+          const SizedBox(width: 10),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               child: Text(
                 _message!,
                 style: const TextStyle(fontSize: 13.5, height: 1.35),
@@ -720,37 +844,47 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            _roundButton(
-              colors: colors,
-              tooltip: 'Back',
-              onPressed: () => Navigator.maybePop(context),
-              icon: const Icon(Icons.arrow_back_rounded, size: 22),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: _surface(colors),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _border(colors)),
+            boxShadow: _floatShadow,
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: Row(
+              children: [
+                _barButton(
+                  colors: colors,
+                  tooltip: 'Back',
+                  onPressed: () => Navigator.maybePop(context),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 22),
+                ),
+                Expanded(child: _searchField(colors)),
+                Container(width: 1, height: 26, color: _border(colors)),
+                _barButton(
+                  colors: colors,
+                  tooltip: _position == null
+                      ? 'Use my current location'
+                      : 'Using your current location',
+                  active: _position != null,
+                  onPressed: _busy ? null : _locate,
+                  icon: _busy
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          _position == null
+                              ? Icons.my_location_rounded
+                              : Icons.near_me_rounded,
+                          size: 20,
+                        ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(child: _searchField(colors)),
-            const SizedBox(width: 8),
-            _roundButton(
-              colors: colors,
-              tooltip: _position == null
-                  ? 'Use my current location'
-                  : 'Using your current location',
-              active: _position != null,
-              onPressed: _busy ? null : _locate,
-              icon: _busy
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      _position == null
-                          ? Icons.near_me_outlined
-                          : Icons.near_me_rounded,
-                      size: 21,
-                    ),
-            ),
-          ],
+          ),
         ),
         if (_message != null) _messageBanner(colors),
       ],
@@ -784,6 +918,11 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
               _moveAfterFrame();
             }
             final resting = _sizes.of(_stop) * space;
+            final wide = constraints.maxWidth >= _wideFrom;
+            // The panel and search bar share one column on wide screens.
+            final sideRight = wide
+                ? constraints.maxWidth - _sideWidth - 16
+                : 0.0;
             return Stack(
               fit: StackFit.expand,
               children: [
@@ -791,7 +930,12 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                   child: _buildMap(
                     offices,
                     selected,
-                    EdgeInsets.only(top: reservedTop, bottom: resting + 8),
+                    wide
+                        ? EdgeInsets.only(left: _sideWidth + 16, top: 16)
+                        : EdgeInsets.only(
+                            top: reservedTop,
+                            bottom: resting + 8,
+                          ),
                   ),
                 ),
                 if (keyboard == 0)
@@ -800,11 +944,11 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                     builder: (context, extent, child) {
                       final panel =
                           (extent == 0 ? _sizes.of(_stop) : extent) * space;
-                      final room = space - panel - reservedTop;
+                      final room = wide ? space : space - panel - reservedTop;
                       // Always Positioned: a plain child would shrink the Stack to fit it.
                       return Positioned(
-                        right: 12,
-                        bottom: panel + 12,
+                        right: wide ? 16 : 12,
+                        bottom: wide ? 24 : panel + 12,
                         child: room > _controlsHeight + 16
                             ? child!
                             : const SizedBox.shrink(),
@@ -813,8 +957,8 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                     child: _mapControls(offices, colors),
                   ),
                 Positioned(
-                  left: 0,
-                  right: 0,
+                  left: wide ? 16 : 0,
+                  right: sideRight,
                   top: 0,
                   bottom: keyboard,
                   child: NotificationListener<DraggableScrollableNotification>(
@@ -841,8 +985,8 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                   ),
                 ),
                 Positioned(
-                  left: 0,
-                  right: 0,
+                  left: wide ? 4 : 0,
+                  right: wide ? sideRight - 12 : 0,
                   top: 0,
                   child: SafeArea(
                     bottom: false,
@@ -939,7 +1083,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: _dark ? colors.surfaceContainerLow : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: .12),
@@ -1006,7 +1150,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
         height: 22,
         child: Center(
           child: Container(
-            width: 40,
+            width: 36,
             height: 4,
             decoration: BoxDecoration(
               color: colors.outlineVariant,
@@ -1021,13 +1165,30 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   // Office list ---------------------------------------------------------------
 
   Widget _listTop(List<OfficeModel> offices, ColorScheme colors) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
+    padding: const EdgeInsets.fromLTRB(20, 2, 14, 10),
     child: Row(
       children: [
         Expanded(
-          child: Text(
-            _countLabel(offices.length),
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _countLabel(offices.length),
+                style: const TextStyle(
+                  fontSize: 17,
+                  height: 1.25,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                _position == null
+                    ? 'Government offices in IDireksyon'
+                    : _sort == _OfficeSort.nearest
+                    ? 'Nearest to you first'
+                    : 'Sorted by name',
+                style: _note(colors),
+              ),
+            ],
           ),
         ),
         // "Nearest" means nothing until the resident's location is known.
@@ -1041,16 +1202,20 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
     return '$count ${count == 1 ? 'office' : 'offices'}';
   }
 
-  Widget _sortButton(ColorScheme colors) => TextButton.icon(
+  Widget _sortButton(ColorScheme colors) => OutlinedButton.icon(
     onPressed: () => setState(() {
       _sort = _sort == _OfficeSort.nearest
           ? _OfficeSort.name
           : _OfficeSort.nearest;
     }),
-    style: TextButton.styleFrom(
+    style: OutlinedButton.styleFrom(
       foregroundColor: colors.primary,
       visualDensity: VisualDensity.compact,
-      textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 13),
+      side: BorderSide(color: _border(colors)),
+      shape: const StadiumBorder(),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      textStyle: Theme.of(context).textTheme.labelLarge
+          ?.copyWith(fontSize: 13, fontWeight: FontWeight.w600),
     ),
     icon: const Icon(Icons.swap_vert_rounded, size: 17),
     label: Text(_sort == _OfficeSort.nearest ? 'Nearest' : 'Name'),
@@ -1059,12 +1224,12 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   List<Widget> _officeList(List<OfficeModel> offices, ColorScheme colors) => [
     if (_position != null && _located(offices).isNotEmpty)
       Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
         child: Text(
-          widget.showRoadEstimates
-              ? 'Straight-line distances. Select an office to check road distance and time.'
+          _travelOn
+              ? 'Straight-line distances. Select an office to see travel time.'
               : 'Straight-line distances, not road distances.',
-          style: _note(colors),
+          style: _note(colors).copyWith(fontSize: 12),
         ),
       ),
     if (_loadingOffices)
@@ -1073,74 +1238,88 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
         child: Center(child: CircularProgressIndicator()),
       ),
     if (_officesError != null)
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-        child: Column(
-          children: [
-            Text(_officesError!, textAlign: TextAlign.center),
-            TextButton.icon(
-              onPressed: _retryOffices,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try again'),
-            ),
-          ],
+      _statePanel(
+        colors,
+        icon: Icons.cloud_off_rounded,
+        title: _officesError!,
+        action: TextButton.icon(
+          onPressed: _retryOffices,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Try again'),
         ),
       ),
-    for (final (index, office) in offices.indexed) ...[
-      if (index > 0)
-        Divider(height: 1, indent: 70, endIndent: 16, color: _border(colors)),
-      _officeRow(office, colors),
-    ],
+    for (final office in offices) _officeRow(office, colors),
     if (!_loadingOffices && _officesError == null && offices.isEmpty)
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-        child: Column(
-          children: [
-            Icon(
-              Icons.travel_explore_rounded,
-              size: 30,
-              color: colors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'No matching offices',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Try another office name, agency, or address.',
-              textAlign: TextAlign.center,
-              style: _note(colors),
-            ),
-          ],
-        ),
+      _statePanel(
+        colors,
+        icon: Icons.travel_explore_rounded,
+        title: 'No matching offices',
+        body: 'Try another office name, agency, or address.',
       ),
   ];
 
+  /// Empty and error states share one calm layout.
+  Widget _statePanel(
+    ColorScheme colors, {
+    required IconData icon,
+    required String title,
+    String? body,
+    Widget? action,
+  }) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+    child: Column(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: colors.primaryContainer,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 21, color: colors.onPrimaryContainer),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        if (body != null) ...[
+          const SizedBox(height: 4),
+          Text(body, textAlign: TextAlign.center, style: _note(colors)),
+        ],
+        ?action,
+      ],
+    ),
+  );
+
   /// Agency initials from the office name, or a civic icon when it has none.
-  Widget _officeBadge(OfficeModel office, ColorScheme colors) {
+  Widget _officeBadge(
+    OfficeModel office,
+    ColorScheme colors, {
+    double size = 44,
+  }) {
     final first = office.name.split(' ').first;
     final initials = office.agency.isNotEmpty
         ? office.agency
         : (first == first.toUpperCase() ? first : '');
     return ExcludeSemantics(
       child: Container(
-        width: 40,
-        height: 40,
+        width: size,
+        height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: colors.primaryContainer,
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(size * .3),
         ),
-        padding: const EdgeInsets.all(5),
+        padding: const EdgeInsets.all(6),
         child: initials.isNotEmpty
             ? FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   initials,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                     letterSpacing: .3,
                     color: colors.onPrimaryContainer,
@@ -1148,72 +1327,117 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                 ),
               )
             : Icon(
-                Icons.account_balance_outlined,
-                size: 19,
+                Icons.account_balance_rounded,
+                size: size * .45,
                 color: colors.onPrimaryContainer,
               ),
       ),
     );
   }
 
+  /// A small labelled fact, such as a distance or today's hours.
+  Widget _metaChip(ColorScheme colors, IconData icon, String text) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: _dark ? colors.surfaceContainerHigh : AppTheme.pageBackground,
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: colors.primary),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+              color: colors.primary,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
   Widget _officeRow(OfficeModel office, ColorScheme colors) {
     final meters = _metersTo(office);
     final hours = office.hoursOn(DateTime.now());
-    final facts = [if (meters != null) _distanceLabel(meters), ?hours];
-    return MotionInkWell(
-      onTap: () => _select(office),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 11, 12, 11),
-        child: Row(
-          children: [
-            _officeBadge(office, colors),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    office.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14.5,
-                      height: 1.3,
-                    ),
-                  ),
-                  if (_isOwnBarangay(office)) _yourBarangay(office, colors),
-                  const SizedBox(height: 2),
-                  Text(
-                    office.address,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.3,
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-                  if (facts.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      facts.join('  •  '),
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        height: 1.3,
-                        fontWeight: FontWeight.w600,
-                        color: colors.primary,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      child: Material(
+        color: _surface(colors),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: _border(colors)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: MotionInkWell(
+          onTap: () => _select(office),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _officeBadge(office, colors),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        office.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14.5,
+                          height: 1.3,
+                        ),
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 3),
-                  Text(office.serviceTag, style: _note(colors)),
-                ],
-              ),
+                      if (_isOwnBarangay(office)) _yourBarangay(office, colors),
+                      const SizedBox(height: 2),
+                      Text(
+                        office.address,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.3,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      if (meters != null || hours != null) ...[
+                        const SizedBox(height: 7),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            if (meters != null)
+                              _metaChip(
+                                colors,
+                                Icons.near_me_rounded,
+                                _distanceLabel(meters),
+                              ),
+                            if (hours != null)
+                              _metaChip(colors, Icons.schedule_rounded, hours),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Text(office.serviceTag, style: _note(colors)),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: colors.onSurfaceVariant,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1230,7 +1454,7 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
           padding: const EdgeInsets.only(top: 1),
           child: Icon(icon, size: 17, color: colors.primary),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
@@ -1248,15 +1472,21 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   /// Stays visible when the panel is minimized.
   Widget _detailsTop(OfficeModel office, ColorScheme colors) {
     final meters = _metersTo(office);
+    final agency = office.agencyName.isNotEmpty
+        ? office.agencyName
+        : office.agency;
+    // The travel card shows the real drive; this is only a quick hint.
     final facts = [
-      if (office.agency.isNotEmpty) office.agency,
-      if (meters != null) '${_distanceLabel(meters)} away',
+      if (agency.isNotEmpty) agency,
+      if (meters != null && !_travelOn) '${_distanceLabel(meters)} away',
     ];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 8, 10),
+      padding: const EdgeInsets.fromLTRB(20, 2, 10, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _officeBadge(office, colors, size: 46),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1264,18 +1494,19 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
                 Text(
                   office.name,
                   style: const TextStyle(
-                    fontSize: 17.5,
+                    fontSize: 18,
                     height: 1.25,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 if (_isOwnBarangay(office)) _yourBarangay(office, colors),
                 if (facts.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     facts.join('  •  '),
                     style: TextStyle(
                       fontSize: 13,
+                      height: 1.3,
                       fontWeight: FontWeight.w600,
                       color: colors.primary,
                     ),
@@ -1284,11 +1515,18 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
               ],
             ),
           ),
-          IconButton(
+          const SizedBox(width: 4),
+          IconButton.filledTonal(
             tooltip: 'Back to offices',
             onPressed: _closeDetails,
+            style: IconButton.styleFrom(
+              backgroundColor: _dark
+                  ? colors.surfaceContainerHigh
+                  : AppTheme.pageBackground,
+              foregroundColor: colors.onSurfaceVariant,
+            ),
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.close_rounded, size: 20),
+            icon: const Icon(Icons.close_rounded, size: 19),
           ),
         ],
       ),
@@ -1296,46 +1534,49 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   }
 
   bool _hasMore(OfficeModel office) =>
-      office.records.isNotEmpty ||
-      office.weeklyHours.isNotEmpty ||
-      (widget.showRoadEstimates && _point(office) != null);
+      office.records.isNotEmpty || office.weeklyHours.isNotEmpty;
 
   List<Widget> _essentials(OfficeModel office, ColorScheme colors) {
     final hours = office.hoursOn(DateTime.now());
     final expanded = _stop == _SheetStop.full;
+    final located = _point(office) != null;
     return [
       _infoRow(colors, Icons.location_on_outlined, office.address),
       if (hours != null) ...[
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         _infoRow(colors, Icons.schedule_rounded, hours),
       ],
-      const SizedBox(height: 12),
-      if (_point(office) != null)
+      const SizedBox(height: 14),
+      if (located)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_travelOn) ...[
+                _travelCard(colors),
+                const SizedBox(height: 10),
+              ],
               FilledButton.icon(
                 onPressed: _openingMaps ? null : _directions,
                 style: FilledButton.styleFrom(
                   backgroundColor: colors.primary,
                   foregroundColor: colors.onPrimary,
-                  minimumSize: const Size.fromHeight(46),
+                  minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                   textStyle: Theme.of(context).textTheme.labelLarge
-                      ?.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
+                      ?.copyWith(fontSize: 15.5, fontWeight: FontWeight.w700),
                 ),
-                icon: const Icon(Icons.directions_rounded, size: 20),
+                icon: const Icon(Icons.directions_rounded, size: 21),
                 label: const Text('Get Directions'),
               ),
               const SizedBox(height: 6),
               Text(
                 'Opens Google Maps. Pin may be approximate.',
                 textAlign: TextAlign.center,
-                style: _note(colors),
+                style: _note(colors).copyWith(fontSize: 12),
               ),
             ],
           ),
@@ -1343,9 +1584,30 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
       else
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'Map location isn’t available for this office yet.',
-            style: _note(colors),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _dark
+                  ? colors.surfaceContainerHigh
+                  : AppTheme.pageBackground,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.location_off_outlined,
+                  size: 18,
+                  color: colors.onSurfaceVariant,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Map location isn’t available for this office yet.',
+                    style: _note(colors),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       if (_hasMore(office))
@@ -1372,165 +1634,285 @@ class _OfficeFinderScreenState extends State<OfficeFinderScreen> {
   }
 
   Widget _sectionLabel(String text, ColorScheme colors) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
+    padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
     child: Semantics(
       header: true,
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 12.5,
+          fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: colors.onSurfaceVariant,
+          color: colors.onSurface,
         ),
+      ),
+    ),
+  );
+
+  /// Solid card for a group of detail rows.
+  Widget _detailCard(ColorScheme colors, List<Widget> rows) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      decoration: BoxDecoration(
+        color: _surface(colors),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border(colors)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: rows,
       ),
     ),
   );
 
   List<Widget> _moreDetails(OfficeModel office, ColorScheme colors) {
     final week = office.weeklyHours;
+    const text = TextStyle(fontSize: 13.5, height: 1.3);
     return [
       if (week.isNotEmpty) ...[
         _sectionLabel('Weekly hours', colors),
-        for (final line in week)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 76,
-                  child: Text(
-                    line.days,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
+        _detailCard(colors, [
+          for (final line in week)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 80,
+                    child: Text(
+                      line.days,
+                      style: text.copyWith(fontWeight: FontWeight.w600),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Text(
-                    line.hours,
-                    style: const TextStyle(fontSize: 13.5, height: 1.3),
-                  ),
-                ),
-              ],
+                  Expanded(child: Text(line.hours, style: text)),
+                ],
+              ),
             ),
-          ),
+        ]),
       ],
       if (office.records.isNotEmpty) ...[
         _sectionLabel('IDs and documents', colors),
-        for (final record in office.records)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 5),
+        _detailCard(colors, [
+          for (final record in office.records)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(
+                      Icons.description_outlined,
+                      size: 16,
+                      color: colors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(record, style: text)),
+                ],
+              ),
+            ),
+        ]),
+      ],
+    ];
+  }
+
+  // Travel time ---------------------------------------------------------------
+
+  /// The driving time and distance on the app's navy banner. Get Directions
+  /// below works whatever happens here, and Google Maps offers other modes.
+  Widget _travelCard(ColorScheme colors) => Semantics(
+    container: true,
+    child: Container(
+      key: const ValueKey('office-travel-card'),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppTheme.navy, AppTheme.primaryBlue],
+        ),
+      ),
+      child: AnimatedSize(
+        duration: AppMotion.duration(context),
+        curve: AppMotion.curve,
+        alignment: Alignment.topCenter,
+        child: AnimatedSwitcher(
+          duration: AppMotion.duration(context, AppMotion.quick),
+          child: KeyedSubtree(
+            key: ValueKey(_travelState),
+            child: _travelResult(),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  /// Changes whenever the card shows something different, for the transition.
+  String get _travelState =>
+      '${_road != null}|$_roadLoading|$_roadMissing|$_roadError|${_position != null}';
+
+  static const _onBanner = Colors.white;
+  static const _onBannerSoft = Color(0xD9FFFFFF);
+
+  Widget _bannerIcon(IconData icon) => Container(
+    width: 38,
+    height: 38,
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .14),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Icon(icon, size: 20, color: _onBanner),
+  );
+
+  /// Solid white, like the other banner buttons in the app.
+  Widget _bannerButton(String label, IconData icon) => FilledButton.icon(
+    onPressed: _showRoadDistance,
+    style: FilledButton.styleFrom(
+      backgroundColor: Colors.white,
+      foregroundColor: AppTheme.navy,
+      minimumSize: const Size(0, 38),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+      textStyle: Theme.of(context).textTheme.labelLarge
+          ?.copyWith(fontSize: 13.5, fontWeight: FontWeight.w700),
+    ),
+    icon: Icon(icon, size: 17),
+    label: Text(label),
+  );
+
+  Widget _travelResult() {
+    const soft = TextStyle(fontSize: 12, height: 1.35, color: _onBannerSoft);
+    final road = _road;
+    if (road != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            label:
+                'About ${_durationLabel(road.seconds)} by car, ${_distanceLabel(road.meters)}',
+            excludeSemantics: true,
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: Icon(
-                    Icons.description_outlined,
-                    size: 16,
-                    color: colors.primary,
+                _bannerIcon(Icons.directions_car_rounded),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Estimated travel time', style: soft),
+                      Text(
+                        _durationLabel(road.seconds),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          height: 1.15,
+                          fontWeight: FontWeight.w800,
+                          color: _onBanner,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    record,
-                    style: const TextStyle(fontSize: 13.5, height: 1.3),
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _distanceLabel(road.meters),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: _onBanner,
+                      ),
+                    ),
+                    const Text('by car', style: soft),
+                  ],
                 ),
               ],
             ),
           ),
-      ],
-      if (widget.showRoadEstimates && _point(office) != null)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: _roadDistance(colors),
+          const SizedBox(height: 8),
+          const Text(
+            'Estimated without live traffic. Actual time may differ.',
+            style: soft,
           ),
-        ),
-    ];
-  }
-
-  /// Separate from Get Directions, which works whatever happens here.
-  List<Widget> _roadDistance(ColorScheme colors) {
-    final note = _note(colors);
-    final road = _road;
-    if (road != null) {
-      return [
-        const SizedBox(height: 12),
+        ],
+      );
+    }
+    if (_roadLoading) {
+      return const Row(
+        children: [
+          SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _onBanner),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Calculating travel time…',
+              style: TextStyle(fontSize: 14, color: _onBanner),
+            ),
+          ),
+        ],
+      );
+    }
+    final missing = _roadMissing;
+    if (missing != null) {
+      return Row(
+        children: [
+          _bannerIcon(Icons.info_outline_rounded),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '$missing Google Maps may still suggest a way.',
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: _onBanner,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    final error = _roadError;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         Row(
           children: [
-            Icon(
-              Icons.directions_car_outlined,
-              size: 17,
-              color: colors.primary,
-            ),
-            const SizedBox(width: 8),
+            _bannerIcon(Icons.directions_car_rounded),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                '${_distanceLabel(road.meters)} by road • ${_durationLabel(road.seconds)} drive',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: colors.primary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    error ?? 'How long is the drive?',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                      color: _onBanner,
+                    ),
+                  ),
+                  if (error == null && _position == null)
+                    const Text(
+                      'Uses your current location. IDireksyon does not save it.',
+                      style: soft,
+                    ),
+                ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Estimated without live traffic. Actual time may differ.',
-          style: note,
-        ),
-      ];
-    }
-    if (_roadLoading) {
-      return [
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            const SizedBox.square(
-              dimension: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const SizedBox(width: 10),
-            Expanded(child: Text('Calculating road distance…', style: note)),
-          ],
-        ),
-      ];
-    }
-    return [
-      const SizedBox(height: 12),
-      if (_roadError != null) ...[
-        Text(_roadError!, style: note.copyWith(color: colors.error)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
+        error != null
+            ? _bannerButton('Try again', Icons.refresh_rounded)
+            : _bannerButton('Show travel time', Icons.near_me_rounded),
       ],
-      OutlinedButton.icon(
-        onPressed: _showRoadDistance,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: colors.primary,
-          minimumSize: const Size.fromHeight(44),
-          side: BorderSide(color: _border(colors)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        icon: const Icon(Icons.directions_car_outlined, size: 18),
-        label: Text(
-          _roadError == null ? 'Show road distance and time' : 'Try again',
-        ),
-      ),
-      const SizedBox(height: 6),
-      Text(
-        'Your current location is sent to calculate the route. IDireksyon does not save it.',
-        style: note,
-      ),
-    ];
+    );
   }
 }
 

@@ -25,11 +25,12 @@ void main() {
     await tester.pumpAndSettle();
     final arrow = find.byIcon(Icons.arrow_back_rounded);
     final field = find.byType(TextField);
-    expect(tester.getTopLeft(find.byTooltip('Back')).dx, closeTo(12, 2));
+    // One floating bar from margin to margin, with both buttons inside it.
+    expect(tester.getTopLeft(find.byTooltip('Back')).dx, closeTo(17, 3));
     expect(tester.getCenter(arrow).dy, tester.getCenter(field).dy);
     expect(
       tester.getTopRight(find.byTooltip('Use my current location')).dx,
-      closeTo(378, 2),
+      closeTo(373, 3),
     );
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));

@@ -44,4 +44,10 @@ class FixtureOfficeServices extends OfficeMapServices {
 
   @override
   Future<LatLng> locate() async => const LatLng(14.84, 120.81);
+
+  /// Tests start without a known location unless they set one.
+  LatLng? knownLocation;
+
+  @override
+  Future<LatLng?> locateIfAllowed() async => knownLocation;
 }

@@ -284,7 +284,7 @@ void main() {
       await _tapText(tester, 'Get Directions');
       expect(
         opened.single.toString(),
-        'https://www.google.com/maps/dir/?api=1&destination=14.85%2C120.81',
+        'https://www.google.com/maps/dir/?api=1&destination=14.85%2C120.81&travelmode=driving',
       );
       await _done(tester);
     });

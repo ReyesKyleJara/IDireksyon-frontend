@@ -45,10 +45,6 @@ void main() {
 
   Future<void> showDirections(WidgetTester tester) async {
     await tester.pumpAndSettle();
-    if (roadEstimates) {
-      await tester.tap(find.text('More details'));
-      await tester.pumpAndSettle();
-    }
   }
 
   Future<void> close(WidgetTester tester) async {
@@ -67,10 +63,11 @@ void main() {
         return true;
       },
     );
-    expect(find.text('Drive'), findsNothing);
-    expect(find.text('Walk'), findsNothing);
-    expect(find.text('Public transport'), findsNothing);
     await showDirections(tester);
+    // Residents pick walking or commuting in Google Maps, not here.
+    expect(find.text('Walk'), findsNothing);
+    expect(find.text('Transit'), findsNothing);
+    expect(find.text('Car'), findsNothing);
     expect(
       find.text('Opens Google Maps. Pin may be approximate.'),
       findsOneWidget,
@@ -142,14 +139,14 @@ void main() {
     await open(tester, services);
     await showDirections(tester);
     expect(find.text('Get Directions'), findsOneWidget);
-    expect(find.text('Show road distance and time'), findsNothing);
-    expect(find.textContaining('Your current location is sent'), findsNothing);
+    expect(find.text('Show travel time'), findsNothing);
+    expect(find.textContaining('Uses your current location'), findsNothing);
     expect(services.estimates, 0);
     await close(tester);
   });
 
   group('road distance', () {
-    const button = 'Show road distance and time';
+    const button = 'Show travel time';
 
     setUp(() => roadEstimates = true);
     tearDown(() => roadEstimates = false);
@@ -164,7 +161,7 @@ void main() {
       expect(services.estimates, 0);
       await showDirections(tester);
       expect(
-        find.textContaining('Your current location is sent'),
+        find.text('Uses your current location. IDireksyon does not save it.'),
         findsOneWidget,
       );
       expect(find.text(button), findsOneWidget);
@@ -183,7 +180,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(button));
       await tester.pumpAndSettle();
-      expect(find.text('2.4 km by road • About 8 min drive'), findsOneWidget);
+      expect(find.text('8 min'), findsOneWidget);
+      expect(find.text('2.4 km'), findsOneWidget);
+      expect(find.text('by car'), findsOneWidget);
       expect(
         find.text('Estimated without live traffic. Actual time may differ.'),
         findsOneWidget,
@@ -192,7 +191,101 @@ void main() {
       expect(services.locates, 1);
       expect(services.estimates, 1);
       expect(services.officeIds.single, dfaMalolos.id);
+      await close(tester);
+    });
+
+    testWidgets('draws the drive as a blue line on the map', (tester) async {
+      final services = _TestServices()..knownLocation = _here;
+      await open(tester, services);
+      await tester.pumpAndSettle();
+      expect(find.text('8 min'), findsOneWidget);
+      final lines = {
+        for (final line in _lastMap.polylines) line.polylineId.value: line,
+      };
+      expect(lines.keys, unorderedEquals(['route', 'route-edge']));
+      expect(lines['route']!.points, hasLength(3));
+      expect(lines['route']!.points.first.latitude, 14.84);
+      expect(lines['route']!.zIndex, greaterThan(lines['route-edge']!.zIndex));
+
+      // Leaving the office takes its line away.
+      await tester.tap(find.byTooltip('Back to offices'));
+      await tester.pumpAndSettle();
       expect(_lastMap.polylines, isEmpty);
+      await close(tester);
+    });
+
+    testWidgets('a route without a line still shows time and distance', (
+      tester,
+    ) async {
+      final services = _TestServices()
+        ..knownLocation = _here
+        ..path = const [];
+      await open(tester, services);
+      await tester.pumpAndSettle();
+      expect(find.text('8 min'), findsOneWidget);
+      expect(_lastMap.polylines, isEmpty);
+      await close(tester);
+    });
+
+    testWidgets('appears by itself once the location is already known', (
+      tester,
+    ) async {
+      final opened = <Uri>[];
+      final services = _TestServices()..knownLocation = _here;
+      await open(
+        tester,
+        services,
+        launch: (uri) async {
+          opened.add(uri);
+          return true;
+        },
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('8 min'), findsOneWidget);
+      expect(services.locates, 0, reason: 'no permission prompt');
+      expect(find.text(button), findsNothing);
+
+      await tester.ensureVisible(find.text('Get Directions'));
+      await tester.tap(find.text('Get Directions'));
+      await tester.pumpAndSettle();
+      expect(opened.single.toString(), _mapsUrlFrom);
+      await close(tester);
+    });
+
+    testWidgets('no driving route shows a calm note, not a made-up time', (
+      tester,
+    ) async {
+      final services = _TestServices()
+        ..knownLocation = _here
+        ..noRoute = true;
+      await open(tester, services);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'No driving route was found to this office. Google Maps may still suggest a way.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Try again'), findsNothing);
+      expect(find.textContaining(' min'), findsNothing);
+      await close(tester);
+    });
+
+    testWidgets('tapping quickly through offices asks only for the last', (
+      tester,
+    ) async {
+      final services = _TestServices()..knownLocation = _here;
+      await open(tester, services, selected: false);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(postOffice.name).first);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.byTooltip('Back to offices'));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.ensureVisible(find.text(sssSantaMaria.name).first);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text(sssSantaMaria.name).first);
+      await tester.pumpAndSettle();
+      expect(services.officeIds, [sssSantaMaria.id]);
       await close(tester);
     });
 
@@ -224,7 +317,7 @@ void main() {
           find.text(
             services.denied
                 ? 'Allow location access to continue.'
-                : 'Road distance is unavailable right now.',
+                : 'Travel time is unavailable right now.',
           ),
           findsOneWidget,
         );
@@ -235,7 +328,10 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Get Directions'));
         await tester.pumpAndSettle();
-        expect(opened.single.toString(), _mapsUrl);
+        expect(
+          opened.single.toString(),
+          services.denied ? _mapsUrl : _mapsUrlFrom,
+        );
         await close(tester);
       });
     }
@@ -250,17 +346,76 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(button));
       await tester.pump();
-      expect(find.text('Calculating road distance…'), findsOneWidget);
+      expect(find.text('Calculating travel time…'), findsOneWidget);
 
       // The spinner keeps animating, so settling must wait for the tap below.
+      await tester.ensureVisible(find.byTooltip('Back to offices'));
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.byTooltip('Back to offices'));
       await tester.pumpAndSettle();
+      // The next office gets its own estimate straight away.
       await tester.tap(find.text(postOffice.name).first);
       await tester.pumpAndSettle();
-      services.reply!.complete(const RoadEstimate(2400, 480));
+      expect(find.text('8 min'), findsOneWidget);
+      services.reply!.complete(const RoadEstimate(9900, 3600));
       await tester.pumpAndSettle();
-      expect(find.textContaining('by road'), findsNothing);
+      expect(find.text('1 hr'), findsNothing);
+      expect(find.text('9.9 km'), findsNothing);
+      expect(find.text('8 min'), findsOneWidget);
+      expect(services.officeIds, [dfaMalolos.id, postOffice.id]);
       await close(tester);
+    });
+
+    test('reads the server switch with the office list', () async {
+      for (final (meta, expected) in [
+        ('{"travel_times":true}', true),
+        ('{"travel_times":false}', false),
+        ('null', false),
+      ]) {
+        final service = OfficeMapServices(
+          baseUrl: 'http://localhost:8000/api',
+          client: MockClient(
+            (_) async => http.Response('{"data":[],"meta":$meta}', 200),
+          ),
+        );
+        await service.offices();
+        expect(service.travelTimes, expected, reason: meta);
+        service.dispose();
+      }
+    });
+
+    test('remembers a missing route instead of asking again', () async {
+      var calls = 0;
+      final service = OfficeMapServices(
+        baseUrl: 'http://localhost:8000/api',
+        token: () => 'resident-token',
+        client: MockClient((_) async {
+          calls++;
+          return http.Response('{"code":"no_route"}', 422);
+        }),
+      );
+      addTearDown(service.dispose);
+      for (var i = 0; i < 2; i++) {
+        await expectLater(
+          service.roadEstimate('7', _here),
+          throwsA(isA<TravelUnavailable>()),
+        );
+      }
+      expect(calls, 1);
+    });
+
+    test('decodes the route line, and ignores a broken one', () {
+      // Google's documented example.
+      expect(
+        decodePolyline('_p~iF~ps|U_ulLnnqC_mqNvxq`@')
+            .map((p) => (p.latitude, p.longitude))
+            .toList(),
+        [(38.5, -120.2), (40.7, -120.95), (43.252, -126.453)],
+      );
+      expect(decodePolyline(null), isEmpty);
+      expect(decodePolyline(''), isEmpty);
+      expect(decodePolyline('_p~iF'), isEmpty);
+      expect(decodePolyline(' '), isEmpty);
     });
 
     test('sends the token and location, and reuses a nearby answer', () async {
@@ -271,7 +426,7 @@ void main() {
         client: MockClient((request) async {
           requests.add(request);
           return http.Response(
-            '{"data":{"distance_meters":8400,"duration_seconds":1200}}',
+            '{"data":{"distance_meters":8400,"duration_seconds":1200,"polyline":"_p~iF~ps|U_ulLnnqC"}}',
             200,
           );
         }),
@@ -286,6 +441,7 @@ void main() {
 
       expect(first.meters, 8400);
       expect(first.seconds, 1200);
+      expect(first.path, hasLength(2));
       expect(requests, hasLength(1));
       expect(
         requests.single.url.toString(),
@@ -300,7 +456,7 @@ void main() {
     });
 
     final problems = <String, (int, String, String)>{
-      'an expired login': (401, '{}', 'Log in again to see road distance.'),
+      'an expired login': (401, '{}', 'Log in again to see travel time.'),
       'too many requests': (
         429,
         '{}',
@@ -314,17 +470,17 @@ void main() {
       'an office with no location': (
         422,
         '{"code":"office_no_location"}',
-        'Road distance is not available for this office yet.',
+        'Travel time is not available for this office yet.',
       ),
       'a location outside the Philippines': (
         422,
         '{"message":"bad"}',
-        'Road distance is only available within the Philippines.',
+        'Travel time is only available within the Philippines.',
       ),
       'a server problem': (
         503,
         'oops',
-        'Road distance is unavailable right now.',
+        'Travel time is unavailable right now.',
       ),
     };
     for (final problem in problems.entries) {
@@ -339,7 +495,17 @@ void main() {
         await expectLater(
           service.roadEstimate('7', const LatLng(14.7, 120.9)),
           throwsA(
-            isA<StateError>().having((e) => e.message, 'message', message),
+            problem.key == 'no route'
+                ? isA<TravelUnavailable>().having(
+                    (e) => e.message,
+                    'message',
+                    message,
+                  )
+                : isA<StateError>().having(
+                    (e) => e.message,
+                    'message',
+                    message,
+                  ),
           ),
         );
       });
@@ -452,7 +618,13 @@ void main() {
 }
 
 const _mapsUrl =
-    'https://www.google.com/maps/dir/?api=1&destination=14.8527%2C120.816';
+    'https://www.google.com/maps/dir/?api=1&destination=14.8527%2C120.816&travelmode=driving';
+
+/// After the location is known, Google Maps gets it as the starting point.
+const _here = LatLng(14.84, 120.81);
+
+const _mapsUrlFrom =
+    'https://www.google.com/maps/dir/?api=1&origin=14.84%2C120.81&destination=14.8527%2C120.816&travelmode=driving';
 
 late google.GoogleMap _lastMap;
 Widget _testMap(google.GoogleMap map) {
@@ -463,16 +635,24 @@ Widget _testMap(google.GoogleMap map) {
 class _TestServices extends FixtureOfficeServices {
   bool denied = false;
   bool estimateFails = false;
+  bool noRoute = false;
   Completer<RoadEstimate>? reply;
   int locates = 0;
   int estimates = 0;
   final officeIds = <String>[];
 
+  /// The drive's line; from the resident's spot to the DFA office.
+  List<LatLng> path = const [
+    _here,
+    LatLng(14.846, 120.813),
+    LatLng(14.8527, 120.816),
+  ];
+
   @override
   Future<LatLng> locate() async {
     locates++;
     if (denied) throw StateError('Allow location access to continue.');
-    return const LatLng(14.84, 120.81);
+    return _here;
   }
 
   @override
@@ -480,9 +660,17 @@ class _TestServices extends FixtureOfficeServices {
     estimates++;
     officeIds.add(officeId);
     if (estimateFails) {
-      throw StateError('Road distance is unavailable right now.');
+      throw StateError('Travel time is unavailable right now.');
     }
-    return reply?.future ?? const RoadEstimate(2400, 480);
+    if (noRoute) {
+      throw const TravelUnavailable(
+        'No driving route was found to this office.',
+      );
+    }
+    // Only the first office waits, so a late reply can be told apart.
+    final waiting = reply;
+    if (waiting != null && officeId == dfaMalolos.id) return waiting.future;
+    return RoadEstimate(2400, 480, path);
   }
 }
 
