@@ -770,7 +770,24 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
       'Purpose': record.purpose,
       "Who it's for": record.targetGroup,
     }..removeWhere((_, value) => !_has(value));
-    final sources = _maps(record.research['sources']);
+    final verifiedInfo = record.raw['verified_information'];
+    final sources = _maps(
+      verifiedInfo is Map
+          ? verifiedInfo['sources']
+          : record.research['sources'],
+    );
+    final verification = verifiedInfo is Map
+        ? verifiedInfo['verification']
+        : null;
+    final officialSources = sources.where((source) {
+      final title = source['title'];
+      final url = source['url'];
+      return title is String &&
+          title.trim().isNotEmpty &&
+          url is String &&
+          CatalogOfficialLink.isSafe(url);
+    }).toList();
+
     final hasOfficialLink =
         _has(record.officialLink) &&
         CatalogOfficialLink.isSafe(record.officialLink!);
@@ -809,16 +826,22 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
             label: 'Visit official website',
           ),
         ]),
-      // Public website references only; never agency confirmation.
-      for (final source in sources)
-        CatalogSourceCard(
-          source: source,
-          recordName: record.name,
-          agencyName: record.issuedBy,
-        ),
-      // Direct agency confirmations, kept separate and below public references.
-      for (final confirmation in record.agencyConfirmations)
-        AgencyVerificationCard(confirmation: confirmation),
+      if (verifiedInfo is Map) ...[
+        if (officialSources.isNotEmpty || verification is Map)
+          _verifiedInformation(
+            officialSources,
+            verification is Map ? verification : null,
+          ),
+      ] else ...[
+        for (final source in sources)
+          CatalogSourceCard(
+            source: source,
+            recordName: record.name,
+            agencyName: record.issuedBy,
+          ),
+        for (final confirmation in record.agencyConfirmations)
+          AgencyVerificationCard(confirmation: confirmation),
+      ],
       // The description is in the hero; other background details stay here.
       if (about.isNotEmpty)
         _card('More details', small: true, [
@@ -833,6 +856,75 @@ class _IdDetailsScreenState extends State<IdDetailsScreen>
           ],
         ]),
     ];
+  }
+
+  Widget _verifiedInformation(
+    List<Map<String, dynamic>> sources,
+    Map<dynamic, dynamic>? verification,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    final date = DateTime.tryParse(verification?['date']?.toString() ?? '');
+
+    Widget heading(IconData icon, String title, {Color? color}) => Row(
+      children: [
+        Icon(icon, color: color ?? colors.onSurfaceVariant, size: 17),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+
+    return _card('', [
+      heading(
+        verification == null ? Icons.language : Icons.verified_user_outlined,
+        verification == null ? 'Official References' : 'Verified Information',
+        color: verification == null ? null : const Color(0xFF278458),
+      ),
+      if (date != null) ...[
+        const SizedBox(height: 4),
+        Text(
+          'Last verified: ${MaterialLocalizations.of(context).formatMonthYear(date).replaceFirst(' ', ' ${date.day}, ')}',
+          style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+        ),
+      ],
+      const Padding(
+        padding: EdgeInsets.symmetric(vertical: 9),
+        child: _SoftDivider(),
+      ),
+      if (sources.isNotEmpty) ...[
+        heading(Icons.language, 'Official Government Source'),
+        Padding(
+          padding: const EdgeInsets.only(left: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final source in sources)
+                CatalogOfficialLink(
+                  url: source['url'] as String,
+                  label: source['title'] as String,
+                ),
+            ],
+          ),
+        ),
+      ],
+      if (verification != null) ...[
+        if (sources.isNotEmpty) const SizedBox(height: 4),
+        heading(Icons.location_on_outlined, verification['method'] as String),
+        Padding(
+          padding: const EdgeInsets.only(left: 25, top: 4),
+          child: Text(verification['office'] as String),
+        ),
+      ],
+      const SizedBox(height: 8),
+      Text(
+        'Information reviewed by the IDireksyon research team. Requirements and procedures may change.',
+        style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+      ),
+    ]);
   }
 }
 

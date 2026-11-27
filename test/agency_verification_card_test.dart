@@ -84,6 +84,61 @@ Future<void> pumpOverview(
 }
 
 void main() {
+  testWidgets('shows one combined card with links and the approved date', (
+    tester,
+  ) async {
+    await pumpOverview(
+      tester,
+      record({
+        'agency_verification': field(),
+        'verified_information': {
+          'sources': [
+            {'title': 'Official site', 'url': 'https://example.gov.ph/page'},
+          ],
+          'verification': {
+            'office': 'Santa Maria Branch',
+            'method': 'Phone Verification',
+            'date': '2026-02-10',
+          },
+        },
+      }),
+    );
+
+    expect(find.text('Verified Information'), findsOneWidget);
+    expect(find.text('Last verified: February 10, 2026'), findsOneWidget);
+    expect(find.text('Phone Verification'), findsOneWidget);
+    expect(find.text('Santa Maria Branch'), findsOneWidget);
+    final link = tester.widget<CatalogOfficialLink>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is CatalogOfficialLink && widget.label == 'Official site',
+      ),
+    );
+    expect(link.url, 'https://example.gov.ph/page');
+    expect(find.byType(CatalogSourceCard), findsNothing);
+    expect(find.byType(AgencyVerificationCard), findsNothing);
+  });
+
+  testWidgets('uses Official References for website sources alone', (
+    tester,
+  ) async {
+    await pumpOverview(
+      tester,
+      record({
+        'verified_information': {
+          'sources': [
+            {'title': 'Official site', 'url': 'https://example.gov.ph/page'},
+          ],
+          'verification': null,
+        },
+      }),
+    );
+
+    expect(find.text('Official References'), findsOneWidget);
+    expect(find.text('Verified Information'), findsNothing);
+    expect(find.textContaining('Last verified'), findsNothing);
+  });
+
   group('parsing', () {
     test('reads a current confirmation from the API field', () {
       final list = AgencyConfirmation.listFrom(field());
