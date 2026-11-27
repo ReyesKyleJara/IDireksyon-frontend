@@ -120,6 +120,16 @@ Future<void> _open(
   await tester.pump(const Duration(milliseconds: 300));
 }
 
+/// Scrolls the open page until [target] is built and on screen.
+Future<void> _scrollTo(WidgetTester tester, Finder target) async {
+  await tester.scrollUntilVisible(
+    target,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('OfficeModel.fromJson', () {
     test('reads the API payload, including decimal strings', () {
@@ -240,12 +250,12 @@ void main() {
           _Services([OfficeModel.fromJson(_pilotJson(id, name))]),
         );
         await tester.pumpAndSettle();
+        await select(tester, name);
         expect(
           _map.markers.map((marker) => marker.markerId.value),
           contains('office-$id'),
         );
-        await select(tester, name);
-        expect(find.text('Get Directions'), findsOneWidget);
+        expect(find.text('Start Route'), findsOneWidget);
         expect(find.textContaining('erified'), findsNothing);
         await done(tester);
       });
@@ -260,9 +270,9 @@ void main() {
           ]),
         );
         await tester.pumpAndSettle();
-        expect(_map.markers, isEmpty);
         await select(tester, name);
-        expect(find.text('Get Directions'), findsNothing);
+        expect(find.text('Start Route'), findsNothing);
+        expect(find.textContaining('isn’t available'), findsOneWidget);
         await done(tester);
       });
     }
@@ -276,16 +286,15 @@ void main() {
           ),
         ]);
         await _open(tester, services);
-        await tester.tap(find.byTooltip('Use my current location'));
+        await tester.tap(find.text('Nearby'));
+        await tester.pumpAndSettle();
+        // Nearby cannot place it, so All still lists it, with no distance.
+        await tester.tap(find.text('All'));
         await tester.pumpAndSettle();
         expect(find.text('PRC Regional Office III'), findsOneWidget);
-        expect(find.textContaining('Straight-line'), findsNothing);
-        expect(
-          _map.markers.map((marker) => marker.markerId.value),
-          isNot(contains('office-14')),
-        );
+        expect(find.textContaining(' km'), findsNothing);
         await select(tester, 'PRC Regional Office III');
-        expect(find.text('Get Directions'), findsNothing);
+        expect(find.text('Start Route'), findsNothing);
         expect(find.textContaining('isn’t available'), findsOneWidget);
         expect(find.textContaining('erified'), findsNothing);
         await done(tester);
@@ -329,30 +338,25 @@ void main() {
     await tester.enterText(find.byType(TextField), 'dfa');
     await tester.pumpAndSettle();
     expect(services.locates, 0);
-    expect(find.textContaining('Straight-line'), findsNothing);
+    expect(find.textContaining('straight-line'), findsNothing);
 
-    await tester.tap(find.byTooltip('Use my current location'));
+    await tester.tap(find.text('Nearby'));
     await tester.pumpAndSettle();
     expect(services.locates, 1);
-    expect(find.text('SSS Marilao'), findsNothing);
-    tester
-        .widget<DraggableScrollableSheet>(find.byType(DraggableScrollableSheet))
-        .controller!
-        .jumpTo(.96);
+    // Nearby keeps offices within 10 km; Malolos is farther.
+    expect(find.text('DFA Malolos'), findsNothing);
+    expect(find.text('DFA Marilao'), findsOneWidget);
+    await tester.tap(find.text('All'));
     await tester.pumpAndSettle();
+    expect(find.text('SSS Marilao'), findsNothing);
     double top(String name) => tester.getTopLeft(find.text(name)).dy;
     expect(top('DFA Marilao'), lessThan(top('DFA Malolos')));
     expect(top('DFA Malolos'), lessThan(top('DFA Annex')));
-    expect(find.text('3 offices'), findsOneWidget);
-    expect(find.textContaining('found near you'), findsNothing);
     expect(
-      find.text('Straight-line distances, not road distances.'),
+      find.text('3 offices · nearest first · straight-line distances'),
       findsOneWidget,
     );
-    expect(
-      _map.markers.map((marker) => marker.markerId.value),
-      isNot(contains('office-5')),
-    );
+    expect(services.locates, 1);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));
   });
@@ -380,7 +384,7 @@ void main() {
     await tester.tap(find.text('DFA Annex'));
     await tester.pumpAndSettle();
     expect(find.textContaining('isn’t available'), findsOneWidget);
-    expect(find.text('Get Directions'), findsNothing);
+    expect(find.text('Start Route'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));
   });
@@ -395,15 +399,14 @@ void main() {
       longitude: 120.8,
     );
     await _open(tester, _Services([office]));
-    expect(find.text('TIN ID and 1 more'), findsOneWidget);
     await tester.tap(find.text('Regional Office'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('More details'));
-    await tester.pumpAndSettle();
+    expect(find.text('2 handled here'), findsOneWidget);
+    await _scrollTo(tester, find.text('Philippine Passport'));
     expect(find.text('IDs and documents'), findsOneWidget);
     expect(find.text('TIN ID'), findsOneWidget);
     expect(find.text('Philippine Passport'), findsOneWidget);
-    expect(find.byIcon(Icons.description_outlined), findsNWidgets(2));
+    expect(find.byIcon(Icons.check_circle_outline_rounded), findsNWidgets(2));
     expect(find.byType(Chip), findsNothing);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));
@@ -447,11 +450,8 @@ void main() {
       size: const Size(320, 640),
       textScale: 2,
     );
-    final sheet = tester
-        .widget<DraggableScrollableSheet>(find.byType(DraggableScrollableSheet))
-        .controller!;
-    sheet.jumpTo(.96);
     await tester.pumpAndSettle();
+    await _scrollTo(tester, find.text(longName));
     expect(tester.widget<Text>(find.text(longName)).maxLines, isNull);
     expect(tester.widget<Text>(find.text(longAddress)).maxLines, isNull);
     expect(tester.takeException(), isNull);
@@ -461,9 +461,10 @@ void main() {
       tester.getTopLeft(find.text(longName)) + const Offset(20, 10),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Get Directions'), findsOneWidget);
-    sheet.jumpTo(.96);
-    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await _scrollTo(tester, find.text('Start Route'));
+    expect(find.text('Start Route'), findsOneWidget);
+    await _scrollTo(tester, find.text(longRecord));
     expect(tester.widget<Text>(find.text(longRecord)).maxLines, isNull);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

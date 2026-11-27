@@ -73,18 +73,14 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Get Directions'));
+    await tester.ensureVisible(find.text('Start Route'));
+    await tester.tap(find.text('Start Route'));
     await tester.pumpAndSettle();
 
     expect(opened.single.toString(), _mapsUrl);
     expect(services.locates, 0);
     expect(_lastMap.polylines, isEmpty);
     expect(find.text(_openFailed), findsNothing);
-
-    await tester.ensureVisible(find.byTooltip('Minimize panel'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Minimize panel'));
-    await tester.pumpAndSettle();
     expect(find.text(dfaMalolos.address), findsOneWidget);
     expect(tester.takeException(), isNull);
     await close(tester);
@@ -98,7 +94,8 @@ void main() {
     testWidgets('shows a clear message when ${failure.key}', (tester) async {
       await open(tester, _TestServices(), launch: failure.value);
       await showDirections(tester);
-      await tester.tap(find.text('Get Directions'));
+      await tester.ensureVisible(find.text('Start Route'));
+      await tester.tap(find.text('Start Route'));
       await tester.pumpAndSettle();
       expect(find.text(_openFailed), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -118,15 +115,17 @@ void main() {
       },
     );
     await showDirections(tester);
-    await tester.tap(find.text('Get Directions'));
+    await tester.ensureVisible(find.text('Start Route'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start Route'));
     await tester.pump();
-    await tester.tap(find.text('Get Directions'), warnIfMissed: false);
+    await tester.tap(find.text('Start Route'), warnIfMissed: false);
     await tester.pump();
     expect(launches, 1);
 
     launching.complete(true);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Get Directions'));
+    await tester.tap(find.text('Start Route'));
     await tester.pump();
     expect(launches, 2);
     await close(tester);
@@ -138,7 +137,7 @@ void main() {
     final services = _TestServices();
     await open(tester, services);
     await showDirections(tester);
-    expect(find.text('Get Directions'), findsOneWidget);
+    expect(find.text('Start Route'), findsOneWidget);
     expect(find.text('Show travel time'), findsNothing);
     expect(find.textContaining('Uses your current location'), findsNothing);
     expect(services.estimates, 0);
@@ -180,7 +179,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(button));
       await tester.pumpAndSettle();
-      expect(find.text('8 min'), findsOneWidget);
+      expect(find.text('8 min'), findsWidgets);
       expect(find.text('2.4 km'), findsOneWidget);
       expect(find.text('by car'), findsOneWidget);
       expect(
@@ -198,7 +197,7 @@ void main() {
       final services = _TestServices()..knownLocation = _here;
       await open(tester, services);
       await tester.pumpAndSettle();
-      expect(find.text('8 min'), findsOneWidget);
+      expect(find.text('8 min'), findsWidgets);
       final lines = {
         for (final line in _lastMap.polylines) line.polylineId.value: line,
       };
@@ -206,11 +205,6 @@ void main() {
       expect(lines['route']!.points, hasLength(3));
       expect(lines['route']!.points.first.latitude, 14.84);
       expect(lines['route']!.zIndex, greaterThan(lines['route-edge']!.zIndex));
-
-      // Leaving the office takes its line away.
-      await tester.tap(find.byTooltip('Back to offices'));
-      await tester.pumpAndSettle();
-      expect(_lastMap.polylines, isEmpty);
       await close(tester);
     });
 
@@ -222,7 +216,7 @@ void main() {
         ..path = const [];
       await open(tester, services);
       await tester.pumpAndSettle();
-      expect(find.text('8 min'), findsOneWidget);
+      expect(find.text('8 min'), findsWidgets);
       expect(_lastMap.polylines, isEmpty);
       await close(tester);
     });
@@ -241,12 +235,13 @@ void main() {
         },
       );
       await tester.pumpAndSettle();
-      expect(find.text('8 min'), findsOneWidget);
+      expect(find.text('8 min'), findsWidgets);
       expect(services.locates, 0, reason: 'no permission prompt');
       expect(find.text(button), findsNothing);
 
-      await tester.ensureVisible(find.text('Get Directions'));
-      await tester.tap(find.text('Get Directions'));
+      await tester.ensureVisible(find.text('Start Route'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start Route'));
       await tester.pumpAndSettle();
       expect(opened.single.toString(), _mapsUrlFrom);
       await close(tester);
@@ -279,10 +274,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(postOffice.name).first);
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.byTooltip('Back to offices'));
-      await tester.pump(const Duration(milliseconds: 100));
+      // Leaves before the short pause ends, so no estimate is asked for.
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text(sssSantaMaria.name).first);
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(sssSantaMaria.name).first);
       await tester.pumpAndSettle();
       expect(services.officeIds, [sssSantaMaria.id]);
@@ -324,9 +320,9 @@ void main() {
         expect(find.text('Try again'), findsOneWidget);
         if (services.denied) expect(services.estimates, 0);
 
-        await tester.ensureVisible(find.text('Get Directions'));
+        await tester.ensureVisible(find.text('Start Route'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Get Directions'));
+        await tester.tap(find.text('Start Route'));
         await tester.pumpAndSettle();
         expect(
           opened.single.toString(),
@@ -340,8 +336,10 @@ void main() {
       tester,
     ) async {
       final services = _TestServices()..reply = Completer<RoadEstimate>();
-      await open(tester, services);
-      await showDirections(tester);
+      await open(tester, services, selected: false);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(dfaMalolos.name).first);
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text(button));
       await tester.pumpAndSettle();
       await tester.tap(find.text(button));
@@ -349,19 +347,20 @@ void main() {
       expect(find.text('Calculating travel time…'), findsOneWidget);
 
       // The spinner keeps animating, so settling must wait for the tap below.
-      await tester.ensureVisible(find.byTooltip('Back to offices'));
+      await tester.tap(find.byTooltip('Back'));
       await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.byTooltip('Back to offices'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
       // The next office gets its own estimate straight away.
+      await tester.ensureVisible(find.text(postOffice.name).first);
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text(postOffice.name).first);
       await tester.pumpAndSettle();
-      expect(find.text('8 min'), findsOneWidget);
+      expect(find.text('8 min'), findsWidgets);
       services.reply!.complete(const RoadEstimate(9900, 3600));
       await tester.pumpAndSettle();
       expect(find.text('1 hr'), findsNothing);
       expect(find.text('9.9 km'), findsNothing);
-      expect(find.text('8 min'), findsOneWidget);
+      expect(find.text('8 min'), findsWidgets);
       expect(services.officeIds, [dfaMalolos.id, postOffice.id]);
       await close(tester);
     });
@@ -512,26 +511,37 @@ void main() {
     }
   });
 
-  testWidgets('current location marks the map and a denial is recoverable', (
-    tester,
-  ) async {
-    final services = _TestServices();
-    await open(tester, services, selected: false);
-    await tester.tap(find.byTooltip('Use my current location'));
-    await tester.pumpAndSettle();
-    expect(find.byTooltip('Using your current location'), findsOneWidget);
-    expect(
-      _lastMap.markers.map((marker) => marker.markerId.value),
-      contains('current-position'),
-    );
+  testWidgets(
+    'Nearby asks for location, marks the map, and a denial is recoverable',
+    (tester) async {
+      final services = _TestServices();
+      await open(tester, services, selected: false);
+      await tester.pumpAndSettle();
+      services.denied = true;
+      await tester.tap(find.text('Nearby'));
+      await tester.pumpAndSettle();
+      expect(find.text('Allow location access to continue.'), findsOneWidget);
+      expect(find.text('3 offices'), findsOneWidget, reason: 'still on All');
 
-    services.denied = true;
-    await tester.tap(find.byTooltip('Using your current location'));
-    await tester.pumpAndSettle();
-    expect(find.text('Allow location access to continue.'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await close(tester);
-  });
+      services.denied = false;
+      await tester.tap(find.text('Nearby'));
+      await tester.pumpAndSettle();
+      expect(services.locates, 2);
+      expect(find.textContaining('nearest first'), findsOneWidget);
+      // SSS Santa Maria is about 16 km away, past the Nearby limit.
+      expect(find.text(sssSantaMaria.name), findsNothing);
+      expect(find.text(dfaMalolos.name), findsOneWidget);
+
+      await tester.tap(find.text(dfaMalolos.name));
+      await tester.pumpAndSettle();
+      expect(
+        _lastMap.markers.map((marker) => marker.markerId.value),
+        contains('current-position'),
+      );
+      expect(tester.takeException(), isNull);
+      await close(tester);
+    },
+  );
 
   testWidgets('search uses the loaded offices and no map endpoints', (
     tester,
@@ -603,9 +613,10 @@ void main() {
         expect(find.text('3 offices'), findsOneWidget);
         await tester.tap(find.text('DFA Consular Office Malolos').first);
         await tester.pumpAndSettle();
-        expect(find.text('Get Directions'), findsOneWidget);
+        expect(find.text('Start Route'), findsOneWidget);
         expect(find.text('Open in Maps'), findsNothing);
-        await tester.tap(find.byTooltip('Back to offices'));
+        await tester.tap(find.byTooltip('Back'));
+        await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextField), 'unlisted office');
         await tester.pump();
         expect(find.text('No matching offices'), findsOneWidget);

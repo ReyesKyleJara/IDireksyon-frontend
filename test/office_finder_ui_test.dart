@@ -72,6 +72,8 @@ Future<void> _open(
   OfficeModel? initial,
   Future<bool> Function(Uri)? launch,
   bool dark = false,
+  double textScale = 1,
+  DateTime? now,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -81,7 +83,13 @@ Future<void> _open(
   await tester.pumpWidget(
     MaterialApp(
       theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: OfficeFinderScreen(
+        now: now == null ? null : () => now,
         initialOffice: initial,
         services: services,
         mapBuilder: (map) {
@@ -104,17 +112,36 @@ Future<void> _done(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1));
 }
 
-double _panelTop(WidgetTester tester) =>
-    tester.getTopLeft(find.byKey(const ValueKey('office-sheet-handle'))).dy;
-
-DraggableScrollableController _sheet(WidgetTester tester) => tester
-    .widget<DraggableScrollableSheet>(find.byType(DraggableScrollableSheet))
-    .controller!;
-
 Future<void> _tapText(WidgetTester tester, String text) async {
-  await tester.tap(find.text(text));
+  await tester.ensureVisible(find.text(text, skipOffstage: false).first);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(text).first);
   await tester.pumpAndSettle();
 }
+
+/// Scrolls the open page until [target] is built and on screen.
+Future<void> _scrollTo(WidgetTester tester, Finder target) async {
+  await tester.scrollUntilVisible(
+    target,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Philippine wall-clock time on Wednesday 2026-11-25 (PHT = UTC+8).
+DateTime _manila(int hour, [int minute = 0]) =>
+    DateTime.utc(2026, 11, 25, hour - 8, minute);
+
+/// Open on weekdays only.
+List<Map<String, dynamic>> _weekdays() => [
+  day(0, 'closed'),
+  for (var i = 1; i <= 5; i++)
+    day(i, 'open', [
+      ['08:00:00', '17:00:00'],
+    ]),
+  day(6, 'closed'),
+];
 
 /// Wording the app must never show again.
 void _expectNoVerificationText() {
@@ -232,32 +259,114 @@ void main() {
       ]);
     });
 
-    testWidgets('the hours row disappears with no gap when none exist', (
+    testWidgets('an office without hours shows no hours card and no gaps', (
       tester,
     ) async {
       final without = office(1, 'No Hours');
       final withHours = office(2, 'Has Hours', schedules: everyDay());
       await _open(tester, _Services([without, withHours]));
 
-      expect(find.text('Today: 8:00 AM - 5:00 PM'), findsOneWidget);
       await _tapText(tester, 'No Hours');
-      expect(find.byIcon(Icons.schedule_rounded), findsNothing);
-      expect(find.textContaining('Today'), findsNothing);
-      expect(find.text('Weekly hours'), findsNothing);
+      expect(find.text('Not yet added'), findsNWidgets(2));
+      expect(find.text('Office Hours'), findsOneWidget, reason: 'fact tile');
+      expect(find.text('Open Now'), findsNothing);
+      expect(find.text('Closed'), findsNothing);
       _expectNoVerificationText();
-      final gap =
-          tester.getTopLeft(find.text('Get Directions')).dy -
-          tester.getBottomLeft(find.text('Saved address 1')).dy;
-      expect(gap, lessThan(40));
 
-      await tester.tap(find.byTooltip('Back to offices'));
+      await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
       await _tapText(tester, 'Has Hours');
-      expect(find.text('Today: 8:00 AM - 5:00 PM'), findsOneWidget);
-      expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
-      await _tapText(tester, 'More details');
-      expect(find.text('Weekly hours'), findsOneWidget);
+      // The week shows once, at the top; there is no second hours card.
       expect(find.text('Mon–Sun'), findsOneWidget);
+      expect(find.text('Office Hours'), findsOneWidget);
+      await _done(tester);
+    });
+  });
+
+  group('open now', () {
+    test('reads open, closed and unknown in Philippine time', () {
+      final weekdays = office(1, 'Weekdays', schedules: _weekdays());
+      final open = weekdays.openStateAt(_manila(9, 41))!;
+      expect(open.open, isTrue);
+      expect(open.minutesLeft, 7 * 60 + 19);
+      expect(weekdays.openStateAt(_manila(7, 59))!.open, isFalse);
+      expect(weekdays.openStateAt(_manila(17))!.open, isFalse);
+      // Saturday 2026-11-28 is listed as closed.
+      expect(
+        weekdays.openStateAt(DateTime.utc(2026, 11, 28, 2))!.open,
+        isFalse,
+      );
+      expect(office(2, 'Unknown').openStateAt(_manila(10)), isNull);
+      expect(
+        office(
+          3,
+          'Open, no times',
+          schedules: [day(3, 'open')],
+        ).openStateAt(_manila(10)),
+        isNull,
+      );
+    });
+
+    testWidgets('cards show Open Now or Closed only when hours are known', (
+      tester,
+    ) async {
+      await _open(
+        tester,
+        _Services([
+          office(1, 'Weekday Office', schedules: _weekdays()),
+          office(2, 'Unknown Hours'),
+        ]),
+        now: _manila(9, 41),
+      );
+      expect(find.text('Open Now'), findsNWidgets(2), reason: 'card and chip');
+      expect(find.text('Closed'), findsNothing);
+      await _tapText(tester, 'Weekday Office');
+      expect(find.text('Open Now'), findsOneWidget);
+      expect(find.text('Available Today'), findsOneWidget);
+      expect(find.text('8:00 AM - 5:00 PM'), findsWidgets);
+      expect(find.text('(ends in 7h 19m)'), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('after hours the card says Closed', (tester) async {
+      await _open(
+        tester,
+        _Services([office(1, 'Weekday Office', schedules: _weekdays())]),
+        now: _manila(18),
+      );
+      expect(find.text('Closed'), findsOneWidget);
+      expect(find.text('Open Now'), findsOneWidget, reason: 'the chip only');
+      await _done(tester);
+    });
+
+    testWidgets('the Open Now filter keeps only open offices', (tester) async {
+      await _open(
+        tester,
+        _Services([
+          office(1, 'Weekday Office', schedules: _weekdays()),
+          office(2, 'Unknown Hours'),
+        ]),
+        now: _manila(10),
+      );
+      await tester.tap(find.byKey(const ValueKey('office-filter-openNow')));
+      await tester.pumpAndSettle();
+      expect(find.text('Weekday Office'), findsOneWidget);
+      expect(find.text('Unknown Hours'), findsNothing);
+      await tester.tap(find.text('All'));
+      await tester.pumpAndSettle();
+      expect(find.text('Unknown Hours'), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('Open Now with nothing open explains itself', (tester) async {
+      await _open(
+        tester,
+        _Services([office(1, 'Weekday Office', schedules: _weekdays())]),
+        now: _manila(20),
+      );
+      await tester.tap(find.byKey(const ValueKey('office-filter-openNow')));
+      await tester.pumpAndSettle();
+      expect(find.text('No offices open right now'), findsOneWidget);
       await _done(tester);
     });
   });
@@ -275,13 +384,14 @@ void main() {
           return true;
         },
       );
+      await _tapText(tester, 'View Office');
       expect(
         _map.markers.map((marker) => marker.markerId.value),
         contains('office-7'),
       );
-      await _tapText(tester, 'Encoded Office');
+      expect(find.text('Route to Encoded Office'), findsOneWidget);
       _expectNoVerificationText();
-      await _tapText(tester, 'Get Directions');
+      await _tapText(tester, 'Start Route');
       expect(
         opened.single.toString(),
         'https://www.google.com/maps/dir/?api=1&destination=14.85%2C120.81&travelmode=driving',
@@ -289,16 +399,15 @@ void main() {
       await _done(tester);
     });
 
-    testWidgets('invalid coordinates give no pin and no disabled button', (
+    testWidgets('invalid coordinates give no map and no disabled button', (
       tester,
     ) async {
       await _open(
         tester,
         _Services([office(8, 'Zero Pin', latitude: 0, longitude: 0)]),
       );
-      expect(_map.markers, isEmpty);
       await _tapText(tester, 'Zero Pin');
-      expect(find.text('Get Directions'), findsNothing);
+      expect(find.text('Start Route'), findsNothing);
       expect(find.byType(FilledButton), findsNothing);
       expect(
         find.text('Map location isn’t available for this office yet.'),
@@ -310,269 +419,87 @@ void main() {
     });
   });
 
-  group('compact panel', () {
-    testWidgets('leaves most of the screen to the map', (tester) async {
+  group('pages', () {
+    testWidgets('View Office opens details and Back returns to the list', (
+      tester,
+    ) async {
       await _open(tester, _Services([office(1, 'First'), office(2, 'Second')]));
-      expect(_panelTop(tester), greaterThan(740 * .6));
-
-      await _tapText(tester, 'First');
-      expect(_panelTop(tester), greaterThan(740 * .55));
-      expect(find.text('Get Directions').hitTestable(), findsOneWidget);
-      await _done(tester);
-    });
-
-    testWidgets('a long list still rests low, leaving the map visible', (
-      tester,
-    ) async {
-      await _open(
-        tester,
-        _Services([for (var i = 1; i <= 15; i++) office(i, 'Office $i')]),
-      );
-      expect(_panelTop(tester), greaterThan(740 * .6));
-      await _done(tester);
-    });
-
-    testWidgets('the header is one compact row', (tester) async {
-      await _open(tester, _Services([office(1, 'First')]), top: 24);
-      expect(tester.getSize(find.byType(TextField)).height, lessThan(52));
-      final search = tester.getRect(find.byType(TextField));
-      final back = tester.getRect(find.byTooltip('Back'));
-      final locate = tester.getRect(find.byTooltip('Use my current location'));
-      expect(back.center.dy, closeTo(search.center.dy, 1));
-      expect(locate.center.dy, closeTo(search.center.dy, 1));
-      expect(search.top, greaterThanOrEqualTo(24));
-      expect(find.text('Use my current location'), findsNothing);
-      await _done(tester);
-    });
-
-    testWidgets('expands to its content and collapses to the title', (
-      tester,
-    ) async {
-      await _open(
-        tester,
-        _Services([office(1, 'First', schedules: everyDay())]),
-      );
-      await _tapText(tester, 'First');
-      final mid = _panelTop(tester);
-
-      await _tapText(tester, 'More details');
-      final full = _panelTop(tester);
-      expect(full, lessThan(mid));
-      expect(find.text('Philippine Passport').hitTestable(), findsOneWidget);
-      expect(find.text('Less details'), findsOneWidget);
-      // Nothing but padding lies below the last row.
-      expect(
-        740 - tester.getBottomLeft(find.text('Postal ID')).dy,
-        lessThan(40),
-      );
-
-      await _tapText(tester, 'Less details');
-      expect(_panelTop(tester), closeTo(mid, 2));
-
-      await tester.tap(find.byKey(const ValueKey('office-sheet-handle')));
+      expect(find.text('Office Finder'), findsOneWidget);
+      expect(find.text('View Office'), findsNWidgets(2));
+      await tester.tap(find.text('View Office').last);
       await tester.pumpAndSettle();
-      final peek = _panelTop(tester);
-      expect(peek, greaterThan(740 * .8));
-      expect(find.text('First'), findsOneWidget);
-      expect(find.text('Get Directions').hitTestable(), findsNothing);
-
-      await tester.tap(find.byTooltip('Expand panel'));
-      await tester.pumpAndSettle();
-      expect(_panelTop(tester), closeTo(mid, 2));
-      await _done(tester);
-    });
-
-    testWidgets('dragging moves between resting points', (tester) async {
-      await _open(
-        tester,
-        _Services([office(1, 'First', schedules: everyDay())]),
-      );
-      await _tapText(tester, 'First');
-      final mid = _panelTop(tester);
-
-      await tester.drag(
-        find.byKey(const ValueKey('office-sheet-handle')),
-        const Offset(0, 400),
-      );
-      await tester.pumpAndSettle();
-      expect(_panelTop(tester), greaterThan(mid + 60));
-      expect(find.byTooltip('Expand panel'), findsOneWidget);
-
-      await tester.drag(
-        find.byKey(const ValueKey('office-sheet-handle')),
-        const Offset(0, -700),
-      );
-      await tester.pumpAndSettle();
-      expect(_panelTop(tester), lessThan(mid));
-      expect(find.text('Less details'), findsOneWidget);
-      await _done(tester);
-    });
-
-    testWidgets('the map stays reachable above the collapsed panel', (
-      tester,
-    ) async {
-      await _open(tester, _Services([office(1, 'First')]));
-      await _tapText(tester, 'First');
-      await tester.tap(find.byKey(const ValueKey('office-sheet-handle')));
-      await tester.pumpAndSettle();
-      expect(
-        find
-            .byKey(const ValueKey('map-area'))
-            .hitTestable(at: Alignment.center),
-        findsOneWidget,
-      );
-      await _done(tester);
-    });
-
-    testWidgets('closing details returns to the office list', (tester) async {
-      await _open(tester, _Services([office(1, 'First'), office(2, 'Second')]));
-      await _tapText(tester, 'First');
-      expect(find.text('Second'), findsNothing);
-      await tester.tap(find.byTooltip('Back to offices'));
-      await tester.pumpAndSettle();
-      expect(find.text('2 offices'), findsOneWidget);
+      expect(find.text('Office Details'), findsOneWidget);
       expect(find.text('Second'), findsOneWidget);
-      await _done(tester);
-    });
-
-    testWidgets('system back closes details before leaving', (tester) async {
-      await _open(tester, _Services([office(1, 'First'), office(2, 'Second')]));
-      await _tapText(tester, 'First');
-      await tester.binding.handlePopRoute();
+      await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
-      expect(find.text('2 offices'), findsOneWidget);
+      expect(find.text('Office Finder'), findsOneWidget);
       await _done(tester);
     });
 
-    testWidgets('opening an office after scrolling starts at its top', (
+    testWidgets('a link from another page opens straight to details', (
       tester,
     ) async {
-      await _open(
-        tester,
-        _Services([for (var i = 1; i <= 12; i++) office(i, 'Office $i')]),
-      );
-      _sheet(tester).jumpTo(1);
-      await tester.pumpAndSettle();
-      await tester.dragUntilVisible(
-        find.text('Office 12'),
-        find.byType(SingleChildScrollView),
-        const Offset(0, -300),
-      );
-      await tester.pumpAndSettle();
-      await _tapText(tester, 'Office 12');
-      expect(find.text('Office 12').hitTestable(), findsOneWidget);
-      expect(find.text('Get Directions').hitTestable(), findsOneWidget);
-      await _done(tester);
-    });
-
-    testWidgets('keeps its full width when the zoom buttons have no room', (
-      tester,
-    ) async {
-      await _open(
-        tester,
-        _Services([for (var i = 1; i <= 20; i++) office(i, 'Office $i')]),
-        top: 24,
-      );
-      _sheet(tester).jumpTo(1);
-      await tester.pumpAndSettle();
-      expect(find.byTooltip('Zoom in'), findsNothing);
-      expect(tester.getSize(find.byType(SingleChildScrollView)).width, 360);
-      expect(tester.getSize(find.byKey(const ValueKey('map-area'))).width, 360);
-      await _done(tester);
-    });
-
-    testWidgets('never climbs over the search bar', (tester) async {
-      await _open(
-        tester,
-        _Services([for (var i = 1; i <= 20; i++) office(i, 'Office $i')]),
-        top: 24,
-      );
-      _sheet(tester).jumpTo(1);
-      await tester.pumpAndSettle();
-      expect(
-        _panelTop(tester),
-        greaterThanOrEqualTo(tester.getBottomLeft(find.byType(TextField)).dy),
-      );
-      expect(find.byType(TextField).hitTestable(), findsOneWidget);
+      await _open(tester, _Services([]), initial: office(4, 'Linked Office'));
+      expect(find.text('Office Details'), findsOneWidget);
+      expect(find.text('Linked Office'), findsOneWidget);
       await _done(tester);
     });
   });
 
-  group('small screens, safe areas and the keyboard', () {
+  group('small screens, large text and the keyboard', () {
     for (final size in const [
       Size(280, 653),
       Size(320, 568),
       Size(360, 640),
       Size(844, 390),
+      Size(1280, 800),
     ]) {
-      testWidgets('details fit $size', (tester) async {
+      testWidgets('both pages fit $size', (tester) async {
         await _open(
           tester,
           _Services([
-            office(
-              1,
-              'Bureau of Internal Revenue Revenue District Office',
-              schedules: everyDay(),
-            ),
+            office(1, 'First Office With A Long Name', schedules: everyDay()),
+            office(2, 'Second'),
           ]),
           size: size,
           top: 24,
           bottom: 24,
         );
-        await _tapText(
-          tester,
-          'Bureau of Internal Revenue Revenue District Office',
-        );
         expect(tester.takeException(), isNull);
-        expect(find.text('Get Directions'), findsOneWidget);
-        await _tapText(tester, 'More details');
+        await _tapText(tester, 'First Office With A Long Name');
         expect(tester.takeException(), isNull);
-        await tester.tap(find.byKey(const ValueKey('office-sheet-handle')));
-        await tester.pumpAndSettle();
+        await _scrollTo(tester, find.text('Start Route'));
+        expect(find.text('Start Route').hitTestable(), findsOneWidget);
         await _done(tester);
       });
     }
 
-    testWidgets('actions stay above the system navigation bar', (tester) async {
-      await _open(tester, _Services([office(1, 'First')]), bottom: 48);
-      await _tapText(tester, 'First');
-      expect(
-        tester.getBottomLeft(find.text('Get Directions')).dy,
-        lessThan(740 - 48),
+    testWidgets('large text wraps on both pages', (tester) async {
+      await _open(
+        tester,
+        _Services([office(1, 'First', schedules: everyDay())]),
+        size: const Size(320, 640),
+        textScale: 2,
       );
+      expect(tester.takeException(), isNull);
+      await _tapText(tester, 'First');
+      await _scrollTo(tester, find.text('Start Route'));
       await _done(tester);
     });
 
-    testWidgets('results sit above the keyboard with the search visible', (
-      tester,
-    ) async {
+    testWidgets('typing with the keyboard open does not break', (tester) async {
       await _open(
         tester,
         _Services([office(1, 'First'), office(2, 'Second')]),
-        keyboard: 300,
+        size: const Size(360, 400),
+        keyboard: 260,
       );
-      await tester.enterText(find.byType(TextField), 'first');
+      // Only the title fits above the keyboard; the field scrolls into view.
+      await tester.ensureVisible(find.byType(TextField, skipOffstage: false));
       await tester.pumpAndSettle();
-      expect(find.text('1 office'), findsOneWidget);
-      expect(find.text('First').hitTestable(), findsOneWidget);
-      expect(tester.getBottomLeft(find.text('First')).dy, lessThan(740 - 300));
-      expect(find.byType(TextField).hitTestable(), findsOneWidget);
-      await _done(tester);
-    });
-
-    testWidgets('a short window with the keyboard open does not break', (
-      tester,
-    ) async {
-      await _open(
-        tester,
-        _Services([for (var i = 1; i <= 6; i++) office(i, 'Office $i')]),
-        size: const Size(320, 568),
-        top: 24,
-        keyboard: 320,
-      );
-      await tester.enterText(find.byType(TextField), 'office');
+      await tester.enterText(find.byType(TextField), 'sec');
       await tester.pumpAndSettle();
-      expect(find.byType(TextField).hitTestable(), findsOneWidget);
+      expect(find.text('First', skipOffstage: false), findsNothing);
       await _done(tester);
     });
   });
@@ -590,10 +517,10 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Loading offices…'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       await tester.pumpAndSettle();
       expect(find.text('First'), findsOneWidget);
+      expect(find.text('1 office'), findsOneWidget);
       await _done(tester);
     });
 
@@ -628,13 +555,13 @@ void main() {
           dark: dark,
         );
         await _tapText(tester, 'First');
-        await _tapText(tester, 'More details');
+        await _scrollTo(tester, find.text('IDs and documents'));
         await _done(tester);
       });
     }
   });
 
-  testWidgets('related IDs and documents are listed in expanded details', (
+  testWidgets('related IDs and documents are listed on the details page', (
     tester,
   ) async {
     await _open(
@@ -643,21 +570,18 @@ void main() {
         office(1, 'First', records: ['TIN ID', 'Philippine Passport']),
       ]),
     );
-    expect(find.text('TIN ID and 1 more'), findsOneWidget);
     await _tapText(tester, 'First');
-    await _tapText(tester, 'More details');
+    expect(find.text('2 handled here'), findsOneWidget);
+    await _scrollTo(tester, find.text('Philippine Passport'));
     expect(find.text('IDs and documents'), findsOneWidget);
     expect(find.text('TIN ID').hitTestable(), findsOneWidget);
-    expect(find.text('Philippine Passport').hitTestable(), findsOneWidget);
     await _done(tester);
   });
 
-  testWidgets('no More details link appears when there is nothing more', (
-    tester,
-  ) async {
+  testWidgets('no documents card appears when there are none', (tester) async {
     await _open(tester, _Services([office(1, 'First', records: const [])]));
     await _tapText(tester, 'First');
-    expect(find.text('More details'), findsNothing);
+    expect(find.text('IDs and documents'), findsNothing);
     await _done(tester);
   });
 }

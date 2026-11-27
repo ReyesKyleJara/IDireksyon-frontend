@@ -146,6 +146,28 @@ class OfficeModel {
 
   List<OfficeHoursLine> get weeklyHours => weeklyLines(schedule);
 
+  /// Whether the office is open at [now], in Philippine time, or null when the
+  /// CMS has no real hours for today. Never guesses.
+  OfficeOpenState? openStateAt(DateTime now) {
+    final local = now.toUtc().add(const Duration(hours: 8));
+    final day = schedule[local.weekday % 7];
+    if (day == null) return null;
+    if (day.status == 'closed') return const OfficeOpenState(false);
+    if (day.status != 'open' || day.intervals.isEmpty) return null;
+    final minute = local.hour * 60 + local.minute;
+    for (final (opens, closes) in day.intervals) {
+      if (minute >= opens && minute < closes) {
+        return OfficeOpenState(true, closes - minute);
+      }
+    }
+    return const OfficeOpenState(false);
+  }
+
+  /// Today's hours alone, such as `8:00 AM - 5:00 PM`, or null when unknown.
+  String? todayHours(DateTime now) =>
+      schedule[now.toUtc().add(const Duration(hours: 8)).weekday % 7]
+          ?.displayHours;
+
   /// Tidies CMS typing slips for display; the stored value is left as entered.
   static String _text(dynamic value) => value is String
       ? value
@@ -183,23 +205,53 @@ class OfficeHoursLine {
   String toString() => '$days: $hours';
 }
 
-class OfficeDay {
-  const OfficeDay(this.status, this.hours);
+/// Open or closed right now; [minutesLeft] counts down to closing time.
+class OfficeOpenState {
+  const OfficeOpenState(this.open, [this.minutesLeft]);
 
-  factory OfficeDay.fromJson(Map<dynamic, dynamic> json) =>
-      OfficeDay('${json['status']}', [
-        for (final row
-            in (json['intervals'] as List<dynamic>? ?? []).whereType<Map>())
+  final bool open;
+  final int? minutesLeft;
+}
+
+class OfficeDay {
+  const OfficeDay(this.status, this.hours, [this.intervals = const []]);
+
+  factory OfficeDay.fromJson(Map<dynamic, dynamic> json) {
+    final rows = (json['intervals'] as List<dynamic>? ?? []).whereType<Map>();
+    return OfficeDay(
+      '${json['status']}',
+      [
+        for (final row in rows)
           if ((_clock(row['opens_at']), _clock(row['closes_at'])) case (
             final String opens,
             final String closes,
           ))
             '$opens - $closes',
-      ]);
+      ],
+      [
+        for (final row in rows)
+          if ((_minutes(row['opens_at']), _minutes(row['closes_at']))
+              case (final int opens, final int closes) when closes > opens)
+            (opens, closes),
+      ],
+    );
+  }
 
   /// `open`, `closed` or `unknown`.
   final String status;
   final List<String> hours;
+
+  /// Opening and closing times as minutes after midnight.
+  final List<(int, int)> intervals;
+
+  static int? _minutes(dynamic time) {
+    final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch('$time');
+    if (match == null) return null;
+    final hour = int.parse(match[1]!);
+    final minute = int.parse(match[2]!);
+    if (hour > 24 || minute > 59 || (hour == 24 && minute > 0)) return null;
+    return hour * 60 + minute;
+  }
 
   /// What to show for this day, or null when the CMS has no real information.
   /// A day with no research is never reported as closed.
