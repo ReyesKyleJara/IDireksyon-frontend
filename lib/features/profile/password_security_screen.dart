@@ -24,6 +24,9 @@ class _PasswordSecurityScreenState
   final _newPassword = TextEditingController();
   final _confirmPassword = TextEditingController();
 
+  final _newPasswordFocus = FocusNode();
+  final _confirmPasswordFocus = FocusNode();
+
   bool _hideCurrent = true;
   bool _hideNew = true;
   bool _hideConfirm = true;
@@ -34,6 +37,8 @@ class _PasswordSecurityScreenState
     _currentPassword.dispose();
     _newPassword.dispose();
     _confirmPassword.dispose();
+    _newPasswordFocus.dispose();
+    _confirmPasswordFocus.dispose();
     super.dispose();
   }
 
@@ -173,6 +178,8 @@ class _PasswordSecurityScreenState
                     _passwordField(
                       label: 'Current password',
                       controller: _currentPassword,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _newPasswordFocus.requestFocus(),
                       hidden: _hideCurrent,
                       onVisibilityPressed: () {
                         setState(() {
@@ -211,6 +218,9 @@ class _PasswordSecurityScreenState
                     _passwordField(
                       label: 'New password',
                       controller: _newPassword,
+                      focusNode: _newPasswordFocus,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _confirmPasswordFocus.requestFocus(),
                       hidden: _hideNew,
                       onVisibilityPressed: () {
                         setState(() {
@@ -239,6 +249,9 @@ class _PasswordSecurityScreenState
                     _passwordField(
                       label: 'Confirm new password',
                       controller: _confirmPassword,
+                      focusNode: _confirmPasswordFocus,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _changePassword(),
                       hidden: _hideConfirm,
                       onVisibilityPressed: () {
                         setState(() {
@@ -359,6 +372,9 @@ class _PasswordSecurityScreenState
   Widget _passwordField({
     required String label,
     required TextEditingController controller,
+    FocusNode? focusNode,
+    required TextInputAction textInputAction,
+    required ValueChanged<String> onSubmitted,
     required bool hidden,
     required VoidCallback onVisibilityPressed,
     required String? Function(String?) validator,
@@ -380,7 +396,11 @@ class _PasswordSecurityScreenState
 
         TextFormField(
           controller: controller,
-          enabled: !_saving,
+          focusNode: focusNode,
+          textInputAction: textInputAction,
+          onEditingComplete: () {},
+          onFieldSubmitted: onSubmitted,
+          readOnly: _saving,
           obscureText: hidden,
           enableSuggestions: false,
           autocorrect: false,
@@ -397,17 +417,19 @@ class _PasswordSecurityScreenState
             ),
 
             // SHOW / HIDE PASSWORD
-            suffixIcon: IconButton(
-              onPressed:
-                  _saving ? null : onVisibilityPressed,
-              icon: Icon(
-                hidden
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: colors.onSurfaceVariant,
+            suffixIcon: ExcludeFocusTraversal(
+              child: IconButton(
+                onPressed:
+                    _saving ? null : onVisibilityPressed,
+                icon: Icon(
+                  hidden
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: colors.onSurfaceVariant,
+                ),
+                tooltip:
+                    hidden ? 'Show password' : 'Hide password',
               ),
-              tooltip:
-                  hidden ? 'Show password' : 'Hide password',
             ),
 
             border: OutlineInputBorder(

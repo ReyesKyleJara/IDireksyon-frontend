@@ -86,7 +86,7 @@ class _SignupFormState
   }
 
   void _switchMethod(bool phone) {
-    if (_usePhone == phone) return;
+    if (_submitting || _usePhone == phone) return;
 
     setState(() {
       _usePhone = phone;
@@ -236,6 +236,8 @@ class _SignupFormState
       } else {
         _message(error.message);
       }
+    } catch (_) {
+      if (mounted) _message('Unable to sign up. Please try again.');
     } finally {
       if (mounted) {
         setState(() {
@@ -286,6 +288,7 @@ class _SignupFormState
           TextFormField(
             key: fieldKey,
             controller: controller,
+            readOnly: _submitting,
             obscureText:
                 secret && !showSecret,
             autocorrect: false,
@@ -355,7 +358,7 @@ class _SignupFormState
         selected: selected,
         button: true,
         child: InkWell(
-          onTap: () => _switchMethod(phone),
+          onTap: _submitting ? null : () => _switchMethod(phone),
           borderRadius: BorderRadius.circular(12),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
@@ -625,7 +628,7 @@ class _SignupFormState
                                           semanticLabel:
                                               'Agree to Terms and Privacy Policy',
                                           onChanged:
-                                              (value) {
+                                              _submitting ? null : (value) {
                                             setState(
                                               () {
                                                 _accepted =

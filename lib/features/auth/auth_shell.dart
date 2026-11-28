@@ -100,8 +100,6 @@ class AuthShell extends StatelessWidget {
                       child: const ColoredBox(color: Colors.white),
                     ),
                     SingleChildScrollView(
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           minHeight: constraints.maxHeight,

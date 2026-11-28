@@ -1,4 +1,5 @@
 import 'forgot_password_screen.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
@@ -39,16 +40,6 @@ class _LoginScreenState extends State<LoginScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  bool _isSystemError(String message) {
-    final lower = message.toLowerCase();
-
-    return lower.contains('connect') ||
-        lower.contains('server') ||
-        lower.contains('timed out') ||
-        lower.contains('too many attempts') ||
-        lower.contains('unexpected');
-  }
-
   Future<void> _submit() async {
     if (_submitting) return;
 
@@ -77,31 +68,24 @@ class _LoginScreenState extends State<LoginScreen> {
     } on AuthException catch (error) {
       if (!mounted) return;
 
-      final identifierError = error.fieldErrors['identifier'];
+      final identifierError = error.field('identifier');
+      final passwordError = error.field('password');
 
-      final passwordError = error.fieldErrors['password'];
-
-      if (identifierError != null || passwordError != null) {
-        setState(() {
-          _identifierServerError = identifierError;
-
-          _passwordServerError = passwordError;
-        });
-
-        _formKey.currentState?.validate();
-
-        return;
-      }
-
-      if (_isSystemError(error.message)) {
-        _showMessage(error.message);
-      } else {
-        // Keep login failures generic so we don't
-        // reveal whether an account exists.
+      if (identifierError == 'The provided credentials are incorrect.') {
         setState(() {
           _loginError = 'Incorrect email/mobile number or password.';
         });
+      } else if (identifierError != null || passwordError != null) {
+        setState(() {
+          _identifierServerError = identifierError;
+          _passwordServerError = passwordError;
+        });
+        _formKey.currentState?.validate();
+      } else {
+        _showMessage(error.message);
       }
+    } catch (_) {
+      if (mounted) _showMessage('Unable to log in. Please try again.');
     } finally {
       if (mounted) {
         setState(() {
@@ -140,6 +124,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _identifier,
+                readOnly: _submitting,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 decoration: AuthShell.inputDecoration(
                   'Enter your email or mobile number',
                 ),
@@ -169,6 +155,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _password,
+                readOnly: _submitting,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 obscureText: !_showPassword,
                 enableSuggestions: false,
                 autocorrect: false,
@@ -187,19 +175,23 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: _input,
                 decoration: AuthShell.inputDecoration(
                   'Enter your password',
-                  suffixIcon: IconButton(
-                    tooltip: _showPassword ? 'Hide password' : 'Show password',
-                    onPressed: () {
-                      setState(() {
-                        _showPassword = !_showPassword;
-                      });
-                    },
-                    icon: Icon(
-                      _showPassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      size: 20,
-                      color: const Color(0xFF697386),
+                  suffixIcon: ExcludeFocusTraversal(
+                    child: IconButton(
+                      tooltip: _showPassword
+                          ? 'Hide password'
+                          : 'Show password',
+                      onPressed: () {
+                        setState(() {
+                          _showPassword = !_showPassword;
+                        });
+                      },
+                      icon: Icon(
+                        _showPassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 20,
+                        color: const Color(0xFF697386),
+                      ),
                     ),
                   ),
                 ),
@@ -229,9 +221,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     MaterialPageRoute(
                       builder: (_) => ForgotPasswordScreen(
                         initialEmail:
-                            RegExp(
-                              r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                            ).hasMatch(_identifier.text.trim())
+                            RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                .hasMatch(_identifier.text.trim())
                             ? _identifier.text.trim()
                             : '',
                       ),
@@ -274,9 +265,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   TextButton(
                     onPressed: () {
-                      Navigator.of(
-                        context,
-                      ).pushReplacementNamed('/signup/email');
+                      Navigator.of(context)
+                          .pushReplacementNamed('/signup/email');
                     },
                     style: AuthShell.linkButton,
                     child: const Text('Sign Up'),

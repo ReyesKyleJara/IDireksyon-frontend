@@ -68,6 +68,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         _challengeId,
         _code.text,
       );
+      if (!mounted) return;
       await widget.onVerified(_proof!);
       if (!mounted) return;
       Navigator.of(context)
@@ -78,8 +79,14 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           _error = error.message;
           if (error.fieldErrors.containsKey('email_verification_token')) {
             _proof = null;
+            _code.clear();
+            _error = 'This verification expired. Request a new code.';
           }
         });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Unable to verify. Please try again.');
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -105,8 +112,14 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       if (mounted) {
         setState(() {
           _error = error.message;
-          _resendSeconds = AuthService.instance.signupResendSeconds(widget.email);
+          _resendSeconds = AuthService.instance.signupResendSeconds(
+            widget.email,
+          );
         });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Unable to send a code. Please try again.');
       }
     } finally {
       if (mounted) setState(() => _busy = false);

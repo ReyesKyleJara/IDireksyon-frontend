@@ -179,6 +179,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('keyboard Next reaches each change-password field', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: PasswordSecurityScreen()));
+    final inputs = find.byType(EditableText);
+
+    await tester.enterText(inputs.at(0), 'current password');
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(inputs.at(1)).focusNode.hasFocus, isTrue);
+    tester.testTextInput.enterText('updated password');
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(inputs.at(2)).focusNode.hasFocus, isTrue);
+    expect(tester.widget<EditableText>(inputs.at(1)).controller.text, 'updated password');
+  });
+
   testWidgets('account form scrolls with large text and validates password', (
     tester,
   ) async {
